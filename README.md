@@ -1,1 +1,0 @@
-# SmartRisk Credit
