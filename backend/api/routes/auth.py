@@ -212,6 +212,7 @@ async def verify_otp(body: OTPVerifyBody, db: AsyncSession = Depends(get_db)):
         "email"    : body.email.lower(),
         "plan"     : user.plan,
         "credits"  : user.credits,
+        "role"     : user.role,
     }
 
 

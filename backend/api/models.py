@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Integer, Boolean, Text, DateTime,
+    Integer, Boolean, Text, DateTime, BigInteger,
     ForeignKey, ARRAY, func, UniqueConstraint
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -30,9 +30,11 @@ class Tenant(Base):
     session_ttl     : Mapped[int]           = mapped_column(Integer, default=86400)
     created_at      : Mapped[datetime]      = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    users       : Mapped[List["User"]]       = relationship(back_populates="tenant")
-    otps        : Mapped[List["OTP"]]        = relationship(back_populates="tenant")
-    assessments : Mapped[List["Assessment"]] = relationship(back_populates="tenant")
+    users                : Mapped[List["User"]]               = relationship(back_populates="tenant")
+    otps                 : Mapped[List["OTP"]]                = relationship(back_populates="tenant")
+    assessments          : Mapped[List["Assessment"]]         = relationship(back_populates="tenant")
+    credit_transactions  : Mapped[List["CreditTransaction"]]  = relationship(back_populates="tenant")
+    registrations        : Mapped[List["Registration"]]       = relationship(back_populates="tenant")
 
 
 class User(Base):
@@ -41,14 +43,38 @@ class User(Base):
         UniqueConstraint("email", "tenant_id", name="uq_user_email_tenant"),
     )
 
-    id          : Mapped[int]      = mapped_column(Integer, primary_key=True)
-    email       : Mapped[str]      = mapped_column(Text, nullable=False)
-    tenant_id   : Mapped[int]      = mapped_column(ForeignKey("tenants.id"), nullable=False)
-    plan        : Mapped[str]      = mapped_column(Text, default="free")
-    credits     : Mapped[int]      = mapped_column(Integer, default=0)
-    created_at  : Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    id           : Mapped[int]           = mapped_column(Integer, primary_key=True)
+    email        : Mapped[str]           = mapped_column(Text, nullable=False, index=True)
+    tenant_id    : Mapped[int]           = mapped_column(ForeignKey("tenants.id"), nullable=False)
+    name         : Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    company      : Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    role         : Mapped[str]           = mapped_column(Text, default="user")   # user | admin | superadmin
+    plan         : Mapped[str]           = mapped_column(Text, default="free")   # last pack purchased
+    credits      : Mapped[int]           = mapped_column(Integer, default=0)     # current credit balance
+    verified     : Mapped[bool]          = mapped_column(Boolean, default=False) # email verified
+    created_at   : Mapped[datetime]      = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    tenant      : Mapped["Tenant"] = relationship(back_populates="users")
+    tenant       : Mapped["Tenant"]      = relationship(back_populates="users")
+
+
+class Registration(Base):
+    """
+    Holds pending registrations until email is verified.
+    Credits are only granted after verification.
+    """
+    __tablename__ = "registrations"
+
+    id                  : Mapped[int]           = mapped_column(Integer, primary_key=True)
+    email               : Mapped[str]           = mapped_column(Text, nullable=False, index=True)
+    tenant_id           : Mapped[int]           = mapped_column(ForeignKey("tenants.id"), nullable=False)
+    name                : Mapped[str]           = mapped_column(Text, nullable=False)
+    company             : Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    verification_token  : Mapped[str]           = mapped_column(Text, unique=True, nullable=False)
+    token_expires_at    : Mapped[datetime]      = mapped_column(DateTime(timezone=True), nullable=False)
+    verified            : Mapped[bool]          = mapped_column(Boolean, default=False)
+    created_at          : Mapped[datetime]      = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    tenant              : Mapped["Tenant"]      = relationship(back_populates="registrations")
 
 
 class OTP(Base):
@@ -83,3 +109,28 @@ class Assessment(Base):
     created_at    : Mapped[datetime]      = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     tenant        : Mapped["Tenant"]      = relationship(back_populates="assessments")
+
+
+class CreditTransaction(Base):
+    """
+    Full audit trail of every credit purchase.
+    paystack_reference is UNIQUE — prevents double-crediting on duplicate webhooks.
+    expires_at is 12 months from purchase date.
+    """
+    __tablename__ = "credit_transactions"
+    __table_args__ = (
+        UniqueConstraint("paystack_reference", name="uq_paystack_reference"),
+    )
+
+    id                   : Mapped[int]           = mapped_column(Integer, primary_key=True)
+    user_email           : Mapped[str]           = mapped_column(Text, nullable=False, index=True)
+    tenant_id            : Mapped[int]           = mapped_column(ForeignKey("tenants.id"), nullable=False)
+    pack                 : Mapped[str]           = mapped_column(Text, nullable=False)     # starter | standard | professional | team | free
+    credits_added        : Mapped[int]           = mapped_column(Integer, nullable=False)
+    amount_kobo          : Mapped[int]           = mapped_column(BigInteger, default=0)    # 0 for free credits
+    paystack_reference   : Mapped[Optional[str]] = mapped_column(Text, nullable=True)     # null for free credits
+    status               : Mapped[str]           = mapped_column(Text, default="success") # success | failed | refunded
+    expires_at           : Mapped[datetime]      = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at           : Mapped[datetime]      = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    tenant               : Mapped["Tenant"]      = relationship(back_populates="credit_transactions")

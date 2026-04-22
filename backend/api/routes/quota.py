@@ -7,15 +7,6 @@ from api.models import User
 
 router = APIRouter()
 
-PLAN_LIMITS = {
-    "free"        :  2,
-    "starter"     :  5,
-    "standard"    : 15,
-    "professional": 40,
-    "team"        : 100,
-    "unlimited"   : 9999,
-}
-
 
 @router.get("/status")
 async def quota_status(
@@ -32,12 +23,8 @@ async def quota_status(
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
 
-    limit   = PLAN_LIMITS.get(user.plan, PLAN_LIMITS["free"])
-    allowed = user.credits < limit
-
     return {
-        "plan"   : user.plan,
-        "used"   : user.credits,
-        "limit"  : limit,
-        "allowed": allowed,
+        "plan"    : user.plan,
+        "credits" : user.credits,
+        "allowed" : user.credits > 0,
     }

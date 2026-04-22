@@ -193,6 +193,7 @@ export default function Login() {
         email  : res.data.email,
         plan   : res.data.plan,
         credits: res.data.credits,
+        role   : res.data.role,
       });
       navigate("/", { replace: true });
     } catch (e) {
@@ -411,7 +412,9 @@ export default function Login() {
           )}
 
           <div style={S.footerNote}>
-            Access is restricted to authorised personnel only.<br />
+            Don't have an account?{" "}
+            <a href="/register" style={S.footerLink}>Create one free →</a>
+            <br /><br />
             <a href={`mailto:${tenant?.adminEmail || "info@smartrisksheets.com"}`} style={S.footerLink}>
               Request access
             </a>

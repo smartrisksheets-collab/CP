@@ -3,6 +3,11 @@ import { useAuth } from "./context/AuthContext.jsx";
 import { useTenant } from "./context/TenantContext.jsx";
 import Login from "./pages/Login.jsx";
 import AppPage from "./pages/AppPage.jsx";
+import Register from "./pages/Register.jsx";
+import VerifyEmail from "./pages/VerifyEmail.jsx";
+import Pricing from "./pages/Pricing.jsx";
+import PaymentCallback from "./pages/PaymentCallback.jsx";
+import AdminDashboard from "./pages/AdminDashboard.jsx";
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -48,7 +53,19 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route path="/login"            element={<Login />} />
+        <Route path="/register"         element={<Register />} />
+        <Route path="/verify-email"     element={<VerifyEmail />} />
+        <Route path="/pricing"          element={<Pricing />} />
+        <Route path="/payment/callback" element={<PaymentCallback />} />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/*"
           element={

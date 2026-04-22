@@ -10,6 +10,8 @@ export default defineConfig({
       '/quota'     : 'http://localhost:8000',
       '/tenant'    : 'http://localhost:8000',
       '/health'    : 'http://localhost:8000',
+      '/payments'  : 'http://localhost:8000',
+      '/admin'     : 'http://localhost:8000',
     }
   }
 })

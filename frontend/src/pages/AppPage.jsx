@@ -7,7 +7,9 @@ import ReviewData from "../components/steps/ReviewData.jsx";
 import Scores from "../components/steps/Scores.jsx";
 import Result from "../components/steps/Result.jsx";
 import Dashboard from "../components/Dashboard.jsx";
-import { LogOut, BookOpen, HelpCircle, LayoutDashboard, X } from "lucide-react";
+import { LogOut, BookOpen, LayoutDashboard, X, Zap, Shield } from "lucide-react";
+import { getQuotaStatus } from "../api/client.js";
+import { useNavigate } from "react-router-dom";
 
 const STEPS = ["Upload", "Review Data", "Scores", "Result"];
 
@@ -22,14 +24,13 @@ export default function AppPage() {
   const [scoreResult, setScoreResult] = useState(null);
   const [assessmentId, setAssessmentId] = useState(null);
   const [narrative, setNarrative]     = useState(null);
+  const navigate = useNavigate();
   const [showDash, setShowDash]       = useState(false);
   const [showGuide, setShowGuide]     = useState(false);
   const [quota, setQuota]             = useState(null);
 
   useEffect(() => {
-    import("../api/client.js").then(({ getQuotaStatus }) => {
-      getQuotaStatus().then((res) => setQuota(res.data)).catch(() => {});
-    });
+    getQuotaStatus().then((res) => setQuota(res.data)).catch(() => {});
   }, [scoreResult]); // refresh after every completed assessment
   function startNew() {
     setStep(0);
@@ -67,11 +68,21 @@ export default function AppPage() {
             color: quota.allowed ? "#01b88e" : "#F09595",
             fontWeight:"bold", whiteSpace:"nowrap",
           }}>
-            {quota.used}/{quota.limit} assessments · {quota.plan}
+            {quota.credits} credit{quota.credits !== 1 ? "s" : ""} remaining · {quota.plan}
           </div>
         )}
-        <HdrBtn icon={<LayoutDashboard size={13}/>} label="Dashboard" onClick={() => setShowDash(true)} />
+        <HdrBtn icon={<LayoutDashboard size={13}/>} label="Dashboard"  onClick={() => setShowDash(true)} />
         <HdrBtn icon={<BookOpen size={13}/>}        label="User Guide" onClick={() => setShowGuide(true)} />
+        {quota && (
+          <HdrBtn
+            icon={<Zap size={13}/>}
+            label="Buy Credits"
+            onClick={() => navigate("/pricing")}
+          />
+        )}
+        {["admin","superadmin"].includes(user?.role) && (
+          <HdrBtn icon={<Shield size={13}/>} label="Admin" onClick={() => navigate("/admin")} />
+        )}
         <HdrBtn icon={<LogOut size={13}/>}          label="Sign Out"   onClick={logout} />
       </div>
     </div>

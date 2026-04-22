@@ -16,15 +16,6 @@ from api.report import build_pdf
 
 router = APIRouter()
 
-PLAN_LIMITS = {
-    "free"        :  2,
-    "starter"     :  5,
-    "standard"    : 15,
-    "professional": 40,
-    "team"        : 100,
-    "unlimited"   : 9999,
-}
-
 MAX_PDF_SIZE_MB = 20
 
 
@@ -53,44 +44,41 @@ async def _get_user(email: str, tenant_id: int, db: AsyncSession) -> User:
 
 
 async def _check_quota(user: User) -> None:
-    limit = PLAN_LIMITS.get(user.plan, PLAN_LIMITS["free"])
-    if user.credits >= limit:
+    if user.credits <= 0:
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail={
                 "quotaExceeded": True,
-                "used"         : user.credits,
-                "limit"        : limit,
+                "credits"      : user.credits,
                 "plan"         : user.plan,
-                "message"      : f"Assessment limit reached ({user.credits}/{limit}). Please upgrade your plan.",
+                "message"      : "You have 0 credits remaining. Please purchase a credit pack to continue.",
             },
         )
 
 
-async def _increment_credits(user: User, db: AsyncSession) -> None:
+async def _decrement_credits(user: User, db: AsyncSession) -> None:
     """
-    Atomic increment — prevents race condition from read-then-write.
-    Uses UPDATE with WHERE clause so concurrent requests can't both pass quota.
+    Atomic decrement — WHERE credits > 0 prevents race condition.
+    Two simultaneous requests cannot both pass if only 1 credit remains.
     """
     result = await db.execute(
         update(User)
         .where(and_(
             User.id      == user.id,
-            User.credits  < PLAN_LIMITS.get(user.plan, PLAN_LIMITS["free"]),
+            User.credits  > 0,
         ))
-        .values(credits=User.credits + 1)
+        .values(credits=User.credits - 1)
         .returning(User.credits)
     )
     updated = result.fetchone()
     await db.commit()
 
     if not updated:
-        # Row was not updated — quota was hit by a concurrent request
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail={
                 "quotaExceeded": True,
-                "message"      : "Assessment limit reached. Please upgrade your plan.",
+                "message"      : "You have 0 credits remaining. Please purchase a credit pack to continue.",
             },
         )
 
@@ -188,7 +176,7 @@ async def run_assessment(
         raise HTTPException(status_code=502, detail=str(e))
 
     # Atomic credit increment — handles concurrency
-    await _increment_credits(user, db)
+    await _decrement_credits(user, db)
 
     # Log assessment
     assessment = Assessment(

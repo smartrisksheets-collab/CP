@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import os
 
 from api.db import engine, Base
-from api.routes import auth, assessment, quota, tenant
+from api.routes import auth, assessment, quota, tenant, register, payments, admin
 
 load_dotenv()
 
@@ -24,6 +24,10 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
 
 
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from api.deps import limiter
+
 app = FastAPI(
     title="SmartRisk Credit API",
     version="1.0.0",
@@ -31,6 +35,9 @@ app = FastAPI(
     redoc_url=None,
     lifespan=lifespan,
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -41,9 +48,12 @@ app.add_middleware(
 )
 
 app.include_router(auth.router,       prefix="/auth",       tags=["auth"])
+app.include_router(register.router,   prefix="/auth",       tags=["auth"])
 app.include_router(assessment.router, prefix="/assessment", tags=["assessment"])
 app.include_router(quota.router,      prefix="/quota",      tags=["quota"])
 app.include_router(tenant.router,     prefix="/tenant",     tags=["tenant"])
+app.include_router(payments.router,   prefix="/payments",   tags=["payments"])
+app.include_router(admin.router,      prefix="/admin",      tags=["admin"])
 
 
 @app.get("/health")
