@@ -84,7 +84,7 @@ def _build_ratio_rows(ratios: list) -> str:
     return rows
 
 
-def _build_cp_terms(cp: dict | None) -> str:
+def _build_cp_terms(cp) -> str:
     if not cp:
         return "<p style='color:#888;font-size:9pt;'>No CP terms provided.</p>"
 
