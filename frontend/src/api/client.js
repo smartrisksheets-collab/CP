@@ -1,0 +1,74 @@
+import axios from "axios";
+
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+
+const api = axios.create({
+  baseURL: BASE_URL,
+  headers: { "Content-Type": "application/json" },
+});
+
+// ── Attach JWT to every request ───────────────────────────────
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("sr_token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+// ── Global 401 handler — clear token and reload ───────────────
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem("sr_token");
+      localStorage.removeItem("sr_user");
+      window.location.href = "/login";
+    }
+    return Promise.reject(err);
+  }
+);
+
+
+// ── Auth ──────────────────────────────────────────────────────
+export const requestOTP = (email, hostname, code) =>
+  api.post("/auth/request-otp", { email, hostname, code });
+
+export const verifyOTP = (email, hostname, otp) =>
+  api.post("/auth/verify-otp", { email, hostname, otp });
+
+export const getMe = () =>
+  api.get("/auth/me");
+
+export const logout = () => {
+  localStorage.removeItem("sr_token");
+  localStorage.removeItem("sr_user");
+};
+
+
+// ── Tenant ────────────────────────────────────────────────────
+export const getTenant = (hostname) =>
+  api.get(`/tenant/${hostname}`);
+
+
+// ── Quota ─────────────────────────────────────────────────────
+export const getQuotaStatus = () =>
+  api.get("/quota/status");
+
+
+// ── Assessment ────────────────────────────────────────────────
+export const extractFigures = (formData) =>
+  api.post("/assessment/extract", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+
+export const runAssessment = (figures, clientInfo) =>
+  api.post("/assessment/run", { figures, clientInfo });
+
+export const generateReport = (assessmentId) =>
+  api.post(
+    "/assessment/report",
+    { assessment_id: assessmentId },
+    { responseType: "blob" }
+  );
+
+export const getHistory = () =>
+  api.get("/assessment/history");

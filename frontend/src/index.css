@@ -1,0 +1,25 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --primary      : #1F2854;
+  --primary-hover: #2A3870;
+  --accent       : #01b88e;
+  --accent-hover : #019B78;
+  --accent-rgb   : 1,184,142;
+  --bg           : #F5F5F2;
+  --text         : #1F2854;
+  --muted        : #888;
+  --border       : #E8E8E8;
+  --white        : #ffffff;
+  --error        : #A32D2D;
+  --error-bg     : #FCEBEB;
+  --success      : #27500A;
+  --success-bg   : #EAF3DE;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
