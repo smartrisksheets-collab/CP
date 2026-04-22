@@ -9,7 +9,7 @@ load_dotenv()
 
 TENANTS = [
     {
-        "hostname"       : "score.smartrisksheets.com",
+        "hostname"       : "scores.smartrisksheets.com",
         "client_name"    : "SmartRisk Sheets",
         "logo_url"       : "https://smartrisksheets.com/wp-content/uploads/2025/07/SmartRisk-Sheets-Logo.png",
         "primary_color"  : "#1F2854",
