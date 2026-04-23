@@ -239,37 +239,6 @@ async def generate_report(
     )
 
 
-# ── GET /assessment/{id} ─────────────────────────────────────
-@router.get("/{assessment_id}")
-async def get_assessment(
-    assessment_id: int,
-    current_user : dict         = Depends(get_current_user),
-    db           : AsyncSession = Depends(get_db),
-):
-    result = await db.execute(
-        select(Assessment).where(and_(
-            Assessment.id         == assessment_id,
-            Assessment.user_email == current_user["email"],
-            Assessment.tenant_id  == current_user["tenant_id"],
-        ))
-    )
-    a = result.scalar_one_or_none()
-    if not a:
-        raise HTTPException(status_code=404, detail="Assessment not found.")
-
-    return {
-        "id"          : a.id,
-        "clientName"  : a.client_name,
-        "creditRating": a.credit_rating,
-        "totalScore"  : a.total_score,
-        "maxScore"    : a.max_score or 56,
-        "eligible"    : a.eligible,
-        "ratios"      : a.ratios,
-        "narrative"   : a.narrative,
-        "createdAt"   : a.created_at.isoformat(),
-    }
-
-
 # ── PATCH /assessment/{id}/narrative ─────────────────────────
 class NarrativeUpdateBody(BaseModel):
     narrative: dict
@@ -325,3 +294,34 @@ async def history(
         }
         for r in rows
     ]
+
+
+# ── GET /assessment/{id} ─────────────────────────────────────
+@router.get("/{assessment_id}")
+async def get_assessment(
+    assessment_id: int,
+    current_user : dict         = Depends(get_current_user),
+    db           : AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Assessment).where(and_(
+            Assessment.id         == assessment_id,
+            Assessment.user_email == current_user["email"],
+            Assessment.tenant_id  == current_user["tenant_id"],
+        ))
+    )
+    a = result.scalar_one_or_none()
+    if not a:
+        raise HTTPException(status_code=404, detail="Assessment not found.")
+
+    return {
+        "id"          : a.id,
+        "clientName"  : a.client_name,
+        "creditRating": a.credit_rating,
+        "totalScore"  : a.total_score,
+        "maxScore"    : a.max_score or 56,
+        "eligible"    : a.eligible,
+        "ratios"      : a.ratios,
+        "narrative"   : a.narrative,
+        "createdAt"   : a.created_at.isoformat(),
+    }
