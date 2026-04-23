@@ -116,11 +116,24 @@ async def request_otp(body: OTPRequestBody, db: AsyncSession = Depends(get_db)):
         if not body.code or body.code.strip().upper() != tenant.access_code.upper():
             raise HTTPException(status_code=403, detail="Invalid access code.")
 
-    # 3. Check email is on allowlist
-    if not _is_allowed(tenant, body.email):
+    # 3. Check user exists and is verified
+    result = await db.execute(
+        select(User).where(and_(
+            User.email     == body.email.lower(),
+            User.tenant_id == tenant.id,
+        ))
+    )
+    existing_user = result.scalar_one_or_none()
+
+    if not existing_user:
         raise HTTPException(
             status_code=403,
-            detail=f"This email is not authorised. Contact {tenant.admin_email} to request access.",
+            detail="No account found for this email. Please register first.",
+        )
+    if not existing_user.verified:
+        raise HTTPException(
+            status_code=403,
+            detail="Your email is not yet verified. Please check your inbox for the verification link.",
         )
 
     # 4. Invalidate any existing unused OTPs for this email + tenant
