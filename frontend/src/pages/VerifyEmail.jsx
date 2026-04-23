@@ -12,13 +12,13 @@ export default function VerifyEmail() {
   const { tenant }     = useTenant();
   const token          = searchParams.get("token");
 
-  const [status, setStatus]   = useState("loading");
+  const [status, setStatus]   = useState("pending");
   const [message, setMessage] = useState("");
 
-  useEffect(() => {
+  async function handleActivate() {
     if (!token) { setStatus("error"); setMessage("Invalid verification link."); return; }
-
-    axios.get(`${BASE_URL}/auth/verify-email`, { params: { token } })
+    setStatus("loading");
+    axios.post(`${BASE_URL}/auth/verify-email`, { token })
       .then((res) => {
         setStatus("success");
         setMessage(res.data.message || "Email verified successfully.");
@@ -28,7 +28,7 @@ export default function VerifyEmail() {
         setStatus("error");
         setMessage(e.response?.data?.detail || "Verification failed. The link may have expired.");
       });
-  }, [token]);
+  }
 
   return (
     <div style={{ minHeight:"100vh", background:"var(--primary)", display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
@@ -38,7 +38,20 @@ export default function VerifyEmail() {
                style={{ height:36, objectFit:"contain", display:"block", margin:"0 auto 24px" }} />
         )}
 
-        {status === "loading" && (
+        {status === "pending" && (
+          <>
+            <div style={{ fontSize:48, marginBottom:16 }}>📬</div>
+            <h2 style={{ fontSize:20, fontWeight:"bold", color:"var(--primary)", marginBottom:8 }}>Activate Your Account</h2>
+            <p style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.65, marginBottom:24 }}>
+              Click below to verify your email and activate your account.
+            </p>
+            <button onClick={handleActivate}
+              style={{ padding:"12px 28px", background:"var(--primary)", color:"#fff", borderRadius:8, fontSize:14, fontWeight:600, border:"none", cursor:"pointer" }}>
+              Activate Account →
+            </button>
+          </>
+        )}
+          {status === "loading" && (
           <>
             <Loader size={40} style={{ animation:"spin 0.8s linear infinite", color:"var(--accent)", display:"block", margin:"0 auto 16px" }} />
             <h2 style={{ fontSize:18, fontWeight:"bold", color:"var(--primary)", marginBottom:8 }}>Verifying your email...</h2>

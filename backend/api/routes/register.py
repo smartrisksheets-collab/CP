@@ -166,8 +166,12 @@ async def register(
 
 
 # ── GET /auth/verify-email ────────────────────────────────────
-@router.get("/verify-email")
-async def verify_email(token: str, db: AsyncSession = Depends(get_db)):
+class VerifyEmailBody(BaseModel):
+    token: str
+
+@router.post("/verify-email")
+async def verify_email(body: VerifyEmailBody, db: AsyncSession = Depends(get_db)):
+    token = body.token
     # Find registration by token
     result = await db.execute(
         select(Registration).where(
@@ -183,7 +187,10 @@ async def verify_email(token: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Invalid or already used verification link.")
 
     # Check expiry
-    if datetime.now(timezone.utc) > reg.token_expires_at.replace(tzinfo=timezone.utc):
+    expires = reg.token_expires_at
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) > expires:
         raise HTTPException(status_code=400, detail="Verification link has expired. Please register again.")
 
     # Mark registration verified
