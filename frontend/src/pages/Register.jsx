@@ -40,13 +40,17 @@ export default function Register() {
     setLoading(true);
     setGlobalErr("");
     try {
-      await axios.post(`${BASE_URL}/auth/register`, {
+      const res = await axios.post(`${BASE_URL}/auth/register`, {
         name    : form.name.trim(),
         email   : form.email.trim().toLowerCase(),
         company : form.company.trim() || null,
         hostname,
       });
-      setDone(true);
+      if (res.data.already_verified) {
+        setGlobalErr("This email is already registered. Please sign in instead.");
+      } else {
+        setDone(true);
+      }
     } catch (e) {
       const detail = e.response?.data?.detail;
       setGlobalErr(typeof detail === "string" ? detail : "Registration failed. Please try again.");

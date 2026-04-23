@@ -122,10 +122,13 @@ async def register(
     SUCCESS_MSG = {"ok": True, "message": f"Verification email sent to {email}. Check your inbox."}
 
     if existing_user and existing_user.verified:
-        # Already registered — send to login silently, don't reveal account exists
-        return SUCCESS_MSG
+        return {
+            "ok"     : True,
+            "already_verified": True,
+            "message": "This email is already registered and verified. Please sign in instead.",
+        }
 
-    # Invalidate any existing pending registrations
+    # Find existing pending registration
     result = await db.execute(
         select(Registration).where(and_(
             Registration.email     == email,
@@ -133,22 +136,27 @@ async def register(
             Registration.verified  == False,
         ))
     )
-    for old in result.scalars().all():
-        old.verified = True  # invalidate old token
-    await db.commit()
+    existing_reg = result.scalar_one_or_none()
 
-    # Create new pending registration
     token      = secrets.token_urlsafe(48)
     expires_at = datetime.now(timezone.utc) + timedelta(hours=VERIFICATION_EXPIRY)
 
-    db.add(Registration(
-        email              = email,
-        tenant_id          = tenant.id,
-        name               = body.name.strip(),
-        company            = body.company.strip() if body.company else None,
-        verification_token = token,
-        token_expires_at   = expires_at,
-    ))
+    if existing_reg:
+        # Update existing record — no duplicate rows
+        existing_reg.verification_token = token
+        existing_reg.token_expires_at   = expires_at
+        existing_reg.name               = body.name.strip()
+        existing_reg.company            = body.company.strip() if body.company else None
+    else:
+        db.add(Registration(
+            email              = email,
+            tenant_id          = tenant.id,
+            name               = body.name.strip(),
+            company            = body.company.strip() if body.company else None,
+            verification_token = token,
+            token_expires_at   = expires_at,
+        ))
+
     await db.commit()
 
     # Send verification email
