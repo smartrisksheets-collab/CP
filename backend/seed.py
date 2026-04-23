@@ -20,7 +20,7 @@ TENANTS = [
         "login_eyebrow"  : "Analyst Portal",
         "login_subtext"  : "Sign in to access SmartRisk Credit — AI-powered credit risk assessment.",
         "admin_email"    : "info@smartrisksheets.com",
-        "access_code"    : "SRCR26",
+        "access_code"    : None,
         "allowed_emails" : [
             "smartrisksheets@gmail.com",
             "chineduozulumba@yahoo.com",
