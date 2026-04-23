@@ -11,7 +11,7 @@ TENANTS = [
     {
         "hostname"       : "scores.smartrisksheets.com",
         "client_name"    : "SmartRisk Sheets",
-        "logo_url"       : "https://smartrisksheets.com/wp-content/uploads/2025/07/SmartRisk-Sheets-Logo.png",
+        "logo_url"       : "http://smartrisksheets.com/wp-content/uploads/2025/09/cropped-Smartrisksheets-favicon-v2.png",
         "primary_color"  : "#1F2854",
         "primary_hover"  : "#2A3870",
         "accent_color"   : "#01b88e",

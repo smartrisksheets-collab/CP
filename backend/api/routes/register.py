@@ -58,7 +58,10 @@ def _validate_email(email: str) -> str:
 
 
 async def _send_verification_email(email: str, name: str, token: str, tenant_name: str, hostname: str):
-    verify_url = f"https://{hostname}/verify-email?token={token}"
+    is_local   = hostname in ("localhost", "127.0.0.1")
+    scheme     = "http" if is_local else "https"
+    port_str   = ":5173" if is_local else ""
+    verify_url = f"{scheme}://{hostname}{port_str}/verify-email?token={token}"
     resend.api_key = os.getenv("RESEND_API_KEY")
     try:
         resend.Emails.send({

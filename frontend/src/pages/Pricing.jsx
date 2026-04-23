@@ -88,7 +88,7 @@ export default function Pricing() {
       </div>
 
       <div style={css.hero}>
-        <h1 style={{ fontSize:32, fontWeight:700, color:"var(--primary)", marginBottom:8, fontFamily:"Georgia, serif" }}>
+        <h1 style={{ fontSize:32, fontWeight:700, color:"var(--primary)", marginBottom:8, fontFamily:"'Playfair Display', serif" }}>
           Buy Assessment Credits
         </h1>
         <p style={{ fontSize:15, color:"#5A5A5A", maxWidth:520, margin:"0 auto" }}>

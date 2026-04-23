@@ -7,7 +7,7 @@ import ReviewData from "../components/steps/ReviewData.jsx";
 import Scores from "../components/steps/Scores.jsx";
 import Result from "../components/steps/Result.jsx";
 import Dashboard from "../components/Dashboard.jsx";
-import { LogOut, BookOpen, LayoutDashboard, X, Zap, Shield } from "lucide-react";
+import { LogOut, BookOpen, LayoutDashboard, X, Zap, Shield, MessageCircle, ChevronDown, User } from "lucide-react";
 import { getQuotaStatus } from "../api/client.js";
 import { useNavigate } from "react-router-dom";
 
@@ -27,6 +27,11 @@ export default function AppPage() {
   const navigate = useNavigate();
   const [showDash, setShowDash]       = useState(false);
   const [showGuide, setShowGuide]     = useState(false);
+  const [showFaq, setShowFaq]         = useState(false);
+  const [legalModal, setLegalModal]   = useState(null);
+  const [quotaMsg, setQuotaMsg]       = useState(null);
+  const [mobileMenu, setMobileMenu]   = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const [quota, setQuota]             = useState(null);
 
   useEffect(() => {
@@ -45,18 +50,18 @@ export default function AppPage() {
   // ── Header ───────────────────────────────────────────────
   const header = (
     <div style={{
-      background:"var(--primary)", padding:"10px 24px",
+      background:"var(--primary)", padding:"12px 24px",
       display:"flex", alignItems:"center", justifyContent:"space-between",
       position:"sticky", top:0, zIndex:100,
     }}>
       <div style={{ display:"flex", alignItems:"center", gap:12 }}>
         {tenant?.logoUrl && (
           <img src={tenant.logoUrl} alt={tenant.clientName}
-               style={{ height:32, width:"auto", objectFit:"contain" }} />
+               style={{ width:36, height:36, borderRadius:6, objectFit:"contain", flexShrink:0 }} />
         )}
         <div>
-          <div style={{ color:"var(--accent)", fontSize:15, fontWeight:"bold" }}>SmartRisk Credit</div>
-          <div style={{ color:"#999", fontSize:11 }}>CP &amp; Promissory Note Assessment</div>
+          <div style={{ color:"var(--accent)", fontSize:16, fontWeight:"bold", letterSpacing:"0.03em" }}>SmartRisk Credit</div>
+          <div style={{ color:"#999", fontSize:12 }}>CP &amp; Promissory Note Assessment</div>
         </div>
       </div>
       <div style={{ display:"flex", alignItems:"center", gap:8 }}>
@@ -71,24 +76,98 @@ export default function AppPage() {
             {quota.credits} credit{quota.credits !== 1 ? "s" : ""} remaining · {quota.plan}
           </div>
         )}
-        <HdrBtn icon={<LayoutDashboard size={13}/>} label="Dashboard"  onClick={() => setShowDash(true)} />
-        <HdrBtn icon={<BookOpen size={13}/>}        label="User Guide" onClick={() => setShowGuide(true)} />
-        {quota && (
-          <HdrBtn
-            icon={<Zap size={13}/>}
-            label="Buy Credits"
-            onClick={() => navigate("/pricing")}
-          />
-        )}
-        {["admin","superadmin"].includes(user?.role) && (
-          <HdrBtn icon={<Shield size={13}/>} label="Admin" onClick={() => navigate("/admin")} />
-        )}
-        <HdrBtn icon={<LogOut size={13}/>}          label="Sign Out"   onClick={logout} />
+        <span className="sr-hdr-btn"><HdrBtn icon={<LayoutDashboard size={13}/>} label="Dashboard" onClick={() => setShowDash(true)} /></span>
+        <button onClick={() => setMobileMenu(v => !v)}
+          className="sr-hamburger"
+          aria-label="Menu"
+          style={{ display:"none", flexDirection:"column", justifyContent:"center", gap:5, cursor:"pointer", padding:4, background:"none", border:"none" }}>
+          <span style={{ display:"block", width:22, height:2, background:"#fff", borderRadius:2, transition:"all 0.25s", transform: mobileMenu ? "translateY(7px) rotate(45deg)" : "none" }} />
+          <span style={{ display:"block", width:22, height:2, background:"#fff", borderRadius:2, transition:"all 0.25s", opacity: mobileMenu ? 0 : 1 }} />
+          <span style={{ display:"block", width:22, height:2, background:"#fff", borderRadius:2, transition:"all 0.25s", transform: mobileMenu ? "translateY(-7px) rotate(-45deg)" : "none" }} />
+        </button>
+
+        {/* User dropdown */}
+        <div style={{ position:"relative" }}>
+          <button
+            onClick={() => setShowUserMenu(v => !v)}
+            style={{
+              background:"none", border:"1px solid #3a4a7a", color:"#ccc",
+              fontSize:11, padding:"5px 10px", borderRadius:5, cursor:"pointer",
+              display:"flex", alignItems:"center", gap:5, fontFamily:"Arial,sans-serif",
+            }}
+          >
+            <User size={13} />
+            {user?.email?.split("@")[0]}
+            <ChevronDown size={11} style={{ opacity:0.6 }} />
+          </button>
+
+          {showUserMenu && (
+            <>
+              {/* backdrop */}
+              <div onClick={() => setShowUserMenu(false)}
+                   style={{ position:"fixed", inset:0, zIndex:199 }} />
+              <div style={{
+                position:"absolute", top:"calc(100% + 6px)", right:0,
+                background:"#1a2347", border:"1px solid #2e3f6e",
+                borderRadius:8, minWidth:160, zIndex:200,
+                boxShadow:"0 8px 24px rgba(0,0,0,0.4)",
+                overflow:"hidden",
+              }}>
+                <div style={{ padding:"10px 12px", borderBottom:"1px solid #2e3f6e" }}>
+                  <div style={{ fontSize:11, color:"#aaa" }}>{user?.email}</div>
+                  {quota && (
+                    <div style={{ fontSize:11, marginTop:3, color:"var(--accent)", fontWeight:600 }}>
+                      {quota.plan} Plan · {quota.credits} credit{quota.credits !== 1 ? "s" : ""}
+                    </div>
+                  )}
+                </div>
+                <DropItem icon={<BookOpen size={13}/>}      label="User Guide" onClick={() => { setShowUserMenu(false); setShowGuide(true); }} />
+                <DropItem icon={<MessageCircle size={13}/>} label="FAQ"        onClick={() => { setShowUserMenu(false); setShowFaq(true); }} />
+                <div style={{ borderTop:"1px solid #2e3f6e", margin:"4px 0" }} />
+                <DropItem icon={<Zap size={13}/>}           label="Buy Credits" onClick={() => { setShowUserMenu(false); navigate("/pricing"); }} />
+                {["admin","superadmin"].includes(user?.role) && (
+                  <DropItem icon={<Shield size={13}/>}  label="Admin Panel" onClick={() => { setShowUserMenu(false); navigate("/admin"); }} />
+                )}
+                <div style={{ borderTop:"1px solid #2e3f6e", margin:"4px 0" }} />
+                <DropItem icon={<LogOut size={13}/>}    label="Sign Out"    onClick={logout} danger />
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
 
   // ── Stepper ──────────────────────────────────────────────
+  const mobileMenuEl = !extracting && mobileMenu && (
+    <div style={{ background:"var(--primary)", borderTop:"1px solid #2a3870" }}>
+      {STEPS.map((label, i) => {
+        const active = i === step;
+        const done   = i < step;
+        return (
+          <div key={i} style={{
+            display:"flex", alignItems:"center", gap:12,
+            padding:"14px 24px", fontSize:14,
+            color: active ? "var(--accent)" : done ? "#1E7E34" : "#888",
+            fontWeight: active ? "bold" : "normal",
+            borderBottom:"1px solid #2a3870",
+          }}>
+            <span style={{
+              width:24, height:24, borderRadius:"50%", flexShrink:0,
+              display:"flex", alignItems:"center", justifyContent:"center",
+              fontSize:11, fontWeight:"bold",
+              background: active ? "var(--accent)" : done ? "#1E7E34" : "#2a3870",
+              color: active || done ? "#fff" : "#888",
+            }}>
+              {done ? "✓" : i + 1}
+            </span>
+            {label}
+          </div>
+        );
+      })}
+    </div>
+  );
+
   const stepper = !extracting && (
     <div style={{
       display:"flex", background:"#fff",
@@ -166,6 +245,7 @@ export default function AppPage() {
         figures={figures}
         scoreResult={scoreResult}
         onScored={setScoreResult}
+        onQuotaExceeded={(msg) => setQuotaMsg(msg)}
         onBack={() => setStep(1)}
         onNext={(result, id, narr) => {
           setScoreResult(result);
@@ -191,8 +271,16 @@ export default function AppPage() {
 
   return (
     <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", paddingBottom:40 }}>
+      <style>{`
+        @media (max-width: 640px) {
+          .sr-hamburger { display: flex !important; }
+          .sr-stepper   { display: none !important; }
+          .sr-hdr-btn   { display: none !important; }
+        }
+      `}</style>
       {header}
-      {stepper}
+      {mobileMenuEl}
+      <div className="sr-stepper">{stepper}</div>
       <div style={{ maxWidth:960, margin:"0 auto", width:"100%", padding:"24px 24px 0" }}>
         {content}
       </div>
@@ -201,11 +289,50 @@ export default function AppPage() {
       <div style={{
         background:"var(--primary)", color:"#999", fontSize:11,
         padding:"10px 24px", position:"fixed", bottom:0, left:0, right:0,
-        display:"flex", alignItems:"center", justifyContent:"space-between",
+        display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:6,
       }}>
-        <span>SmartRisk Sheets Technologies Limited (RC: 9170218)</span>
-        <span style={{ color:"var(--accent)" }}>{user?.email}</span>
+        <div style={{ display:"flex", alignItems:"center", gap:16 }}>
+          <span>Powered by <span style={{ color:"var(--accent)" }}>SmartRisk Sheets Technologies Limited</span></span>
+        </div>
+        <div style={{ display:"flex", alignItems:"center", gap:16 }}>
+          {[["Privacy","lm-privacy"],["Terms","lm-terms"],["Disclaimer","lm-disclaimer"],["Legal Notice","lm-legal"]].map(([label, id]) => (
+            <button key={id} onClick={() => setLegalModal(id)}
+              style={{ background:"none", border:"none", color:"#999", fontSize:11, cursor:"pointer", padding:0, textDecoration:"none" }}
+              onMouseEnter={e => e.target.style.color="#ccc"} onMouseLeave={e => e.target.style.color="#999"}>
+              {label}
+            </button>
+          ))}
+          <a href="mailto:info@smartrisksheets.com" style={{ color:"#999", textDecoration:"none" }}
+             onMouseEnter={e => e.target.style.color="#ccc"} onMouseLeave={e => e.target.style.color="#999"}>Contact</a>
+          <span style={{ color:"var(--accent)" }}>{user?.email}</span>
+        </div>
       </div>
+
+      {/* Legal modals */}
+      {legalModal && <LegalModal id={legalModal} onClose={() => setLegalModal(null)} />}
+
+      {/* Quota modal */}
+      {quotaMsg && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <div style={{ background:"#fff", borderRadius:10, padding:"28px 28px 22px", maxWidth:420, width:"90%", boxShadow:"0 8px 32px rgba(0,0,0,0.2)" }}>
+            <div style={{ marginBottom:12 }}>
+              <Zap size={28} color="var(--accent)" strokeWidth={1.75} />
+            </div>
+            <div style={{ fontSize:15, fontWeight:"bold", color:"var(--primary)", marginBottom:8 }}>Monthly Limit Reached</div>
+            <div style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.65, marginBottom:20 }}>{quotaMsg} Purchase credits to continue.</div>
+            <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+              <button onClick={() => setQuotaMsg(null)}
+                style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"var(--primary)", fontFamily:"Arial,sans-serif" }}>
+                Close
+              </button>
+              <button onClick={() => { setQuotaMsg(null); navigate("/pricing"); }}
+                style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"none", background:"var(--accent)", color:"#fff", fontFamily:"Arial,sans-serif", fontWeight:600 }}>
+                Buy Credits
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Dashboard modal */}
       {showDash && (
@@ -220,7 +347,30 @@ export default function AppPage() {
           <UserGuide />
         </Modal>
       )}
+
+      {/* FAQ modal */}
+      {showFaq && (
+        <Modal onClose={() => setShowFaq(false)} title="Frequently Asked Questions">
+          <FaqContent />
+        </Modal>
+      )}
     </div>
+  );
+}
+
+function DropItem({ icon, label, onClick, danger }) {
+  return (
+    <button onClick={onClick} style={{
+      display:"flex", alignItems:"center", gap:8, width:"100%",
+      padding:"9px 14px", background:"none", border:"none",
+      color: danger ? "#f87171" : "#ccc", fontSize:12,
+      cursor:"pointer", textAlign:"left", fontFamily:"Arial,sans-serif",
+    }}
+    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.06)"}
+    onMouseLeave={e => e.currentTarget.style.background = "none"}
+    >
+      {icon}{label}
+    </button>
   );
 }
 
@@ -260,6 +410,104 @@ function Modal({ onClose, title, children }) {
   );
 }
 
+const LEGAL = {
+  "lm-privacy": {
+    title: "Privacy Policy", date: "April 2026",
+    body: [
+      ["1. Who we are", "SmartRisk Sheets Technologies Limited ('SmartRisk', 'we', 'our') operates the SmartRisk Credit platform at score.smartrisksheets.com."],
+      ["2. What we collect", "We collect your email address at login to verify authorised access. We do not collect payment card details (handled by Paystack). We do not collect the contents of uploaded financial documents beyond the active session."],
+      ["3. How we use it", "Your email is used solely to manage access to the platform. Assessment results (client name, scores) are logged to a secure record for your organisation. We do not sell, rent, or share your data with third parties."],
+      ["4. Data retention", "Uploaded financial documents are not stored beyond your active session. Email addresses are retained for as long as your account is active. You may request deletion at any time."],
+      ["5. Security", "Data in transit is encrypted via HTTPS/TLS. Access to backend systems is restricted to authorised personnel only."],
+      ["6. Your rights", "You have the right to access, correct, or request deletion of your personal data at any time. Email support@smartrisksheets.com with the subject line \"Data Request.\" We will respond within 10 working days."],
+      ["7. Cookies", "We use essential session cookies only — no tracking, no advertising, no third-party cookies."],
+      ["8. Contact", "General enquiries: info@smartrisksheets.com\nData deletion or complaints: support@smartrisksheets.com"],
+    ]
+  },
+  "lm-terms": {
+    title: "Terms of Use", date: "April 2026",
+    body: [
+      ["1. Acceptance", "By using SmartRisk Credit you agree to these terms. If you do not agree, discontinue use immediately."],
+      ["2. Nature of the service", "SmartRisk Credit is an AI-assisted quantitative credit risk scoring tool designed for Nigerian capital markets professionals. It is intended to support — not replace — professional credit analysis and judgment."],
+      ["3. Not financial advice", "All scores, ratios, narratives, and PDF reports generated by this tool are for informational and internal reference purposes only. They do not constitute financial advice, investment recommendations, or a substitute for regulated credit analysis. SmartRisk Sheets Technologies Limited accepts no liability for any decision made on the basis of outputs from this tool."],
+      ["4. Intellectual property", "The SmartRisk Credit scoring model, benchmarks, weighting methodology, and report templates are proprietary to SmartRisk Sheets Technologies Limited. You may not reproduce, reverse-engineer, or redistribute any part of the scoring engine."],
+      ["5. Dispute resolution", "Contact support@smartrisksheets.com with subject \"Formal Complaint.\" We acknowledge within 5 working days and aim to resolve within 30 days."],
+      ["6. Governing law", "These terms are governed by the laws of the Federal Republic of Nigeria."],
+    ]
+  },
+  "lm-disclaimer": {
+    title: "Disclaimer", date: "April 2026",
+    body: [
+      ["", "SmartRisk Credit generates quantitative credit risk scores based on financial data extracted from uploaded documents. The outputs of this tool — including scores, ratio analyses, narratives, and PDF reports — are for internal reference and decision support only."],
+      ["", "These outputs do not constitute a credit rating, financial advice, or an investment recommendation. They should not be relied upon as the sole basis for any investment, lending, or credit decision."],
+      ["", "SmartRisk Sheets Technologies Limited makes no representation or warranty, express or implied, as to the accuracy, completeness, or fitness for purpose of any output generated by this tool. The company shall not be liable for any loss or damage — direct, indirect, or consequential — arising from reliance on any output produced by SmartRisk Credit."],
+      ["", "Users are responsible for independently verifying all extracted figures against source financial statements before relying on any assessment output."],
+    ]
+  },
+  "lm-legal": {
+    title: "Legal Notice", date: "April 2026",
+    body: [
+      ["1. Company identity", "SmartRisk Sheets Technologies Limited is the legal entity responsible for operating the SmartRisk Credit platform at score.smartrisksheets.com."],
+      ["2. Registered details", "SmartRisk Sheets Technologies Limited is incorporated in the Federal Republic of Nigeria under the Companies and Allied Matters Act (CAMA). RC Number: 9170218."],
+      ["3. Platform ownership", "All content on this platform — including scoring methodology, report templates, ratio benchmarks, and software — is owned by or licensed to SmartRisk Sheets Technologies Limited. Unauthorised reproduction or distribution is prohibited."],
+      ["4. Regulatory status", "SmartRisk Credit is a technology tool providing quantitative financial analysis for internal use by capital markets professionals. It is not a licensed credit rating agency and does not provide regulated financial advice under Nigerian law."],
+      ["5. Governing law", "This Legal Notice and all matters relating to this platform are governed by the laws of the Federal Republic of Nigeria."],
+      ["6. Contact", "General enquiries: info@smartrisksheets.com\nComplaints & data requests: support@smartrisksheets.com"],
+    ]
+  },
+};
+
+function LegalModal({ id, onClose }) {
+  const doc = LEGAL[id];
+  if (!doc) return null;
+  return (
+    <div onClick={(e) => e.target === e.currentTarget && onClose()}
+         style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:99999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+      <div style={{ background:"#fff", borderRadius:12, maxWidth:640, width:"100%", maxHeight:"80vh", overflowY:"auto", padding:"36px 40px", position:"relative", boxShadow:"0 24px 80px rgba(0,0,0,0.25)" }}>
+        <button onClick={onClose} style={{ position:"absolute", top:14, right:18, background:"none", border:"none", fontSize:22, cursor:"pointer", color:"#888", lineHeight:1 }}>
+          <X size={18} />
+        </button>
+        <h2 style={{ fontSize:20, fontWeight:"bold", color:"var(--primary)", marginBottom:6 }}>{doc.title}</h2>
+        <div style={{ fontSize:12, color:"#888", marginBottom:22 }}>Last updated: {doc.date}</div>
+        {doc.body.map(([heading, text], i) => (
+          <div key={i}>
+            {heading && <h3 style={{ fontSize:14, fontWeight:"bold", color:"var(--primary)", margin:"18px 0 6px" }}>{heading}</h3>}
+            <p style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.75, marginBottom:10, whiteSpace:"pre-line" }}>{text}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FaqContent() {
+  const faqs = [
+    ["What does SmartRisk Credit actually do?", "SmartRisk Credit is an AI-assisted credit risk scoring tool for Nigerian capital markets professionals. You upload a company's audited financial statements, the AI extracts the key figures, and the tool computes 10 standardised ratios to produce a total score out of 56. A score of 34 or above (60%) indicates the issuer is eligible for a CP or promissory note investment."],
+    ["Is the score a formal credit rating?", "No. The SmartRisk Credit score is a quantitative decision-support tool for internal use only. It is not a regulated credit rating and does not replace the opinion of a licensed credit rating agency such as Agusto & Co., GCR Ratings, or DataPro."],
+    ["What financial statements should I upload?", "Upload the most recent audited annual financial statements for the issuing entity — not the group. The document should include the Statement of Comprehensive Income, Statement of Financial Position, Statement of Cash Flows, and Notes to the Accounts."],
+    ["Why standalone figures and not group figures?", "The obligor on the CP or promissory note is the legal entity itself, not the group. Group consolidated figures include subsidiary revenues and assets not available to service the CP. The AI is specifically instructed to extract standalone figures."],
+    ["What if the AI extracts the wrong figures?", "Every extracted figure is shown on the Review Data screen before scores are computed. You can edit any field manually. Blue fields were populated by AI; amber fields require manual entry."],
+    ["How is the cut-off score of 34 determined?", "The cut-off is set at 60% of the maximum possible score of 56 points. This threshold was calibrated against the financial profiles of investment-grade issuers in the Nigerian capital market."],
+    ["Is my uploaded data stored or shared?", "No. Uploaded documents are processed only to extract financial figures and are not retained after your session ends. Your email is used only for access management."],
+    ["How do I upgrade my plan?", "Click 'Buy Credits' in the header, or email info@smartrisksheets.com with the subject line 'SmartRisk Credit — Upgrade Request'."],
+  ];
+  const [open, setOpen] = useState(null);
+  return (
+    <div>
+      {faqs.map(([q, a], i) => (
+        <div key={i} style={{ borderBottom:"1px solid #F0F0F0", padding:"12px 0" }}>
+          <div onClick={() => setOpen(open === i ? null : i)}
+               style={{ display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", fontSize:14, fontWeight:500, color:"#1F2854" }}>
+            {q}
+            <span style={{ fontSize:16, color:"#888", marginLeft:12, flexShrink:0, transform: open === i ? "rotate(180deg)" : "none", transition:"transform 0.2s" }}>⌄</span>
+          </div>
+          {open === i && <p style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.7, marginTop:8 }}>{a}</p>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function UserGuide() {
   return (
     <div style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.75 }}>
@@ -286,8 +534,44 @@ function UserGuide() {
           <div><strong style={{ color:"var(--primary)" }}>{title}</strong> — {body}</div>
         </div>
       ))}
-      <h3 style={{ color:"var(--primary)", margin:"16px 0 8px" }}>Scoring Model</h3>
-      <p>10 ratios, 56 points max, cutoff 34 (60%). Negative scores are possible for ratios in distress bands.</p>
+     <h3 style={{ color:"var(--primary)", margin:"16px 0 8px" }}>Scoring Model</h3>
+      <p style={{ marginBottom:12 }}>10 ratios, 56 points max, cutoff 34 (60%). Negative scores are possible for ratios in distress bands.</p>
+      <div style={{ overflowX:"auto" }}>
+        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12, marginTop:8 }}>
+          <thead>
+            <tr style={{ background:"var(--primary)" }}>
+              {["Ratio","Max","Bands & Points"].map(h => (
+                <th key={h} style={{ color:"#fff", padding:"7px 10px", textAlign:"left", fontSize:11 }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              ["Acid-Test Ratio",          2,  "< 1x: −2 · 1–1.5x: 1 · > 1.5x: 2"],
+              ["Net Income Margin",        4,  "< 10%: 0 · 10–15%: 2 · 15–20%: 3 · > 20%: 4"],
+              ["Revenue Growth Rate",      5,  "Negative: −3 · 0–5%: 1 · 6–15%: 2 · 16–30%: 3 · > 30%: 5"],
+              ["Return on Assets",         5,  "< 10%: 1 · 10–15%: 2 · 15–20%: 3 · 20–30%: 4 · > 30%: 5"],
+              ["Debt to Asset Ratio",      5,  "< 30%: 5 · 30–50%: 3 · 50–75%: 2 · 75–100%: 0 · > 100%: −5"],
+              ["Debt to Capital Ratio",    5,  "< 30%: 5 · 30–50%: 2 · 50–75%: 1 · 75–100%: 0 · > 100%: −5"],
+              ["Interest Coverage Ratio",  6,  "< 1x: −5 · 1–1.5x: 2 · 1.6–3x: 4 · 3.1–5x: 5 · > 5x: 6"],
+              ["Debt Service Coverage",    7,  "< 0.5x: 7 · 0.6–1x: 4 · 1.1–3.5x: 3 · 3.6–4x: 2 · > 4.1x: −5"],
+              ["Debt to EBITDA",           7,  "< 2x: 7 · 2.1–3x: 3 · 3.1–3.5x: 2 · 3.6–4x: 0 · > 4.1x: −5"],
+              ["Altman Z-Score",          10,  "< 1.8: −10 · 1.8–2.9: 5 · > 3: 10"],
+            ].map(([name, max, bands], i) => (
+              <tr key={i} style={{ background: i % 2 === 0 ? "#fff" : "#F9F9F7" }}>
+                <td style={{ padding:"7px 10px", borderBottom:"1px solid #F0F0F0", fontWeight:500 }}>{name}</td>
+                <td style={{ padding:"7px 10px", borderBottom:"1px solid #F0F0F0", textAlign:"center", fontWeight:"bold", color:"var(--primary)" }}>{max}</td>
+                <td style={{ padding:"7px 10px", borderBottom:"1px solid #F0F0F0", color:"#5A5A5A" }}>{bands}</td>
+              </tr>
+            ))}
+            <tr style={{ background:"var(--primary)" }}>
+              <td style={{ padding:"7px 10px", color:"#fff", fontWeight:"bold" }}>TOTAL</td>
+              <td style={{ padding:"7px 10px", color:"var(--accent)", fontWeight:"bold", textAlign:"center" }}>56</td>
+              <td style={{ padding:"7px 10px", color:"rgba(255,255,255,0.6)", fontSize:11 }}>Cutoff: 34 points (60%)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

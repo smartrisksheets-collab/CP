@@ -77,6 +77,7 @@ export default function Result({ scoreResult, assessmentId, narrative, clientInf
         {newCat && <tr key={`cat-${i}`}><td colSpan={4} style={css.cat}>{cat}</td></tr>}
         <tr key={i}>
           <td style={css.td}>{r.name}</td>
+          <td style={css.td}>{r.display_value}</td>
           <td style={css.td}>
             <span style={{ fontSize:11, padding:"2px 8px", borderRadius:999, background:bg, color:col, whiteSpace:"nowrap" }}>
               {r.band}
@@ -140,6 +141,7 @@ export default function Result({ scoreResult, assessmentId, narrative, clientInf
           <thead>
             <tr>
               <th style={css.th}>Ratio</th>
+              <th style={css.th}>Result</th>
               <th style={css.th}>Band</th>
               <th style={{ ...css.th, textAlign:"right" }}>Score</th>
               <th style={{ ...css.th, textAlign:"right" }}>Max</th>

@@ -90,7 +90,7 @@ export default function Register() {
           <div style={{ fontSize:11, fontWeight:600, letterSpacing:"0.1em", textTransform:"uppercase", color:"var(--accent)", border:"1px solid rgba(var(--accent-rgb),0.3)", padding:"5px 12px", borderRadius:20, display:"inline-block", marginBottom:14 }}>
             Credit Risk Intelligence
           </div>
-          <h1 style={{ fontSize:28, fontWeight:700, color:"#fff", lineHeight:1.2, marginBottom:14, fontFamily:"Georgia, serif" }}>
+          <h1 style={{ fontSize:28, fontWeight:700, color:"#fff", lineHeight:1.2, marginBottom:14, fontFamily:"'Playfair Display', serif" }}>
             Start assessing.<br />
             <span style={{ color:"var(--accent)" }}>In seconds.</span>
           </h1>
@@ -141,7 +141,7 @@ export default function Register() {
             </div>
           ) : (
             <>
-              <h2 style={{ fontSize:26, fontWeight:700, color:"#1a1a2e", marginBottom:8, fontFamily:"Georgia, serif" }}>
+              <h2 style={{ fontSize:26, fontWeight:700, color:"#1a1a2e", marginBottom:8, fontFamily:"'Playfair Display', serif" }}>
                 Create your account
               </h2>
               <p style={{ fontSize:13, color:"#6b7280", marginBottom:28, lineHeight:1.6 }}>

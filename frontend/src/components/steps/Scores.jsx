@@ -62,7 +62,7 @@ const CATEGORIES = {
   "Altman Z-Score"         : "Corporate Bankruptcy",
 };
 
-export default function Scores({ figures, scoreResult, onScored, onBack, onNext, clientInfo }) {
+export default function Scores({ figures, scoreResult, onScored, onBack, onNext, onQuotaExceeded, clientInfo }) {
   const [local]    = useState(() => computeLocal(figures));
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
@@ -87,7 +87,7 @@ export default function Scores({ figures, scoreResult, onScored, onBack, onNext,
     } catch (e) {
       const detail = e.response?.data?.detail;
       if (detail?.quotaExceeded) {
-        setError(`Assessment limit reached (${detail.used}/${detail.limit}). Please upgrade your plan.`);
+        onQuotaExceeded?.(`You've used ${detail.used} of your ${detail.limit} assessments this month.`);
       } else {
         setError(typeof detail === "string" ? detail : "Failed to run assessment. Please try again.");
       }

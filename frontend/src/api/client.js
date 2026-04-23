@@ -72,3 +72,9 @@ export const generateReport = (assessmentId) =>
 
 export const getHistory = () =>
   api.get("/assessment/history");
+
+export const getAssessment = (id) =>
+  api.get(`/assessment/${id}`);
+
+export const updateNarrative = (id, narrative) =>
+  api.patch(`/assessment/${id}/narrative`, { narrative });

@@ -16,9 +16,12 @@ export function AuthProvider({ children }) {
 
     getMe()
       .then((res) => setUser(res.data))
-      .catch(() => {
-        localStorage.removeItem("sr_token");
-        localStorage.removeItem("sr_user");
+      .catch((err) => {
+        if (err.response?.status === 401) {
+          localStorage.removeItem("sr_token");
+          localStorage.removeItem("sr_user");
+        }
+        // any other error (network, 500, timeout) — leave token intact
       })
       .finally(() => setLoading(false));
   }, []);
