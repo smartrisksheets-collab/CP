@@ -6,7 +6,12 @@ export default function Dashboard() {
   const [rows, setRows]       = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState("");
-  const [downloading, setDownloading] = useState(null); // assessmentId being downloaded
+  const [downloading, setDownloading] = useState(null);
+  const [viewing, setViewing]         = useState(null);
+  const [loadingView, setLoadingView] = useState(null);
+
+  const th = { textAlign:"left", fontSize:11, fontWeight:"bold", color:"#888", padding:"8px 10px", borderBottom:"2px solid #E8E8E8", textTransform:"uppercase" };
+  const td = { padding:"10px", borderBottom:"1px solid #F0F0F0", fontSize:13 };
 
   useEffect(() => {
     getHistory()
@@ -19,7 +24,6 @@ export default function Dashboard() {
     <div style={{ textAlign:"center", padding:40 }}>
       <Loader size={24} style={{ animation:"spin 0.8s linear infinite", color:"var(--accent)" }} />
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      {viewing && <AssessmentModal data={viewing} onClose={() => setViewing(null)} onSaved={(updated) => setViewing(updated)} />}
     </div>
   );
 
@@ -30,12 +34,6 @@ export default function Dashboard() {
       No past assessments yet. Complete your first assessment to see it here.
     </div>
   );
-
-  const th = { textAlign:"left", fontSize:11, fontWeight:"bold", color:"#888", padding:"8px 10px", borderBottom:"2px solid #E8E8E8", textTransform:"uppercase" };
-  const td = { padding:"10px", borderBottom:"1px solid #F0F0F0", fontSize:13 };
-
-  const [viewing, setViewing]   = useState(null); // full assessment object
-  const [loadingView, setLoadingView] = useState(null);
 
   async function handleView(r) {
     setLoadingView(r.id);
@@ -119,6 +117,7 @@ export default function Dashboard() {
           })}
         </tbody>
       </table>
+    {viewing && <AssessmentModal data={viewing} onClose={() => setViewing(null)} onSaved={(updated) => setViewing(updated)} />}
     </div>
   );
 }
