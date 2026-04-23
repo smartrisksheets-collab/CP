@@ -227,7 +227,7 @@ async def list_assessments(
     ]
 
 
-# ── GET /admin/stats ──────────────────────────────────────────
+# ── GET /admin/stats ──────────────────────
 @router.get("/stats")
 async def stats(
     current_user: dict         = Depends(require_admin),

@@ -6,8 +6,8 @@ import AppPage from "./pages/AppPage.jsx";
 import Register from "./pages/Register.jsx";
 import VerifyEmail from "./pages/VerifyEmail.jsx";
 import Pricing from "./pages/Pricing.jsx";
-import PaymentCallback from "./pages/PaymentCallback.jsx";
-import AdminDashboard from "./pages/AdminDashboard.jsx";
+import PaymentCallback from "./pages/Paymentcallback.jsx";
+import AdminDashboard from "./pages/Admindashboard.jsx";
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
