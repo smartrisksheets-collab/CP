@@ -76,7 +76,7 @@ export default function AppPage() {
             {quota.credits} credit{quota.credits !== 1 ? "s" : ""} remaining · {quota.plan}
           </div>
         )}
-        <span className="sr-hdr-btn"><HdrBtn icon={<LayoutDashboard size={13}/>} label="Dashboard" onClick={() => setShowDash(true)} /></span>
+        <span className="sr-hdr-btn"><HdrBtn icon={<LayoutDashboard size={13}/>} label="Past Assessments" onClick={() => setShowDash(true)} /></span>
         <button onClick={() => setMobileMenu(v => !v)}
           className="sr-hamburger"
           aria-label="Menu"
@@ -115,11 +115,6 @@ export default function AppPage() {
               }}>
                 <div style={{ padding:"10px 12px", borderBottom:"1px solid #2e3f6e" }}>
                   <div style={{ fontSize:11, color:"#aaa" }}>{user?.email}</div>
-                  {quota && (
-                    <div style={{ fontSize:11, marginTop:3, color:"var(--accent)", fontWeight:600 }}>
-                      {quota.plan} Plan · {quota.credits} credit{quota.credits !== 1 ? "s" : ""}
-                    </div>
-                  )}
                 </div>
                 <DropItem icon={<BookOpen size={13}/>}      label="User Guide" onClick={() => { setShowUserMenu(false); setShowGuide(true); }} />
                 <DropItem icon={<MessageCircle size={13}/>} label="FAQ"        onClick={() => { setShowUserMenu(false); setShowFaq(true); }} />
@@ -269,6 +264,8 @@ export default function AppPage() {
     );
   }
 
+  if (showGuide) return <UserGuidePage onBack={() => setShowGuide(false)} />;
+
   return (
     <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", paddingBottom:40 }}>
       <style>{`
@@ -338,13 +335,6 @@ export default function AppPage() {
       {showDash && (
         <Modal onClose={() => setShowDash(false)} title="Past Assessments">
           <Dashboard />
-        </Modal>
-      )}
-
-      {/* User guide modal */}
-      {showGuide && (
-        <Modal onClose={() => setShowGuide(false)} title="User Guide">
-          <UserGuide />
         </Modal>
       )}
 
@@ -508,69 +498,165 @@ function FaqContent() {
   );
 }
 
-function UserGuide() {
+function UserGuidePage({ onBack }) {
+  const RATIOS = [
+    ["Acid-Test Ratio",         2,  "Can the company meet short-term obligations from liquid assets alone? Excludes inventory and prepayments — a stricter test than the current ratio.",        "> 1.5x"],
+    ["Net Income Margin",       4,  "How much of each naira of revenue becomes profit after all costs and tax. A proxy for pricing power and cost discipline.",                               "> 20%"],
+    ["Revenue Growth Rate",     5,  "Year-on-year top-line growth. Signals whether the business is expanding or contracting — critical for short-tenor debt repayment confidence.",           "> 30%"],
+    ["Return on Assets",        5,  "How efficiently the company generates profit from its asset base. Higher ROA signals better capital deployment and earning quality.",                    "> 30%"],
+    ["Debt to Asset Ratio",     5,  "What proportion of total assets is funded by debt. A low ratio means creditors have a large cushion if assets need to be liquidated.",                  "< 30%"],
+    ["Debt to Capital Ratio",   5,  "The share of total capital (debt + equity) that is debt-funded. Measures structural leverage and the buffer available to absorb losses.",               "< 30%"],
+    ["Interest Coverage Ratio", 6,  "How many times operating profit covers interest charges. A ratio below 1.5x means most of operating profit is consumed by interest — a major red flag.", "> 5.0x"],
+    ["Debt Service Coverage",   7,  "EBITDA relative to total debt stock. A low ratio means the company generates strong cash flow relative to its debt — favourable for a CP investor.",   "< 0.5x*"],
+    ["Net Debt / EBITDA",       7,  "How many years of operating cash flow would be needed to repay all net debt. The most widely used leverage metric by Nigerian rating agencies.",        "< 2.0x"],
+    ["Altman Z-Score",         10,  "A multi-factor bankruptcy predictor combining working capital, retained earnings, profitability, leverage, and asset turnover. Score above 3 indicates low distress risk.", "> 3.0"],
+  ];
+
+  const STEPS = [
+    ["Upload",          "Enter the client name, select an external credit rating (optional), and upload the audited financial statements PDF. Optionally upload the credit rating report and a CP indicative terms email. The tool validates each document before proceeding."],
+    ["Extraction",      "The financial statement is sent for review and extraction, which reads the primary financial statements and extract figures. This takes 20–60 seconds. All extracted figures are shown on the Review Data screen for you to verify and correct."],
+    ["Review Data",     "Check every field carefully. Blue fields were extracted by AI. Amber fields require manual entry (e.g. Prior Year Revenue for the growth rate). Always verify revenue, EBIT, and debt figures against the face of the financial statements."],
+    ["Compute Scores",  "Click \"Compute Scores\" to calculate all 10 ratios client-side. Review the ratio table and scores before proceeding. You can go back and edit any figure."],
+    ["View Result",     "Click \"View Result\" to run the final server-side assessment and generate the narrative. The result screen shows the verdict (Eligible / Not Eligible), score breakdown, and report export options."],
+    ["Export Report",   "Starter and above can preview and edit the generated narrative before exporting. Free users can export directly. The report is a PDF containing the CP terms, risk narrative, financial figures, and quantitative score table."],
+  ];
+
+  const card = { background:"#fff", border:"1px solid #E8E8E8", borderRadius:10, padding:"24px 28px", marginBottom:20 };
+  const sectionTitle = { fontSize:15, fontWeight:"bold", color:"var(--primary)", marginBottom:4, paddingBottom:8, borderBottom:"2px solid var(--accent)" };
+
   return (
-    <div style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.75 }}>
-      <h3 style={{ color:"var(--primary)", marginBottom:8 }}>Overview</h3>
-      <p style={{ marginBottom:16 }}>
-        SmartRisk Credit is an AI-assisted quantitative credit risk scoring tool for Nigerian capital markets professionals.
-        It processes audited financial statements, extracts key figures using AI, computes 10 standardised financial ratios,
-        and produces a total score out of <strong>56 points</strong>. A score of <strong>34 or above (60%)</strong> indicates
-        the issuer is eligible for investment consideration.
-      </p>
-      <h3 style={{ color:"var(--primary)", marginBottom:8 }}>Workflow</h3>
-      {[
-        ["Upload",       "Enter client name, select credit rating, upload the audited financial statements PDF. Optionally upload the credit rating report and CP indicative terms."],
-        ["Review Data",  "Check every extracted field. Blue fields were populated by AI. Amber fields require manual entry. Always verify revenue, EBIT, and debt figures."],
-        ["Scores",       "Review the 10 ratio table and scores. Click View Result to run the assessment and generate the narrative."],
-        ["Result",       "View the verdict (Eligible / Not Eligible), score breakdown, AI narrative, and export the PDF report."],
-      ].map(([title, body], i) => (
-        <div key={i} style={{ display:"flex", gap:12, marginBottom:12 }}>
-          <div style={{
-            width:24, height:24, borderRadius:"50%", background:"var(--primary)",
-            color:"#fff", display:"flex", alignItems:"center", justifyContent:"center",
-            fontSize:11, fontWeight:"bold", flexShrink:0, marginTop:1,
-          }}>{i+1}</div>
-          <div><strong style={{ color:"var(--primary)" }}>{title}</strong> — {body}</div>
+    <div style={{ minHeight:"100vh", background:"#F5F6F8", paddingBottom:60 }}>
+      {/* Header */}
+      <div style={{ background:"var(--primary)", padding:"18px 32px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <div>
+          <div style={{ color:"var(--accent)", fontSize:17, fontWeight:"bold" }}>User Guide</div>
+          <div style={{ color:"#999", fontSize:12, marginTop:2 }}>How SmartRisk Credit works and how scores are calculated</div>
         </div>
-      ))}
-     <h3 style={{ color:"var(--primary)", margin:"16px 0 8px" }}>Scoring Model</h3>
-      <p style={{ marginBottom:12 }}>10 ratios, 56 points max, cutoff 34 (60%). Negative scores are possible for ratios in distress bands.</p>
-      <div style={{ overflowX:"auto" }}>
-        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12, marginTop:8 }}>
-          <thead>
-            <tr style={{ background:"var(--primary)" }}>
-              {["Ratio","Max","Bands & Points"].map(h => (
-                <th key={h} style={{ color:"#fff", padding:"7px 10px", textAlign:"left", fontSize:11 }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {[
-              ["Acid-Test Ratio",          2,  "< 1x: −2 · 1–1.5x: 1 · > 1.5x: 2"],
-              ["Net Income Margin",        4,  "< 10%: 0 · 10–15%: 2 · 15–20%: 3 · > 20%: 4"],
-              ["Revenue Growth Rate",      5,  "Negative: −3 · 0–5%: 1 · 6–15%: 2 · 16–30%: 3 · > 30%: 5"],
-              ["Return on Assets",         5,  "< 10%: 1 · 10–15%: 2 · 15–20%: 3 · 20–30%: 4 · > 30%: 5"],
-              ["Debt to Asset Ratio",      5,  "< 30%: 5 · 30–50%: 3 · 50–75%: 2 · 75–100%: 0 · > 100%: −5"],
-              ["Debt to Capital Ratio",    5,  "< 30%: 5 · 30–50%: 2 · 50–75%: 1 · 75–100%: 0 · > 100%: −5"],
-              ["Interest Coverage Ratio",  6,  "< 1x: −5 · 1–1.5x: 2 · 1.6–3x: 4 · 3.1–5x: 5 · > 5x: 6"],
-              ["Debt Service Coverage",    7,  "< 0.5x: 7 · 0.6–1x: 4 · 1.1–3.5x: 3 · 3.6–4x: 2 · > 4.1x: −5"],
-              ["Debt to EBITDA",           7,  "< 2x: 7 · 2.1–3x: 3 · 3.1–3.5x: 2 · 3.6–4x: 0 · > 4.1x: −5"],
-              ["Altman Z-Score",          10,  "< 1.8: −10 · 1.8–2.9: 5 · > 3: 10"],
-            ].map(([name, max, bands], i) => (
-              <tr key={i} style={{ background: i % 2 === 0 ? "#fff" : "#F9F9F7" }}>
-                <td style={{ padding:"7px 10px", borderBottom:"1px solid #F0F0F0", fontWeight:500 }}>{name}</td>
-                <td style={{ padding:"7px 10px", borderBottom:"1px solid #F0F0F0", textAlign:"center", fontWeight:"bold", color:"var(--primary)" }}>{max}</td>
-                <td style={{ padding:"7px 10px", borderBottom:"1px solid #F0F0F0", color:"#5A5A5A" }}>{bands}</td>
-              </tr>
+        <button onClick={onBack} style={{
+          display:"flex", alignItems:"center", gap:6, background:"var(--primary)",
+          border:"1px solid #3a4a7a", color:"#ccc", padding:"8px 14px",
+          borderRadius:6, cursor:"pointer", fontSize:12, fontFamily:"Arial,sans-serif",
+        }}>
+          ← Back to App
+        </button>
+      </div>
+
+      <div style={{ maxWidth:860, margin:"0 auto", padding:"28px 24px 0" }}>
+
+        {/* Overview */}
+        <div style={card}>
+          <div style={sectionTitle}>Overview</div>
+          <p style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.8, marginTop:12, marginBottom:8 }}>
+            SmartRisk Credit is an AI-assisted quantitative credit risk scoring tool for Nigerian capital markets professionals.
+            It is designed to help analysts assess whether a corporate issuer meets the minimum credit quality threshold for investing in Commercial Papers (CPs) or Promissory Notes.
+          </p>
+          <p style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.8 }}>
+            The tool processes audited financial statements, extracts key financial figures using artificial intelligence (AI), computes 10 standardised financial ratios,
+            and produces a total score out of <strong>56 points</strong>. A score of <strong>34 or above (60%)</strong> indicates the issuer is eligible for investment consideration.
+          </p>
+        </div>
+
+        {/* Step-by-step */}
+        <div style={card}>
+          <div style={sectionTitle}>Step-by-Step Workflow</div>
+          <div style={{ marginTop:14 }}>
+            {STEPS.map(([title, body], i) => (
+              <div key={i} style={{ display:"flex", gap:14, marginBottom:14 }}>
+                <div style={{
+                  width:26, height:26, borderRadius:"50%", background:"var(--primary)",
+                  color:"#fff", display:"flex", alignItems:"center", justifyContent:"center",
+                  fontSize:11, fontWeight:"bold", flexShrink:0, marginTop:1,
+                }}>{i + 1}</div>
+                <div style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.75 }}>
+                  <strong style={{ color:"var(--primary)" }}>{title}</strong> — {body}
+                </div>
+              </div>
             ))}
-            <tr style={{ background:"var(--primary)" }}>
-              <td style={{ padding:"7px 10px", color:"#fff", fontWeight:"bold" }}>TOTAL</td>
-              <td style={{ padding:"7px 10px", color:"var(--accent)", fontWeight:"bold", textAlign:"center" }}>56</td>
-              <td style={{ padding:"7px 10px", color:"rgba(255,255,255,0.6)", fontSize:11 }}>Cutoff: 34 points (60%)</td>
-            </tr>
-          </tbody>
-        </table>
+          </div>
+        </div>
+
+        {/* Scoring table */}
+        <div style={card}>
+          <div style={sectionTitle}>Scoring Model — 10 Ratios, 56 Points</div>
+          <p style={{ fontSize:13, color:"#5A5A5A", marginTop:10, marginBottom:14 }}>
+            Each ratio is scored against defined bands. The total score determines eligibility. The cut-off is 34 points (60% of 56).
+          </p>
+          <div style={{ overflowX:"auto" }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
+              <thead>
+                <tr style={{ background:"var(--primary)" }}>
+                  {["Ratio","What it measures","Max Score","Best Practice"].map(h => (
+                    <th key={h} style={{ color:"#fff", padding:"9px 12px", textAlign:"left", fontSize:11, whiteSpace:"nowrap" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {RATIOS.map(([name, max, desc, best], i) => (
+                  <tr key={i} style={{ background: i % 2 === 0 ? "#fff" : "#F9F9F7" }}>
+                    <td style={{ padding:"9px 12px", borderBottom:"1px solid #F0F0F0", fontWeight:600, color:"#1F2854", whiteSpace:"nowrap", verticalAlign:"top" }}>{name}</td>
+                    <td style={{ padding:"9px 12px", borderBottom:"1px solid #F0F0F0", color:"#5A5A5A", lineHeight:1.65, verticalAlign:"top" }}>{desc}</td>
+                    <td style={{ padding:"9px 12px", borderBottom:"1px solid #F0F0F0", textAlign:"center", fontWeight:"bold", color:"var(--primary)", verticalAlign:"top" }}>{max}</td>
+                    <td style={{ padding:"9px 12px", borderBottom:"1px solid #F0F0F0", textAlign:"center", color:"#5A5A5A", verticalAlign:"top", whiteSpace:"nowrap" }}>{best}</td>
+                  </tr>
+                ))}
+                <tr style={{ background:"var(--primary)" }}>
+                  <td style={{ padding:"9px 12px", color:"#fff", fontWeight:"bold" }}>Total</td>
+                  <td style={{ padding:"9px 12px" }} />
+                  <td style={{ padding:"9px 12px", color:"var(--accent)", fontWeight:"bold", textAlign:"center" }}>56</td>
+                  <td style={{ padding:"9px 12px", color:"rgba(255,255,255,0.6)", fontSize:11 }}>Cut-off: 34 pts (60%)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p style={{ fontSize:11, color:"#888", marginTop:10, lineHeight:1.6 }}>
+            * DSCR scoring is inverted by design: a very low DSCR (e.g. &lt;0.5x) means the company has minimal debt relative to EBITDA, which is favourable. A very high DSCR means the company is heavily leveraged, which attracts a penalty score.
+          </p>
+        </div>
+
+        {/* Colour guide */}
+        <div style={card}>
+          <div style={sectionTitle}>Score Colour Guide</div>
+          <p style={{ fontSize:13, color:"#5A5A5A", marginTop:10, marginBottom:14 }}>
+            On the Score Review and Result screens, each ratio score is colour-coded:
+          </p>
+          {[
+            ["#27ae60","#EAF7EF","Green",  "Score equals the maximum for that ratio — best possible band achieved."],
+            ["#d4820a","#FEF6E7","Amber",  "Score is positive but below maximum — within acceptable range."],
+            ["#c0392b","#FDECEA","Red",    "Score is zero or negative — a penalty band. This drags the total score down significantly."],
+          ].map(([color, bg, label, desc]) => (
+            <div key={label} style={{ display:"flex", alignItems:"flex-start", gap:12, marginBottom:10 }}>
+              <span style={{ background:bg, color, border:`1px solid ${color}`, borderRadius:4, padding:"2px 10px", fontSize:12, fontWeight:600, flexShrink:0 }}>{label}</span>
+              <span style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.7 }}>{desc}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Important notes */}
+        <div style={card}>
+          <div style={sectionTitle}>Important Notes</div>
+          <div style={{ marginTop:12 }}>
+            {[
+              ["Standalone figures only.",              "For group companies, always use the standalone (Company) figures, not consolidated (Group) figures. The obligor on the CP is the legal entity, not the group. We extract standalone figures — verify this on the Review Data screen."],
+              ["Interest rates are required for the Interest Coverage Ratio.", "If the notes do not state a specific rate, use the CBN MPR plus the applicable spread, or the rate stated in the borrowing agreement. Enter as a percentage (e.g. 21.5 for 21.5%)."],
+              ["Prior Year Revenue is required for the Revenue Growth Rate.", "This is the only figure not extractable from a single year's statements. Enter it manually on the Review Data screen."],
+              ["The score is not a credit rating.",     "It is a quantitative decision-support tool for internal use. Always supplement with qualitative analysis and consider the external credit rating in context."],
+            ].map(([bold, text]) => (
+              <p key={bold} style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.75, marginBottom:12 }}>
+                <strong style={{ color:"#1F2854" }}>{bold}</strong> {text}
+              </p>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ textAlign:"right", paddingBottom:20 }}>
+          <button onClick={onBack} style={{
+            display:"inline-flex", alignItems:"center", gap:6, background:"var(--primary)",
+            border:"none", color:"#fff", padding:"10px 20px",
+            borderRadius:6, cursor:"pointer", fontSize:13, fontFamily:"Arial,sans-serif", fontWeight:600,
+          }}>
+            ← Back to App
+          </button>
+        </div>
       </div>
     </div>
   );
