@@ -301,7 +301,6 @@ export default function AppPage() {
           ))}
           <a href="mailto:info@smartrisksheets.com" style={{ color:"#999", textDecoration:"none" }}
              onMouseEnter={e => e.target.style.color="#ccc"} onMouseLeave={e => e.target.style.color="#999"}>Contact</a>
-          <span style={{ color:"var(--accent)" }}>{user?.email}</span>
         </div>
       </div>
 

@@ -33,6 +33,16 @@ DISPOSABLE_DOMAINS = {
 }
 
 
+# ── Personal / consumer email domains ─────────────────────────
+PERSONAL_DOMAINS = {
+    "gmail.com", "yahoo.com", "yahoo.co.uk", "yahoo.co.in",
+    "outlook.com", "hotmail.com", "hotmail.co.uk", "live.com",
+    "icloud.com", "me.com", "mac.com", "aol.com",
+    "protonmail.com", "proton.me", "zoho.com",
+    "yandex.com", "yandex.ru", "gmx.com", "gmx.net",
+}
+
+
 # ── Schemas ───────────────────────────────────────────────────
 class RegisterBody(BaseModel):
     email   : str
@@ -51,9 +61,15 @@ def _validate_email(email: str) -> str:
     parts = email.split("@")
     if len(parts) != 2 or not parts[0] or "." not in parts[1]:
         raise HTTPException(status_code=400, detail="Invalid email address.")
-    domain = parts[1]
+    
+    # Strip + aliases (e.g. john+test@gmail.com → john@gmail.com)
+    local, domain = parts[0].split("+")[0], parts[1]
+    email = f"{local}@{domain}"
+
     if domain in DISPOSABLE_DOMAINS:
-        raise HTTPException(status_code=400, detail="Disposable email addresses are not allowed. Please use your work or personal email.")
+        raise HTTPException(status_code=400, detail="Disposable email addresses are not allowed.")
+    if domain in PERSONAL_DOMAINS:
+        raise HTTPException(status_code=400, detail="Please use your work email address to register.")
     return email
 
 

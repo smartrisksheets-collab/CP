@@ -1,9 +1,11 @@
-try:
-    from weasyprint import HTML
-    WEASYPRINT_AVAILABLE = True
-except OSError:
-    WEASYPRINT_AVAILABLE = False
 from api.models import Assessment
+try:
+    from xhtml2pdf import pisa
+    import io
+    PISA_AVAILABLE = True
+except Exception:
+    PISA_AVAILABLE = False
+
 
 
 def _fmt(val) -> str:
@@ -49,6 +51,7 @@ def _build_ratio_rows(ratios: list) -> str:
     }
     seen_cats = set()
     rows      = ""
+    row_idx   = 0
 
     for r in ratios:
         cat = r.get("category", "")
@@ -66,8 +69,10 @@ def _build_ratio_rows(ratios: list) -> str:
         s_color  = _score_color(score, max_s)
         s_bg     = _score_bg(score, max_s)
 
+        row_class = "alt" if row_idx % 2 == 1 else ""
+        row_idx  += 1
         rows += f"""
-        <tr>
+        <tr class="{row_class}">
             <td>{r.get('name','')}</td>
             <td style="font-size:8pt;color:#666;">{r.get('formula','')}</td>
             <td style="font-size:8pt;">{r.get('benchmark','')}</td>
@@ -171,7 +176,7 @@ def _build_html(assessment: Assessment) -> str:
   table {{ width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 12px; }}
   th {{ background: #2A3870; color: #fff; padding: 6px 8px; text-align: left; font-size: 9pt; }}
   td {{ padding: 6px 8px; border-bottom: 1px solid #E8E8E8; vertical-align: top; }}
-  tr:nth-child(even) td {{ background: #F5F5F2; }}
+  tr.alt td {{ background: #F5F5F2; }}
   .footer {{ font-size: 8pt; color: #888; border-top: 1px solid #E0E0E0;
              padding-top: 8px; margin-top: 24px; text-align: center; }}
 </style>
@@ -267,7 +272,13 @@ def _build_html(assessment: Assessment) -> str:
 
 
 def build_pdf(assessment: Assessment) -> bytes:
-    if not WEASYPRINT_AVAILABLE:
-        raise RuntimeError("PDF generation not available in this environment.")
-    html = _build_html(assessment)
-    return HTML(string=html).write_pdf()
+    if not PISA_AVAILABLE:
+        raise RuntimeError(
+            "xhtml2pdf is not installed. Run: pip install xhtml2pdf"
+        )
+    html  = _build_html(assessment)
+    buf   = io.BytesIO()
+    result = pisa.CreatePDF(html, dest=buf)
+    if result.err:
+        raise RuntimeError(f"PDF rendering error: {result.err}")
+    return buf.getvalue()

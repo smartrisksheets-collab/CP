@@ -166,7 +166,7 @@ export default function Login() {
   }
 
   // ── OTP input ─────────────────────────────────────────────
-  function handleOtpChange(idx, val) {
+   function handleOtpChange(idx, val) {
     if (!/^\d*$/.test(val)) return;
     const next = [...otp];
     next[idx]  = val.slice(-1);
@@ -175,6 +175,18 @@ export default function Login() {
     if (val && idx < 5) {
       document.getElementById(`otp-${idx+1}`)?.focus();
     }
+  }
+
+  function handleOtpPaste(e) {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pasted) return;
+    const next = ["","","","","",""];
+    pasted.split("").forEach((ch, i) => { next[i] = ch; });
+    setOtp(next);
+    setOtpErr("");
+    const focusIdx = Math.min(pasted.length, 5);
+    document.getElementById(`otp-${focusIdx}`)?.focus();
   }
 
   function handleOtpKeyDown(idx, e) {
@@ -378,6 +390,7 @@ export default function Login() {
                     value={digit}
                     onChange={(e) => handleOtpChange(idx, e.target.value)}
                     onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                    onPaste={idx === 0 ? handleOtpPaste : undefined}
                     onFocus={() => setOtpFocus(idx)}
                     onBlur={() => setOtpFocus(null)}
                     autoFocus={idx === 0}

@@ -2,6 +2,17 @@ import { useEffect, useState } from "react";
 import { getHistory, generateReport, getAssessment, updateNarrative } from "../api/client.js";
 import { Loader, Download, Eye, X, Save } from "lucide-react";
 
+async function parseAxiosError(e, fallback) {
+  try {
+    if (e.response?.data instanceof Blob) {
+      const text = await e.response.data.text();
+      const json = JSON.parse(text);
+      return json.detail || fallback;
+    }
+    return e.response?.data?.detail || fallback;
+  } catch { return fallback; }
+}
+
 export default function Dashboard() {
   const [rows, setRows]       = useState([]);
   const [loading, setLoading] = useState(true);
@@ -9,6 +20,7 @@ export default function Dashboard() {
   const [downloading, setDownloading] = useState(null);
   const [viewing, setViewing]         = useState(null);
   const [loadingView, setLoadingView] = useState(null);
+  const [errModal, setErrModal]       = useState("");
 
   const th = { textAlign:"left", fontSize:11, fontWeight:"bold", color:"#888", padding:"8px 10px", borderBottom:"2px solid #E8E8E8", textTransform:"uppercase" };
   const td = { padding:"10px", borderBottom:"1px solid #F0F0F0", fontSize:13 };
@@ -41,7 +53,7 @@ export default function Dashboard() {
       const res = await getAssessment(r.id);
       setViewing(res.data);
     } catch {
-      alert("Failed to load assessment.");
+      setErrModal("Failed to load assessment. Please try again.");
     } finally {
       setLoadingView(null);
     }
@@ -57,8 +69,8 @@ export default function Dashboard() {
       a.download = `SmartRisk_${(r.clientName || "Report").replace(/\s+/g, "_")}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      alert("Failed to generate report. Please try again.");
+    } catch (e) {
+      setErrModal(await parseAxiosError(e, "Failed to generate report. Please try again."));
     } finally {
       setDownloading(null);
     }
@@ -117,10 +129,28 @@ export default function Dashboard() {
           })}
         </tbody>
       </table>
-    {viewing && <AssessmentModal data={viewing} onClose={() => setViewing(null)} onSaved={(updated) => setViewing(updated)} />}
+    {viewing && <AssessmentModal data={viewing} onClose={() => setViewing(null)} onSaved={(updated) => setViewing(updated)} onError={setErrModal} />}
+    {errModal && <ErrModal msg={errModal} onClose={() => setErrModal("")} />}
     </div>
   );
 }
+function ErrModal({ msg, onClose }) {
+  return (
+    <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:99999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background:"#fff", borderRadius:10, padding:"28px 32px", maxWidth:380, width:"100%", boxShadow:"0 16px 60px rgba(0,0,0,0.2)", textAlign:"center" }}>
+        <div style={{ width:44, height:44, borderRadius:"50%", background:"#FCEBEB", border:"1px solid #F09595", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 14px" }}>
+          <X size={20} color="#791F1F" />
+        </div>
+        <div style={{ fontSize:15, fontWeight:"bold", color:"#791F1F", marginBottom:8 }}>Error</div>
+        <div style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.65, marginBottom:20 }}>{msg}</div>
+        <button onClick={onClose} style={{ padding:"9px 24px", background:"var(--primary)", color:"#fff", border:"none", borderRadius:6, fontSize:13, fontWeight:600, cursor:"pointer" }}>
+          OK
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const NARR_LABELS = [
   ["financialStandingReview", "Financial Standing"],
   ["cashFlowReview",          "Cash Flow"],
@@ -143,7 +173,7 @@ const CATEGORIES = {
   "altman_z"         : "Corporate Bankruptcy",
 };
 
-function AssessmentModal({ data, onClose, onSaved }) {
+function AssessmentModal({ data, onClose, onSaved, onError }) {
   const [narr, setNarr]     = useState(data.narrative || {});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved]   = useState(false);
@@ -157,7 +187,7 @@ function AssessmentModal({ data, onClose, onSaved }) {
       onSaved({ ...data, narrative: narr });
       setTimeout(() => setSaved(false), 2000);
     } catch {
-      alert("Failed to save. Please try again.");
+      onError("Failed to save narrative. Please try again."); // handled locally — see note below
     } finally {
       setSaving(false);
     }
@@ -173,8 +203,9 @@ function AssessmentModal({ data, onClose, onSaved }) {
       a.download = `SmartRisk_${(data.clientName || "Report").replace(/\s+/g,"_")}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      alert("Failed to generate PDF.");
+    } catch (e) {
+      const msg = await parseAxiosError(e, "Failed to generate PDF. Please try again.");
+      onError(msg);
     } finally {
       setDlBusy(false);
     }

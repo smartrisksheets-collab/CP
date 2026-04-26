@@ -175,7 +175,7 @@ export default function Register() {
                 <label style={{ display:"block", fontSize:12, fontWeight:500, color:"#1a1a2e", marginBottom:6 }}>
                   Company <span style={{ color:"#9ca3af", fontWeight:400 }}>(optional)</span>
                 </label>
-                <input style={inp(false)} type="text" placeholder="e.g. Parthian Partners"
+                <input style={inp(false)} type="text" placeholder="e.g. Rockwell Finance"
                   value={form.company} onChange={e => set("company", e.target.value)}
                   onKeyDown={e => e.key === "Enter" && handleSubmit()} />
               </div>
