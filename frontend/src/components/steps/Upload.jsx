@@ -80,6 +80,13 @@ function countKw(text, list) {
   return list.filter((k) => lc.includes(k.toLowerCase())).length;
 }
 
+function formatReviewDate(val) {
+  if (!val) return "";
+  const d = new Date(val + "T00:00:00"); // force local timezone
+  if (isNaN(d.getTime())) return val;
+  return d.toLocaleDateString("en-NG", { day:"2-digit", month:"short", year:"numeric" });
+}
+
 function maxOccurrences(text, list) {
   const lc = text.toLowerCase();
   return Math.max(0, ...list.map((k) => {
@@ -374,7 +381,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtractStart 
 
   function handleConfirm() {
     setFinFile(confirm.file);
-    setFinV({ validating: false, warnings: [...(confirm.warnings || []), `Statement year ${confirm.year} accepted — ensure this is the most recent audited accounts available.`], error: "" });
+    setFinV({ validating: false, warnings: [...(confirm.warnings || []), `Statement year ${confirm.year} accepted.`], error: "" });
     setConfirm(null);
   }
 
@@ -438,7 +445,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtractStart 
 
     onExtractStart({
       ...info,
-      reviewDate: info.reviewDate || new Date().toLocaleDateString("en-NG", { day:"2-digit", month:"short", year:"numeric" }),
+      reviewDate: formatReviewDate(info.reviewDate) || new Date().toLocaleDateString("en-NG", { day:"2-digit", month:"short", year:"numeric" }),
     }, promise);
   }
 
