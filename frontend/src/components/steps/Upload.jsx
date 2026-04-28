@@ -133,7 +133,8 @@ async function runRatValidation(file, clientName) {
   }
 
   const warnings = [];
-  const expiryMatch = text.match(/expir(?:y|es|ed)[^\n]{0,60}(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4})/i);
+  const DATE_PAT = `(\\d{1,2}[\\/\\-]\\d{1,2}[\\/\\-]\\d{2,4}|\\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?\\s+\\d{1,2},?\\s+\\d{4})`;
+  const expiryMatch = text.match(new RegExp(`(?:expir(?:y|es|ed)|valid until|valid through|valid for|review date)[^\\n]{0,60}${DATE_PAT}`, "i"));
 
   if (expiryMatch) {
     const expiry = new Date(expiryMatch[1]);
@@ -149,7 +150,7 @@ async function runRatValidation(file, clientName) {
     const years = (text.slice(0, 2000).match(/\b(20\d{2})\b/g) || []).map(Number);
     if (years.length) {
       const maxYear = Math.max(...years);
-      if (new Date().getFullYear() - maxYear >= 1) {
+      if (new Date().getFullYear() - maxYear >= 2) {
         warnings.push(`Rating report is from ${maxYear}. No expiry date detected — verify this rating is still current.`);
       }
     }
