@@ -64,7 +64,8 @@ function tokenScore(name, text) {
   const aSet = new Set(tok(name));
   const bTok = tok(text);
   if (!aSet.size || !bTok.length) return 0;
-  return bTok.filter((t) => aSet.has(t)).length / Math.max(aSet.size, bTok.length);
+  const matches = bTok.filter((t) => aSet.has(t)).length;
+  return matches / aSet.size;
 }
 
 function countKw(text, list) {
