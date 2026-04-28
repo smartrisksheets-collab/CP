@@ -480,7 +480,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtractStart 
           </div>
           <div>
             <label style={css.label}>Review date</label>
-            <input style={css.input} type="text" placeholder="e.g. 31 March 2026"
+            <input style={css.input} type="date"
               value={info.reviewDate || ""} onChange={(e) => set("reviewDate", e.target.value)} />
           </div>
         </div>
