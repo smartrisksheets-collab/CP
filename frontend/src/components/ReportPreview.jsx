@@ -3,12 +3,12 @@ import { generateReport } from "../api/client.js";
 import { X, Download, Loader } from "lucide-react";
 
 const SECTIONS = [
-  { key:"financialStandingReview", label:"Financial Standing",   ratingKey:"financialStanding" },
-  { key:"cashFlowReview",          label:"Cash Flow",            ratingKey:"cashFlowRating" },
-  { key:"creditRiskReview",        label:"Credit Risk",          ratingKey:"creditRiskLevel" },
-  { key:"futureRisksReview",       label:"Future Risks",         ratingKey:"futureRiskLevel" },
-  { key:"creditRatingReview",      label:"Credit Rating Context",ratingKey:null },
-  { key:"recommendation",          label:"Recommendation",       ratingKey:null },
+  { key:"financialStandingReview", label:"Earnings Quality",              ratingKey:"financialStanding" },
+  { key:"cashFlowReview",          label:"Liquidity & Debt Service",      ratingKey:"cashFlowRating" },
+  { key:"creditRiskReview",        label:"Capital Structure",             ratingKey:"creditRiskLevel" },
+  { key:"futureRisksReview",       label:"Forward Risk Outlook",          ratingKey:"futureRiskLevel" },
+  { key:"creditRatingReview",      label:"Rating Context",                ratingKey:null },
+  { key:"recommendation",          label:"Investment Committee Recommendation", ratingKey:null },
 ];
 
 const RATING_OPTIONS = {

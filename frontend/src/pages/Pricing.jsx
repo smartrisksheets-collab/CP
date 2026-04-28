@@ -3,17 +3,58 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import { getQuotaStatus } from "../api/client.js";
-import { Loader, Zap, ArrowLeft } from "lucide-react";
+import { Loader, ArrowLeft, Check, Mail } from "lucide-react";
 import axios from "axios";
 
-const BASE_URL        = import.meta.env.VITE_API_BASE_URL || "";
-const PAYSTACK_PK     = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "";
+const BASE_URL    = import.meta.env.VITE_API_BASE_URL || "";
+const PAYSTACK_PK = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "";
 
-const PACK_COLORS = {
-  starter     : { accent:"#01b88e", bg:"#f0fdf9" },
-  standard    : { accent:"#1F2854", bg:"#f0f4ff" },
-  professional: { accent:"#C8A217", bg:"#fffbeb" },
-  team        : { accent:"#7c3aed", bg:"#f5f3ff" },
+// ── Static pack definitions ────────────────────────────────────
+const PACK_STATIC = {
+  starter: {
+    popular  : false,
+    btnLabel : "Buy Starter Pack",
+    features : [
+      "Everything in Free Trial",
+      "Rating report extraction",
+      "CP indicative terms extraction",
+      "Preview & edit AI narrative",
+      "Credits valid for 12 months",
+    ],
+  },
+  standard: {
+    popular  : true,
+    btnLabel : "Buy Standard Pack",
+    features : [
+      "Everything in Starter",
+      "Priority email support",
+      "Assessment history log",
+      "Credits valid for 12 months",
+      "Save 10% vs Starter rate",
+    ],
+  },
+  professional: {
+    popular  : false,
+    btnLabel : "Buy Professional Pack",
+    features : [
+      "Everything in Standard",
+      "Early access to new features",
+      "Dedicated account support",
+      "Credits valid for 12 months",
+      "Save 17.5% vs Starter rate",
+    ],
+  },
+};
+
+const PACK_ORDER = ["starter", "standard", "professional"];
+
+const C = {
+  navy    : "#1F2854",
+  emerald : "#01b88e",
+  cream   : "#F5F5F2",
+  border  : "#E0E0E0",
+  grey    : "#5A5A5A",
+  muted   : "#888",
 };
 
 export default function Pricing() {
@@ -22,18 +63,18 @@ export default function Pricing() {
   const navigate   = useNavigate();
   const hostname   = window.location.hostname;
 
-  const [packs, setPacks]     = useState([]);
-  const [quota, setQuota]     = useState(null);
+  const [packs,   setPacks]   = useState([]);
+  const [quota,   setQuota]   = useState(null);
   const [loading, setLoading] = useState(true);
-  const [paying, setPaying]   = useState(null);
-  const [error, setError]     = useState("");
+  const [paying,  setPaying]  = useState(null);
+  const [error,   setError]   = useState("");
 
   useEffect(() => {
     Promise.all([
-      axios.get(`${BASE_URL}/payments/packs`).then(r => ({ data: Array.isArray(r.data) ? r.data : [] })),
+      axios.get(`${BASE_URL}/payments/packs`),
       user ? getQuotaStatus() : Promise.resolve(null),
     ]).then(([packsRes, quotaRes]) => {
-      setPacks(packsRes.data);
+      setPacks(packsRes.data.filter(p => PACK_ORDER.includes(p.key)));
       if (quotaRes) setQuota(quotaRes.data);
     }).catch(() => setError("Failed to load pricing. Please refresh."))
       .finally(() => setLoading(false));
@@ -47,9 +88,8 @@ export default function Pricing() {
       const res = await axios.post(
         `${BASE_URL}/payments/initialize`,
         { pack: packKey, hostname },
-        { headers: { Authorization: `Bearer ${localStorage.getItem("sr_token")}` } }
+        { headers: { Authorization: `Bearer ${localStorage.getItem("sr_token")}` } },
       );
-      // Redirect to Paystack checkout
       window.location.href = res.data.authorization_url;
     } catch (e) {
       setError(e.response?.data?.detail || "Payment initialization failed. Please try again.");
@@ -57,118 +97,182 @@ export default function Pricing() {
     }
   }
 
-  const css = {
-    page    : { minHeight:"100vh", background:"#F5F5F2", paddingBottom:60 },
-    header  : { background:"var(--primary)", padding:"14px 32px", display:"flex", alignItems:"center", justifyContent:"space-between" },
-    back    : { display:"flex", alignItems:"center", gap:6, color:"#ccc", fontSize:13, cursor:"pointer", background:"none", border:"none", fontFamily:"Arial,sans-serif" },
-    hero    : { textAlign:"center", padding:"48px 24px 32px" },
-    grid    : { display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))", gap:20, maxWidth:960, margin:"0 auto", padding:"0 24px" },
-    card    : (accent, bg, popular) => ({
-      background:"#fff", borderRadius:12, padding:28,
-      border: popular ? `2px solid ${accent}` : "1px solid #E0E0E0",
-      position:"relative", boxShadow: popular ? `0 4px 24px rgba(0,0,0,0.08)` : "none",
-    }),
-    badge   : (accent) => ({ position:"absolute", top:-12, left:"50%", transform:"translateX(-50%)", background:accent, color:"#fff", fontSize:11, fontWeight:700, padding:"3px 12px", borderRadius:999, whiteSpace:"nowrap" }),
-    btn     : (accent, dis) => ({ width:"100%", padding:"11px 0", background: dis ? "#D0D0D0" : accent, color:"#fff", border:"none", borderRadius:8, fontSize:14, fontWeight:600, cursor: dis ? "not-allowed" : "pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6, marginTop:20 }),
-    freeBox : { maxWidth:480, margin:"32px auto 0", background:"#fff", border:"1px solid #E0E0E0", borderRadius:10, padding:"20px 24px", textAlign:"center" },
-  };
-
   return (
-    <div style={css.page}>
-      <div style={css.header}>
-        <button style={css.back} onClick={() => navigate(user ? "/" : "/login")}>
+    <div style={{ minHeight:"100vh", background:C.cream, paddingBottom:60, fontFamily:"Arial,sans-serif" }}>
+      <style>{`@keyframes spin { to { transform:rotate(360deg); } }`}</style>
+
+      {/* ── Header ── */}
+      <div style={{ background:C.navy, padding:"14px 32px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <button
+          onClick={() => navigate(user ? "/" : "/login")}
+          style={{ display:"flex", alignItems:"center", gap:6, color:"#ccc", fontSize:13, cursor:"pointer", background:"none", border:"none", fontFamily:"Arial,sans-serif" }}
+        >
           <ArrowLeft size={14} /> {user ? "Back to App" : "Sign In"}
         </button>
-        <div style={{ color:"var(--accent)", fontSize:15, fontWeight:"bold" }}>SmartRisk Credit</div>
+        <div style={{ color:C.emerald, fontSize:15, fontWeight:"bold" }}>SmartRisk Credit</div>
         {quota && (
           <div style={{ fontSize:12, color:"#aaa" }}>
-            Balance: <strong style={{ color:"var(--accent)" }}>{quota.credits} credits</strong>
+            Balance: <strong style={{ color:C.emerald }}>{quota.credits} credits</strong>
           </div>
         )}
+        {!quota && <div style={{ width:80 }} />}
       </div>
 
-      <div style={css.hero}>
-        <h1 style={{ fontSize:32, fontWeight:700, color:"var(--primary)", marginBottom:8, fontFamily:"'Playfair Display', serif" }}>
-          Buy Assessment Credits
+      {/* ── Hero ── */}
+      <div style={{ textAlign:"center", padding:"48px 24px 32px" }}>
+        <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", color:C.emerald, marginBottom:12 }}>
+          Pricing
+        </div>
+        <h1 style={{ fontSize:36, fontWeight:700, color:C.navy, marginBottom:12, fontFamily:"Georgia,serif", lineHeight:1.2 }}>
+          Simple, transparent pricing.
         </h1>
-        <p style={{ fontSize:15, color:"#5A5A5A", maxWidth:520, margin:"0 auto" }}>
-          One credit = one full assessment. Credits valid for 12 months from purchase.
+        <p style={{ fontSize:15, color:C.grey, maxWidth:480, margin:"0 auto", lineHeight:1.7 }}>
+          Start with 2 free assessments — no credit card, no commitment. Buy credits when you are ready. Credits are valid for 12 months and work across all pack sizes.
         </p>
       </div>
 
+      {/* ── Error ── */}
       {error && (
-        <div style={{ maxWidth:480, margin:"0 auto 20px", padding:"10px 16px", background:"#FCEBEB", color:"#791F1F", border:"1px solid #F09595", borderRadius:6, fontSize:13, textAlign:"center" }}>
+        <div style={{ maxWidth:760, margin:"0 auto 20px", padding:"10px 16px", background:"#FCEBEB", color:"#791F1F", border:"1px solid #F09595", borderRadius:6, fontSize:13, textAlign:"center" }}>
           {error}
         </div>
       )}
 
+      {/* ── Cards ── */}
       {loading ? (
         <div style={{ textAlign:"center", padding:40 }}>
-          <Loader size={28} style={{ animation:"spin 0.8s linear infinite", color:"var(--accent)" }} />
+          <Loader size={28} style={{ animation:"spin 0.8s linear infinite", color:C.emerald }} />
         </div>
-      ) : (
-        <div style={css.grid}>
-          {packs.map((pack, i) => {
-            const colors  = PACK_COLORS[pack.key] || { accent:"var(--primary)", bg:"#fff" };
-            const popular = pack.key === "standard";
-            const busy    = paying === pack.key;
+      ) : null}
+      {!loading && <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:20, maxWidth:960, margin:"0 auto", padding:"0 24px" }}>
+        {packs.sort((a,b) => PACK_ORDER.indexOf(a.key) - PACK_ORDER.indexOf(b.key)).map((pack) => {
+          const key  = pack.key;
+          const s    = PACK_STATIC[key] || {};
+          const m    = {
+            ...s,
+            label    : pack.label,
+            price    : `₦${pack.amount_naira.toLocaleString()}`,
+            credits  : `${pack.credits} credits`,
+            perCredit: `₦${pack.per_credit.toLocaleString()} per assessment`,
+            note     : "Access granted immediately after payment",
+          };
+          const busy = paying === key;
 
-            return (
-              <div key={pack.key} style={css.card(colors.accent, colors.bg, popular)}>
-                {popular && <div style={css.badge(colors.accent)}>Most Popular</div>}
+          return (
+            <div key={key} style={{
+              background    : "#fff",
+              borderRadius  : 12,
+              padding       : 28,
+              border        : m.popular ? `2px solid ${C.emerald}` : `1px solid ${C.border}`,
+              position      : "relative",
+              boxShadow     : m.popular ? "0 4px 24px rgba(0,0,0,0.09)" : "none",
+              display       : "flex",
+              flexDirection : "column",
+            }}>
 
-                <div style={{ fontSize:13, fontWeight:700, color:colors.accent, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:8 }}>
-                  {pack.label}
+              {/* Popular badge */}
+              {m.popular && (
+                <div style={{ position:"absolute", top:-13, left:"50%", transform:"translateX(-50%)", background:C.emerald, color:"#fff", fontSize:11, fontWeight:700, padding:"3px 14px", borderRadius:999, whiteSpace:"nowrap" }}>
+                  Most popular
                 </div>
-                <div style={{ fontSize:36, fontWeight:700, color:"var(--primary)", marginBottom:4 }}>
-                  {pack.credits}
-                  <span style={{ fontSize:16, fontWeight:400, color:"#888" }}> credits</span>
-                </div>
-                <div style={{ fontSize:22, fontWeight:700, color:colors.accent, marginBottom:4 }}>
-                  ₦{pack.amount_naira.toLocaleString()}
-                </div>
-                <div style={{ fontSize:12, color:"#888", marginBottom:16 }}>
-                  ₦{pack.per_credit.toLocaleString()} per assessment
-                </div>
-                <div style={{ fontSize:12, color:"#5A5A5A", lineHeight:1.6 }}>
-                  ✓ Valid for 12 months<br />
-                  ✓ Card, bank transfer, USSD<br />
-                  ✓ Instant credit top-up
-                </div>
+              )}
 
-                <button
-                  style={css.btn(colors.accent, busy || !!paying)}
-                  onClick={() => handleBuy(pack.key)}
-                  disabled={busy || !!paying}
-                >
-                  {busy
-                    ? <><Loader size={14} style={{ animation:"spin 0.8s linear infinite" }} /> Processing...</>
-                    : <><Zap size={14} /> Buy {pack.credits} Credits</>
-                  }
-                </button>
+              {/* Pack name */}
+              <div style={{ fontSize:15, fontWeight:700, color:C.navy, marginBottom:14 }}>
+                {m.label}
               </div>
-            );
-          })}
-        </div>
-      )}
 
-      <div style={css.freeBox}>
-        <div style={{ fontSize:13, fontWeight:"bold", color:"var(--primary)", marginBottom:6 }}>
-          New to SmartRisk Credit?
+              {/* Price */}
+              <div style={{ marginBottom:4 }}>
+                <span style={{ fontSize:28, fontWeight:700, color:C.navy }}>{m.price}</span>
+                <span style={{ fontSize:13, color:C.muted, marginLeft:4 }}>{m.suffix}</span>
+              </div>
+
+              {/* Credits + per assessment */}
+              <div style={{ fontSize:12, color:C.emerald, fontWeight:600, marginBottom:20 }}>
+                {m.credits} &nbsp;&middot;&nbsp; {m.perCredit}
+              </div>
+
+              <hr style={{ border:"none", borderTop:`1px solid ${C.border}`, marginBottom:18 }} />
+
+              {/* Features */}
+              <div style={{ flex:1, display:"flex", flexDirection:"column", gap:10, marginBottom:24 }}>
+                {m.features.map((f, i) => (
+                  <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:8, fontSize:13, color:C.grey, lineHeight:1.5 }}>
+                    <Check size={13} color={C.emerald} style={{ flexShrink:0, marginTop:2 }} />
+                    {f}
+                  </div>
+                ))}
+              </div>
+
+              {/* Button */}
+              <button
+                onClick={() => handleBuy(key)}
+                disabled={!!paying}
+                style={{
+                  width      : "100%",
+                  padding    : "11px 0",
+                  borderRadius: 8,
+                  fontSize   : 14,
+                  fontWeight : 600,
+                  cursor     : paying ? "not-allowed" : "pointer",
+                  fontFamily : "Arial,sans-serif",
+                  display    : "flex",
+                  alignItems : "center",
+                  justifyContent: "center",
+                  gap        : 6,
+                  transition : "opacity 0.15s",
+                  ...(m.popular
+                    ? { background: paying ? "#ccc" : C.emerald, color:"#fff", border:"none" }
+                    : { background:"#fff", color: paying ? C.muted : C.navy, border:`1.5px solid ${paying ? C.border : C.navy}` }
+                  ),
+                }}
+              >
+                {busy
+                  ? <><Loader size={14} style={{ animation:"spin 0.8s linear infinite" }} /> Processing...</>
+                  : m.btnLabel
+                }
+              </button>
+
+              {/* Note */}
+              <div style={{ fontSize:11, color:C.muted, textAlign:"center", marginTop:10 }}>
+                {m.note}
+              </div>
+            </div>
+          );
+        })}
+      </div>}
+
+      {/* ── Enterprise ── */}
+      <div style={{ maxWidth:960, margin:"24px auto 0", padding:"0 24px" }}>
+        <div style={{ background:"#fff", border:`1px solid ${C.border}`, borderRadius:12, padding:"24px 32px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:24, flexWrap:"wrap" }}>
+          <div style={{ flex:1, minWidth:260 }}>
+            <div style={{ fontSize:15, fontWeight:700, color:C.navy, marginBottom:8 }}>Enterprise</div>
+            <div style={{ fontSize:13, color:C.grey, lineHeight:1.7 }}>
+              Unlimited assessments &middot; Team accounts &middot; Approval workflow &middot; Custom branded reports &middot;
+              Dedicated subdomain &middot; SLA &middot; Full audit trail. For PFAs, investment banks, and multi-team risk operations.
+            </div>
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8, flexShrink:0 }}>
+            <div style={{ fontSize:13, color:C.muted, fontWeight:600 }}>Custom pricing</div>
+            <button
+              onClick={() => window.location.href = "mailto:info@smartrisksheets.com"}
+              style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 20px", background:"#fff", color:C.navy, border:`1.5px solid ${C.navy}`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"Arial,sans-serif" }}
+            >
+              <Mail size={13} /> Contact us →
+            </button>
+          </div>
         </div>
-        <div style={{ fontSize:13, color:"#5A5A5A", marginBottom:12 }}>
-          Create a free account and get 2 assessment credits — no card required.
-        </div>
-        <button onClick={() => navigate("/register")}
-          style={{ padding:"9px 24px", background:"var(--primary)", color:"#fff", border:"none", borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer" }}>
-          Start Free →
-        </button>
       </div>
 
-      <div style={{ textAlign:"center", marginTop:32, fontSize:11, color:"#888" }}>
-        All payments processed securely by Paystack &bull; SmartRisk Sheets Technologies Limited (RC: 9170218)
+      {/* ── Footer ── */}
+      <div style={{ textAlign:"center", marginTop:32, fontSize:12, color:C.muted, lineHeight:1.8, padding:"0 24px" }}>
+        Payments processed securely via Paystack. Credit packs are one-time purchases — no subscription, no auto-renewal.<br />
+        Credits are valid for 12 months. Questions? Email{" "}
+        <a href="mailto:info@smartrisksheets.com" style={{ color:C.emerald, textDecoration:"none" }}>
+          info@smartrisksheets.com
+        </a>
       </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

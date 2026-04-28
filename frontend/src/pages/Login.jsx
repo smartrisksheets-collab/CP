@@ -266,8 +266,8 @@ export default function Login() {
             <span style={{ color:"var(--accent)" }}>In seconds.</span>
           </h1>
           <p style={S.heroSub}>
-            Analyse your Commercial Paper and Promissory Note listings in 4 quick steps.
-            Cut your credit risk analysis time in half.
+            Analyse Commercial Paper offerings in 4 quick steps.
+            Cut your assessment time in half and score your clients in seconds.
           </p>
           <div style={S.statStrip}>
             <div style={S.stat}><div style={S.statVal}>4</div><div style={S.statLbl}>Simple steps</div></div>

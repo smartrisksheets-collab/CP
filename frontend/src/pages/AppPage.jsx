@@ -61,7 +61,7 @@ export default function AppPage() {
         )}
         <div>
           <div style={{ color:"var(--accent)", fontSize:16, fontWeight:"bold", letterSpacing:"0.03em" }}>SmartRisk Credit</div>
-          <div style={{ color:"#999", fontSize:12 }}>CP &amp; Promissory Note Assessment</div>
+          <div style={{ color:"#999", fontSize:12 }}>Commercial Paper Risk Assessment</div>
         </div>
       </div>
       <div style={{ display:"flex", alignItems:"center", gap:8 }}>
@@ -471,10 +471,10 @@ function LegalModal({ id, onClose }) {
 
 function FaqContent() {
   const faqs = [
-    ["What does SmartRisk Credit actually do?", "SmartRisk Credit is an AI-assisted credit risk scoring tool for Nigerian capital markets professionals. You upload a company's audited financial statements, the AI extracts the key figures, and the tool computes 10 standardised ratios to produce a total score out of 56. A score of 34 or above (60%) indicates the issuer is eligible for a CP or promissory note investment."],
+    ["What does SmartRisk Credit actually do?", "SmartRisk Credit is an AI-assisted credit risk scoring tool for Nigerian capital markets professionals. You upload a company's audited financial statements, the AI extracts the key figures, and the tool computes 10 standardised ratios to produce a total score out of 56. A score of 34 or above (60%) indicates the issuer is eligible for a investing in Commercial Papers (CPs)."],
     ["Is the score a formal credit rating?", "No. The SmartRisk Credit score is a quantitative decision-support tool for internal use only. It is not a regulated credit rating and does not replace the opinion of a licensed credit rating agency such as Agusto & Co., GCR Ratings, or DataPro."],
     ["What financial statements should I upload?", "Upload the most recent audited annual financial statements for the issuing entity — not the group. The document should include the Statement of Comprehensive Income, Statement of Financial Position, Statement of Cash Flows, and Notes to the Accounts."],
-    ["Why standalone figures and not group figures?", "The obligor on the CP or promissory note is the legal entity itself, not the group. Group consolidated figures include subsidiary revenues and assets not available to service the CP. The AI is specifically instructed to extract standalone figures."],
+    ["Why standalone figures and not group figures?", "The obligor on the CP is the legal entity itself, not the group. Group consolidated figures include subsidiary revenues and assets not available to service the CP. The AI is specifically instructed to extract standalone figures."],
     ["What if the AI extracts the wrong figures?", "Every extracted figure is shown on the Review Data screen before scores are computed. You can edit any field manually. Blue fields were populated by AI; amber fields require manual entry."],
     ["How is the cut-off score of 34 determined?", "The cut-off is set at 60% of the maximum possible score of 56 points. This threshold was calibrated against the financial profiles of investment-grade issuers in the Nigerian capital market."],
     ["Is my uploaded data stored or shared?", "No. Uploaded documents are processed only to extract financial figures and are not retained after your session ends. Your email is used only for access management."],

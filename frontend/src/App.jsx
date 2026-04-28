@@ -65,7 +65,7 @@ function SplashScreen({ onContinue }) {
           SmartRisk Credit
         </div>
         <div style={{ fontSize:12, color:"#7a8db8", marginBottom:36 }}>
-          CP &amp; Promissory Note Assessment
+          Commercial Paper Risk Assessment
         </div>
         <div style={{ fontSize:14, color:"#c8d0e0", lineHeight:1.9, textAlign:"left", marginBottom:32 }}>
           <strong style={{ color:"#fff" }}>Important Notice</strong><br /><br />

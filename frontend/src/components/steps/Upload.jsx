@@ -201,7 +201,7 @@ const css = {
 };
 
 // ── Sub-components ────────────────────────────────────────
-function UploadZone({ label, sub, file, onFile, onClear, validating }) {
+function UploadZone({ label, sub, file, onFile, onClear, validating, onGuard }) {
   const [hover, setHover] = useState(false);
   const ref = useRef();
 
@@ -224,10 +224,10 @@ function UploadZone({ label, sub, file, onFile, onClear, validating }) {
       <input ref={ref} type="file" accept=".pdf" style={{ display:"none" }}
         onChange={(e) => e.target.files[0] && onFile(e.target.files[0])} />
       <div style={css.zone(hover)}
-        onClick={() => ref.current.click()}
+        onClick={() => { if (onGuard?.()) return; ref.current.click(); }}
         onDragOver={(e) => { e.preventDefault(); setHover(true); }}
         onDragLeave={() => setHover(false)}
-        onDrop={(e) => { e.preventDefault(); setHover(false); const f = e.dataTransfer.files[0]; if (f?.type === "application/pdf") onFile(f); }}
+        onDrop={(e) => { e.preventDefault(); setHover(false); if (onGuard?.()) return; const f = e.dataTransfer.files[0]; if (f?.type === "application/pdf") onFile(f); }}
         onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       >
         <UploadIcon size={36} style={{ margin:"0 auto 12px", opacity:0.35, display:"block" }} />
@@ -258,6 +258,23 @@ function ValidationWarnings({ warnings }) {
           <span>{w}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+function InfoModal({ onClose }) {
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:99999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+      <div style={{ background:"#fff", borderRadius:10, padding:"28px 32px", maxWidth:420, width:"100%", boxShadow:"0 16px 60px rgba(0,0,0,0.2)", textAlign:"center" }}>
+        <div style={{ width:40, height:40, borderRadius:"50%", border:"2px solid #1F2854", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", fontSize:18, fontWeight:"bold", color:"#1F2854" }}>i</div>
+        <div style={{ fontSize:15, fontWeight:"bold", color:"#1F2854", marginBottom:10 }}>Client name required</div>
+        <p style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.7, marginBottom:24 }}>
+          Please enter the client name in the field above before uploading the financial statement. The name is used to verify the document belongs to the correct company.
+        </p>
+        <button onClick={onClose} style={{ padding:"9px 28px", fontSize:13, borderRadius:6, cursor:"pointer", border:"none", background:"#1F2854", color:"#fff", fontFamily:"Arial,sans-serif", fontWeight:600 }}>
+          OK, got it
+        </button>
+      </div>
     </div>
   );
 }
@@ -302,7 +319,9 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtractStart 
   const [ratV, setRatV] = useState(BLANK);
   const [cpV,  setCpV]  = useState(BLANK);
 
-  const [confirm, setConfirm] = useState(null); // { year, file }
+  const [confirm,   setConfirm]   = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const nameGuard = () => { if (!info.clientName?.trim()) { setShowModal(true); return true; } return false; };
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
 
@@ -405,6 +424,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtractStart 
     <div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
+      {showModal && <InfoModal onClose={() => setShowModal(false)} />}
       {error && (
         <div style={{ padding:"10px 14px", borderRadius:6, fontSize:13, background:"#FCEBEB", color:"#791F1F", border:"1px solid #F09595", marginBottom:12 }}>
           {error}
@@ -444,6 +464,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtractStart 
           onFile={handleFinFile}
           onClear={() => { setFinFile(null); setFinV(BLANK); }}
           validating={finV.validating}
+          onGuard={nameGuard}
         />
         {finV.error    && <ValidationError msg={finV.error} onClear={() => setFinV(BLANK)} />}
         {!finV.error   && <ValidationWarnings warnings={finV.warnings} />}
@@ -459,6 +480,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtractStart 
           onFile={handleRatFile}
           onClear={() => { setRatFile(null); setRatV(BLANK); }}
           validating={ratV.validating}
+          onGuard={nameGuard}
         />
         {ratV.error    && <ValidationError msg={ratV.error} onClear={() => setRatV(BLANK)} />}
         {!ratV.error   && <ValidationWarnings warnings={ratV.warnings} />}
@@ -474,6 +496,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtractStart 
           onFile={handleCpFile}
           onClear={() => { setCpFile(null); setCpV(BLANK); }}
           validating={cpV.validating}
+          onGuard={nameGuard}
         />
         {cpV.error    && <ValidationError msg={cpV.error} onClear={() => setCpV(BLANK)} />}
         {!cpV.error   && <ValidationWarnings warnings={cpV.warnings} />}

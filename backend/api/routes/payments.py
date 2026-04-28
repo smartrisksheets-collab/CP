@@ -21,10 +21,9 @@ PAYSTACK_PUBLIC_KEY = os.getenv("PAYSTACK_PUBLIC_KEY")
 # ── Credit packs — single source of truth ─────────────────────
 # Amount in kobo (naira × 100)
 CREDIT_PACKS = {
-    "starter"     : {"credits": 5,   "amount_kobo": 1500000,  "label": "Starter"},
-    "standard"    : {"credits": 15,  "amount_kobo": 3500000,  "label": "Standard"},
-    "professional": {"credits": 40,  "amount_kobo": 7500000,  "label": "Professional"},
-    "team"        : {"credits": 100, "amount_kobo": 15000000, "label": "Team"},
+    "starter"     : {"credits": 5,  "amount_kobo": 2000000,  "label": "Starter"},
+    "standard"    : {"credits": 15, "amount_kobo": 5400000,  "label": "Standard"},
+    "professional": {"credits": 30, "amount_kobo": 9900000,  "label": "Professional"},
 }
 
 CREDIT_EXPIRY_DAYS = 365  # 12 months
