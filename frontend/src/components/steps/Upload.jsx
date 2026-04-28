@@ -26,7 +26,14 @@ const CP_PROSPECTUS_KW = [
 
 const UNAUDITED_KW = [
   "unaudited","management accounts","management report",
-  "interim","half year","half-year","quarter",
+  "interim financial","half year report","half-year report",
+  "quarterly report","unaudited interim",
+];
+
+const RAT_KW = [
+  "credit rating","rating agency","rating assigned","rating action",
+  "issuer rating","national scale","long-term rating","short-term rating",
+  "rating rationale","rating outlook","agusto","gcr","datapro","fitch","moody",
 ];
 
 // ── PDF.js ────────────────────────────────────────────────
@@ -98,6 +105,10 @@ async function runFinValidation(file, clientName) {
     return { ok: false, hard: "This does not appear to be a financial statement. Key financial terms were not found. Please upload the audited annual accounts." };
   }
 
+  if (countKw(text, RAT_KW) >= 3 && countKw(text, FIN_KW) < 8) {
+    return { ok: false, hard: "This looks like a credit rating report, not a financial statement. Please upload it in the Credit Rating PDF slot instead." };
+  }
+
   if (clientName?.trim() && tokenScore(clientName, text.slice(0, 3000)) < 0.6) {
     return { ok: false, hard: `Company name mismatch — "${clientName}" was not found in this document. Please verify you have uploaded the correct financial statements.` };
   }
@@ -126,6 +137,14 @@ async function runRatValidation(file, clientName) {
     ({ text } = await extractText(file, 10));
   } catch {
     return { ok: true, warnings: ["Rating PDF could not be fully read. Accepted — verify rating details manually."] };
+  }
+
+  if (text.replace(/\s/g, "").length < 300) {
+    return { ok: true, warnings: ["Scanned or image-based rating PDF detected. Accepted — verify rating details manually."] };
+  }
+
+  if (countKw(text, RAT_KW) < 2) {
+    return { ok: false, hard: "This does not appear to be a credit rating report. Key rating terms were not found. Please upload the rating certificate or report from Agusto & Co., GCR, DataPro, or similar." };
   }
 
   if (clientName?.trim() && tokenScore(clientName, text.slice(0, 3000)) < 0.6) {
@@ -159,7 +178,7 @@ async function runRatValidation(file, clientName) {
   return { ok: true, warnings };
 }
 
-async function runCPValidation(file) {
+async function runCPValidation(file, clientName) {
   let text = "", numPages = 0;
   try {
     ({ text, numPages } = await extractText(file, 10));
@@ -171,11 +190,15 @@ async function runCPValidation(file) {
     return { ok: true, warnings: ["Scanned or image-based PDF detected. Terms accepted — verify all extracted fields carefully."] };
   }
 
+  if (clientName?.trim() && tokenScore(clientName, text.slice(0, 3000)) < 0.6) {
+    return { ok: false, hard: `Company name mismatch — "${clientName}" was not found in this CP terms document. Please verify you have uploaded the correct file.` };
+  }
+
   if (countKw(text, CP_REQUIRED_KW) < 4) {
     return { ok: false, hard: "This does not appear to be an indicative terms email. Key CP terms (Discount Rate, Implied Yield, Offer Open/Close, etc.) were not found. Please upload the forwarded CP email PDF." };
   }
 
-  if (maxOccurrences(text, CP_PROSPECTUS_KW) >= 3) {
+  if (countKw(text, CP_PROSPECTUS_KW) >= 3) {
     return { ok: false, hard: "This looks like a full Programme Memorandum or Information Memorandum, not an indicative terms email. Please upload the short forwarded email (typically 3–6 pages)." };
   }
 
@@ -377,7 +400,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtractStart 
   async function handleCpFile(file) {
     setCpFile(file);
     setCpV({ validating: true, warnings: [], error: "" });
-    const result = await runCPValidation(file);
+    const result = await runCPValidation(file, info.clientName);
 
     if (result.ok === false) {
       setCpFile(null);
