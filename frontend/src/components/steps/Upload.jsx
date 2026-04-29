@@ -345,11 +345,9 @@ const BLANK = { validating: false, warnings: [], error: "" };
 export default function Upload({ clientInfo, onClientInfoChange, onExtractStart }) {
   const [finFile, setFinFile] = useState(null);
   const [ratFile, setRatFile] = useState(null);
-  const [cpFile,  setCpFile]  = useState(null);
 
   const [finV, setFinV] = useState(BLANK);
   const [ratV, setRatV] = useState(BLANK);
-  const [cpV,  setCpV]  = useState(BLANK);
 
   const [confirm,   setConfirm]   = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -404,18 +402,6 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtractStart 
     setRatV({ validating: false, warnings: result.warnings, error: "" });
   }
 
-  async function handleCpFile(file) {
-    setCpFile(file);
-    setCpV({ validating: true, warnings: [], error: "" });
-    const result = await runCPValidation(file, info.clientName);
-
-    if (result.ok === false) {
-      setCpFile(null);
-      setCpV({ validating: false, warnings: [], error: result.hard });
-      return;
-    }
-    setCpV({ validating: false, warnings: result.warnings, error: "" });
-  }
 
   // ── Extract ─────────────────────────────────────────────
   async function handleExtract() {
@@ -427,17 +413,20 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtractStart 
     const fd = new FormData();
     fd.append("financial_pdf", finFile);
     if (ratFile) fd.append("rating_pdf", ratFile);
-    if (cpFile)  fd.append("cp_terms_pdf", cpFile);
 
     const promise = extractFigures(fd)
       .then((res) => {
         const data = res.data;
+        const update = {};
         if (data.ratingData) {
-          onClientInfoChange({
-            ...info,
-            extractedRating : data.ratingData,
-            creditRating    : data.ratingData.longTermRating || info.creditRating,
-          });
+          update.extractedRating = data.ratingData;
+          update.creditRating    = data.ratingData.longTermRating || info.creditRating;
+        }
+        if (data.cpTerms) {
+          update.cpTerms = data.cpTerms;
+        }
+        if (Object.keys(update).length) {
+          onClientInfoChange({ ...info, ...update });
         }
         return data.figures;
       })
@@ -449,7 +438,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtractStart 
     }, promise);
   }
 
-  const anyValidating = finV.validating || ratV.validating || cpV.validating;
+  const anyValidating = finV.validating || ratV.validating;
   const canExtract    = !!finFile && !!info.clientName?.trim() && !loading && !anyValidating;
 
   return (
@@ -516,22 +505,6 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtractStart 
         />
         {ratV.error    && <ValidationError msg={ratV.error} onClear={() => setRatV(BLANK)} />}
         {!ratV.error   && <ValidationWarnings warnings={ratV.warnings} />}
-      </div>
-
-      {/* CP indicative terms */}
-      <div style={css.card}>
-        <div style={css.title}>CP Indicative Terms <span style={{ fontWeight:"normal", fontSize:11, color:"#888" }}>(optional)</span></div>
-        <UploadZone
-          label="Click to upload indicative terms email"
-          sub="Forwarded CP email PDF, max 6 pages — AI extracts all terms"
-          file={cpFile}
-          onFile={handleCpFile}
-          onClear={() => { setCpFile(null); setCpV(BLANK); }}
-          validating={cpV.validating}
-          onGuard={nameGuard}
-        />
-        {cpV.error    && <ValidationError msg={cpV.error} onClear={() => setCpV(BLANK)} />}
-        {!cpV.error   && <ValidationWarnings warnings={cpV.warnings} />}
       </div>
 
       <div style={css.actions}>

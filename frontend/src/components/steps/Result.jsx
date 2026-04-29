@@ -27,7 +27,8 @@ const CATEGORIES = {
   "altman_z"         : "Corporate Bankruptcy",
 };
 
-export default function Result({ scoreResult, assessmentId, narrative, clientInfo, onBack, onNew }) {
+export default function Result({ scoreResult, assessmentId, narrative: initialNarrative, clientInfo, onBack, onNew }) {
+  const [narrative, setNarrative] = useState(initialNarrative);
   const [downloading, setDownloading] = useState(false);
   const [dlError, setDlError]         = useState("");
   const [showPreview, setShowPreview] = useState(false);
@@ -199,6 +200,7 @@ export default function Result({ scoreResult, assessmentId, narrative, clientInf
           clientInfo={clientInfo}
           scoreResult={scoreResult}
           onClose={() => setShowPreview(false)}
+          onSave={(edited) => setNarrative(edited)}
         />
       )}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

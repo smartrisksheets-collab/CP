@@ -38,6 +38,12 @@ export default function ReviewData({ figures, onChange, onBack, onNext }) {
     if (next.ebit !== null && next.ebit !== undefined) {
       next.ebitda = ebit + da;
     }
+    // Auto-compute Total Debt
+    const std = parseFloat(next.shortTermDebt);
+    const ltd = parseFloat(next.longTermDebt);
+    if (!isNaN(std) || !isNaN(ltd)) {
+      next.totalDebt = (std || 0) + (ltd || 0);
+    }
     onChange(next);
   }
 
@@ -103,7 +109,7 @@ export default function ReviewData({ figures, onChange, onBack, onNext }) {
           <Field label="Total Liabilities (₦'000)" id="totalLiabilities" figures={figures} onChange={set} />
           <Field label="Short-term Debt (₦'000)" id="shortTermDebt" figures={figures} onChange={set} />
           <Field label="Long-term Debt (₦'000)" id="longTermDebt" figures={figures} onChange={set} />
-          <Field label="Total Debt (₦'000)" id="totalDebt" figures={figures} onChange={set} />
+          <Field label="Total Debt (₦'000) — auto-computed" id="totalDebt" figures={figures} onChange={set} readonly />
           <Field label="Shareholders' Equity (₦'000)" id="shareholdersEquity" figures={figures} onChange={set} />
           <Field label="Retained Earnings (₦'000)" id="retainedEarnings" figures={figures} onChange={set} />
         </div>

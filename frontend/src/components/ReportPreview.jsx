@@ -18,7 +18,7 @@ const RATING_OPTIONS = {
   futureRiskLevel  : ["Low", "Moderate", "High"],
 };
 
-export default function ReportPreview({ assessmentId, narrative, clientInfo, scoreResult, onClose }) {
+export default function ReportPreview({ assessmentId, narrative, clientInfo, scoreResult, onClose, onSave }) {
   const [edited, setEdited]       = useState({ ...narrative });
   const [downloading, setDownloading] = useState(false);
   const [error, setError]         = useState("");
@@ -31,7 +31,7 @@ export default function ReportPreview({ assessmentId, narrative, clientInfo, sco
     setDownloading(true);
     setError("");
     try {
-      const res = await generateReport(assessmentId);
+      const res = await generateReport(assessmentId, edited);
       const url = URL.createObjectURL(new Blob([res.data], { type:"application/pdf" }));
       const a   = document.createElement("a");
       a.href    = url;
@@ -120,6 +120,10 @@ export default function ReportPreview({ assessmentId, narrative, clientInfo, sco
             <div style={{ fontSize:12, color:"#791F1F", alignSelf:"center", flex:1 }}>{error}</div>
           )}
           <button style={css.btnGhost} onClick={onClose}>Cancel</button>
+          <button style={css.btnGhost} onClick={() => { onSave?.(edited); onClose(); }}
+            style={{ ...css.btnGhost, borderColor:"#1F2854", color:"#1F2854" }}>
+            Save
+          </button>
           <button style={css.btnAccent} onClick={handleDownload} disabled={downloading}>
             {downloading
               ? <><Loader size={14} style={{ animation:"spin 0.8s linear infinite" }} /> Generating...</>

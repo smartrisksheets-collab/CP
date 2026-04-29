@@ -11,9 +11,10 @@ import string
 import os
 import resend
 
+from fastapi import Request
 from api.db import SessionLocal
 from api.models import Tenant, User, OTP
-from api.deps import get_db, get_current_user, JWT_SECRET, JWT_ALGORITHM
+from api.deps import get_db, get_current_user, JWT_SECRET, JWT_ALGORITHM, limiter
 
 router = APIRouter()
 
@@ -103,7 +104,8 @@ async def _send_otp_email(email: str, otp: str, tenant_name: str):
 
 # ── POST /auth/request-otp ────────────────────────────────────
 @router.post("/request-otp")
-async def request_otp(body: OTPRequestBody, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def request_otp(request: Request, body: OTPRequestBody, db: AsyncSession = Depends(get_db)):
     print(f"[request_otp] email={body.email} hostname={body.hostname} code={body.code}")
     # 1. Resolve tenant
     result = await db.execute(select(Tenant).where(Tenant.hostname == body.hostname))
@@ -168,7 +170,8 @@ async def request_otp(body: OTPRequestBody, db: AsyncSession = Depends(get_db)):
 
 # ── POST /auth/verify-otp ─────────────────────────────────────
 @router.post("/verify-otp")
-async def verify_otp(body: OTPVerifyBody, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute")
+async def verify_otp(request: Request, body: OTPVerifyBody, db: AsyncSession = Depends(get_db)):
     # 1. Resolve tenant
     result = await db.execute(select(Tenant).where(Tenant.hostname == body.hostname))
     tenant = result.scalar_one_or_none()
@@ -194,9 +197,16 @@ async def verify_otp(body: OTPVerifyBody, db: AsyncSession = Depends(get_db)):
         await db.commit()
         raise HTTPException(status_code=400, detail="Verification code has expired. Please request a new one.")
 
-    # 4. Verify hash
+    # 4. Verify hash — track failed attempts
     if not _verify_otp_hash(body.otp.strip(), otp_record.code_hash):
-        raise HTTPException(status_code=400, detail="Incorrect verification code.")
+        otp_record.attempts = (otp_record.attempts or 0) + 1
+        if otp_record.attempts >= 5:
+            otp_record.used = True
+            await db.commit()
+            raise HTTPException(status_code=400, detail="Too many incorrect attempts. Please request a new code.")
+        await db.commit()
+        remaining = 5 - otp_record.attempts
+        raise HTTPException(status_code=400, detail=f"Incorrect code. {remaining} attempt{'s' if remaining != 1 else ''} remaining.")
 
     # 5. Mark OTP used — atomic, no race condition
     otp_record.used = True

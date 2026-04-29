@@ -60,13 +60,16 @@ export const extractFigures = (formData) =>
     headers: { "Content-Type": "multipart/form-data" },
   });
 
-export const runAssessment = (figures, clientInfo) =>
-  api.post("/assessment/run", { figures, clientInfo });
+export const extractCpTerms = (formData) =>
+  api.post("/assessment/extract-cp", formData, { headers: { "Content-Type": "multipart/form-data" } });
 
-export const generateReport = (assessmentId) =>
+export const runAssessment = (figures, clientInfo) =>
+  api.post("/assessment/run", { figures, clientInfo }, { timeout: 120000 });
+
+export const generateReport = (assessmentId, narrativeOverrides = {}) =>
   api.post(
     "/assessment/report",
-    { assessment_id: assessmentId },
+    { assessment_id: assessmentId, narrative_overrides: narrativeOverrides },
     { responseType: "blob" }
   );
 

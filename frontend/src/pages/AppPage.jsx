@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import Upload from "../components/steps/Upload.jsx";
 import Extraction from "../components/steps/Extraction.jsx";
+import CPTerms from "../components/steps/CPTerms.jsx";
 import ReviewData from "../components/steps/ReviewData.jsx";
 import Scores from "../components/steps/Scores.jsx";
 import Result from "../components/steps/Result.jsx";
@@ -11,7 +12,7 @@ import { LogOut, BookOpen, LayoutDashboard, X, Zap, Shield, MessageCircle, Chevr
 import { getQuotaStatus } from "../api/client.js";
 import { useNavigate } from "react-router-dom";
 
-const STEPS = ["Upload", "Review Data", "Scores", "Result"];
+const STEPS = ["Upload", "CP Terms", "Review Data", "Scores", "Result"];
 
 export default function AppPage() {
   const { user, logout }  = useAuth();
@@ -221,44 +222,61 @@ export default function AppPage() {
               setExtracting(false);
               setStep(1);
             })
-            .catch(() => setExtracting(false));
+            .catch((e) => {
+              setExtracting(false);
+              const detail = e.response?.data?.detail;
+              if (detail?.quotaExceeded) {
+                setQuotaMsg(detail.message || "You have 0 credits remaining.");
+              } else {
+                setQuotaMsg(typeof detail === "string" ? detail : "Extraction failed. Please try again.");
+              }
+            });
         }}
       />
     );
   } else if (step === 1) {
     content = (
-      <ReviewData
+      <CPTerms
         figures={figures}
-        onChange={setFigures}
+        onFiguresChange={setFigures}
         onBack={() => setStep(0)}
         onNext={() => setStep(2)}
       />
     );
   } else if (step === 2) {
     content = (
+      <ReviewData
+        figures={figures}
+        onChange={setFigures}
+        onBack={() => setStep(1)}
+        onNext={() => setStep(3)}
+      />
+    );
+  } else if (step === 3) {
+    content = (
       <Scores
         figures={figures}
         scoreResult={scoreResult}
         onScored={setScoreResult}
         onQuotaExceeded={(msg) => setQuotaMsg(msg)}
-        onBack={() => setStep(1)}
+        onBack={() => setStep(2)}
         onNext={(result, id, narr) => {
           setScoreResult(result);
           setAssessmentId(id);
           setNarrative(narr);
-          setStep(3);
+          setStep(4);
         }}
         clientInfo={clientInfo}
       />
     );
-  } else if (step === 3) {
+  } else if (step === 4) {
     content = (
       <Result
         scoreResult={scoreResult}
         assessmentId={assessmentId}
         narrative={narrative}
         clientInfo={clientInfo}
-        onBack={() => setStep(2)}
+        onBack={() => setStep(3)}
         onNew={startNew}
       />
     );

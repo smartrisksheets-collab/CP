@@ -26,7 +26,8 @@ class RunAssessmentBody(BaseModel):
 
 
 class ReportBody(BaseModel):
-    assessment_id: int
+    assessment_id      : int
+    narrative_overrides: dict = {}
 
 
 # ── Helpers ───────────────────────────────────────────────────
@@ -105,6 +106,9 @@ async def extract(
     current_user  : dict                    = Depends(get_current_user),
     db            : AsyncSession            = Depends(get_db),
 ):
+    user = await _get_user(current_user["email"], current_user["tenant_id"], db)
+    await _check_quota(user)
+
     # Read and validate financial PDF
     fin_bytes = await financial_pdf.read()
     _validate_pdf(financial_pdf, fin_bytes)
@@ -141,6 +145,22 @@ async def extract(
             result["cpTermsError"] = str(e)
 
     return result
+
+
+# ── POST /assessment/extract-cp ──────────────────────────────
+@router.post("/extract-cp")
+async def extract_cp(
+    cp_terms_pdf : UploadFile     = File(...),
+    current_user : dict           = Depends(get_current_user),
+    db           : AsyncSession   = Depends(get_db),
+):
+    cp_bytes = await cp_terms_pdf.read()
+    _validate_pdf(cp_terms_pdf, cp_bytes)
+    try:
+        cp_terms = await extract_cp_terms(base64.b64encode(cp_bytes).decode())
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return { "cpTerms": cp_terms }
 
 
 # ── POST /assessment/run ──────────────────────────────────────
@@ -224,6 +244,12 @@ async def generate_report(
     assessment = result.scalar_one_or_none()
     if not assessment:
         raise HTTPException(status_code=404, detail="Assessment not found.")
+
+    if body.narrative_overrides:
+        from copy import deepcopy
+        from api.models import Assessment as _A
+        assessment = deepcopy(assessment)
+        assessment.narrative = {**(assessment.narrative or {}), **body.narrative_overrides}
 
     try:
         pdf_bytes = build_pdf(assessment)
