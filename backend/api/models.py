@@ -51,8 +51,11 @@ class User(Base):
     role         : Mapped[str]           = mapped_column(Text, default="user")   # user | admin | superadmin
     plan         : Mapped[str]           = mapped_column(Text, default="free")   # last pack purchased
     credits      : Mapped[int]           = mapped_column(Integer, default=0)     # current credit balance
-    verified     : Mapped[bool]          = mapped_column(Boolean, default=False) # email verified
-    created_at   : Mapped[datetime]      = mapped_column(DateTime(timezone=True), server_default=func.now())
+    verified           : Mapped[bool]           = mapped_column(Boolean, default=False)
+    onboarding_role    : Mapped[Optional[str]]  = mapped_column(Text, nullable=True)
+    onboarding_process : Mapped[Optional[str]]  = mapped_column(Text, nullable=True)
+    onboarding_volume  : Mapped[Optional[str]]  = mapped_column(Text, nullable=True)
+    created_at         : Mapped[datetime]        = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     tenant       : Mapped["Tenant"]      = relationship(back_populates="users")
 

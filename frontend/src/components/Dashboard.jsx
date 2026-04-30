@@ -196,7 +196,7 @@ function AssessmentModal({ data, onClose, onSaved, onError }) {
   async function handleDownload() {
     setDlBusy(true);
     try {
-      const res = await generateReport(data.id);
+      const res = await generateReport(data.id, narr);
       const url = URL.createObjectURL(new Blob([res.data], { type:"application/pdf" }));
       const a   = document.createElement("a");
       a.href    = url;
@@ -240,7 +240,7 @@ function AssessmentModal({ data, onClose, onSaved, onError }) {
   return (
     <div onClick={e => e.target === e.currentTarget && onClose()}
          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
-      <div style={{ background:"#fff", borderRadius:12, width:"100%", maxWidth:780, maxHeight:"90vh", overflowY:"auto", padding:"32px 36px", position:"relative", boxShadow:"0 24px 80px rgba(0,0,0,0.25)" }}>
+      <div style={{ background:"#fff", borderRadius:12, width:"100%", maxWidth:780, maxHeight:"90vh", overflowY:"auto", overflowX:"hidden", padding:"32px 36px", boxSizing:"border-box", position:"relative", boxShadow:"0 24px 80px rgba(0,0,0,0.25)" }}>
         <button onClick={onClose} style={{ position:"absolute", top:14, right:18, background:"none", border:"none", cursor:"pointer", color:"#888" }}><X size={18} /></button>
 
         <h2 style={{ fontSize:18, fontWeight:"bold", color:"var(--primary)", marginBottom:4 }}>{data.clientName}</h2>
@@ -256,8 +256,8 @@ function AssessmentModal({ data, onClose, onSaved, onError }) {
         {data.ratios?.length > 0 && (
           <div style={{ marginBottom:24 }}>
             <div style={{ fontSize:13, fontWeight:"bold", color:"#5A5A5A", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:10, paddingBottom:6, borderBottom:"1px solid #F0F0F0" }}>Score Breakdown</div>
-            <div style={{ overflowX:"auto" }}>
-              <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+            <div style={{ overflowX:"auto", width:"100%" }}>
+              <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13, minWidth:520 }}>
                 <thead><tr>
                   <th style={th}>Ratio</th><th style={th}>Result</th><th style={th}>Band</th>
                   <th style={{ ...th, textAlign:"right" }}>Score</th><th style={{ ...th, textAlign:"right" }}>Max</th>

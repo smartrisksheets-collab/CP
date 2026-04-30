@@ -46,7 +46,7 @@ C_AMBER    = colors.HexColor("#EF9F27")
 C_BLUE     = colors.HexColor("#378ADD")
 C_CREAM    = colors.HexColor("#F5F5F2")
 C_BORDER   = colors.HexColor("#E8E8E8")
-C_BODY     = colors.HexColor("#5A5A5A")
+C_BODY     = colors.HexColor("#2C2C2C")
 C_GREY     = colors.HexColor("#888888")
 C_MUTED    = colors.HexColor("#9aaed4")
 C_RED      = colors.HexColor("#E24B4A")
@@ -127,7 +127,7 @@ def _ST():
         "hd_score" : ps("hd_score", fontSize=7,  textColor=C_MUTED, leading=9, alignment=TA_RIGHT),
         "met_lbl"  : ps("met_lbl",  fontSize=7,  textColor=C_GREY, leading=9),
         "met_val"  : ps("met_val",  fontSize=13, textColor=C_NAVY, fontName=_CURRENCY_FONT, leading=16),
-        "sec_hdr"  : ps("sec_hdr",  fontSize=7,  textColor=C_GREY, fontName="Helvetica-Bold", leading=9),
+        "sec_hdr"  : ps("sec_hdr",  fontSize=9,  textColor=colors.white, fontName="Helvetica-Bold", leading=11),
         "cp_lbl"   : ps("cp_lbl",   fontSize=7,  textColor=C_GREY, leading=9),
         "cp_val"   : ps("cp_val",   fontSize=9,  textColor=C_NAVY, fontName="Helvetica-Bold", leading=11),
         "tile_lbl" : ps("tile_lbl", fontSize=7,  textColor=C_GREY, fontName="Helvetica-Bold", leading=9),
@@ -205,12 +205,10 @@ def _badge(text, bg, fg):
 def _sec_hdr(title, ST):
     t = Table([[Paragraph(title, ST["sec_hdr"])]], colWidths=[CW])
     t.setStyle(TableStyle([
-        ("BACKGROUND",    (0,0), (-1,-1), C_CREAM),
+        ("BACKGROUND",    (0,0), (-1,-1), C_NAVY),
         ("LEFTPADDING",   (0,0), (-1,-1), 12),
-        ("TOPPADDING",    (0,0), (-1,-1), 6),
-        ("BOTTOMPADDING", (0,0), (-1,-1), 6),
-        ("LINEABOVE",     (0,0), (-1,-1), 0.5, C_BORDER),
-        ("LINEBELOW",     (0,0), (-1,-1), 0.5, C_BORDER),
+        ("TOPPADDING",    (0,0), (-1,-1), 7),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 7),
     ]))
     return t
 
@@ -324,7 +322,7 @@ def _build_elements(assessment: Assessment):
 
     # ── 1. HEADER ─────────────────────────────────────────────
     hdr = Table([[
-        [Paragraph("SmartRisk Credit \u2014 Quantitative Assessment", ST["eyebrow"]),
+        [Paragraph("Commercial Paper Assessment", ST["eyebrow"]),
          Spacer(1, 4),
          Paragraph(assessment.client_name or "Client", ST["hd_name"]),
          Spacer(1, 3),
@@ -366,15 +364,15 @@ def _build_elements(assessment: Assessment):
     E.append(metrics)
 
     # ── 3. CP TERMS ───────────────────────────────────────────
-    E.append(_sec_hdr("Commercial Paper Terms", ST))
+    E.append(_sec_hdr("COMMERCIAL PAPER TERMS", ST))
     cp_tbl = Table([
-        [_cp_cell("Programme Size",    cp.get("programmeSize"),  ST),
-         _cp_cell("Target Size",       cp.get("targetSize"),     ST),
+        [_cp_cell("Programme Size (\u20a6)", cp.get("programmeSize"),  ST),
+         _cp_cell("Target Size (\u20a6)",    cp.get("targetSize"),     ST),
          _cp_cell("Discount Rate A",   cp.get("discountRateA"),  ST),
          _cp_cell("Discount Rate B",   cp.get("discountRateB"),  ST)],
         [_cp_cell("Offer Opens",       cp.get("offerOpen"),      ST),
          _cp_cell("Offer Closes",      cp.get("offerClose"),     ST),
-         _cp_cell("Min. Subscription", cp.get("minSubscription"),ST),
+         _cp_cell("Min. Subscription (\u20a6)", cp.get("minSubscription"),ST),
          _cp_cell("Taxation",          cp.get("taxation"),       ST)],
         [_cp_cell("Use of Proceeds",   cp.get("useOfProceeds"),  ST),
          "", _cp_cell("Instrument Type", "Senior Unsecured Commercial Paper", ST), ""],
@@ -394,7 +392,7 @@ def _build_elements(assessment: Assessment):
     E.append(cp_tbl)
 
     # ── 4. CREDIT RISK SCORECARD ──────────────────────────────
-    E.append(_sec_hdr("Credit Risk Scorecard", ST))
+    E.append(_sec_hdr("CREDIT RISK SCORECARD", ST))
     tiles = [
         ("EARNINGS QUALITY",            "#01b88e", eq,  *_badge_colors(eq),  n.get("financialStandingReview","")),
         ("LIQUIDITY &amp; DEBT SERVICE","#EF9F27", lq,  *_badge_colors(lq),  n.get("cashFlowReview","")),
@@ -419,7 +417,7 @@ def _build_elements(assessment: Assessment):
     E.append(sc_tbl)
 
     # ── 5. KEY STRENGTHS & WEAKNESSES ─────────────────────────
-    E.append(_sec_hdr("Key Strengths &amp; Weaknesses", ST))
+    E.append(_sec_hdr("KEY STRENGTHS &amp; WEAKNESSES", ST))
 
     def sw_col(items, hdr_sty, hdr_txt, hdr_bg, tick):
         inner_w = HALF - 20
@@ -451,7 +449,7 @@ def _build_elements(assessment: Assessment):
     E.append(sw)
 
     # ── 6. SCORING BREAKDOWN ──────────────────────────────────
-    E.append(_sec_hdr("Scoring Breakdown by Dimension", ST))
+    E.append(_sec_hdr("SCORING BREAKDOWN BY DIMENSION", ST))
     E.append(Spacer(1, 8))
 
     for dim_name, cat in DIMS:

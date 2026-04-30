@@ -5,3 +5,6 @@ __pycache__/
 dist/
 .venv/
 migrate.py
+add_admin.py
+check_role.py
+check_role2.py

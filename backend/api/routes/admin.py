@@ -40,14 +40,17 @@ async def list_users(
 
     return [
         {
-            "email"    : u.email,
-            "name"     : u.name,
-            "company"  : u.company,
-            "role"     : u.role,
-            "plan"     : u.plan,
-            "credits"  : u.credits,
-            "verified" : u.verified,
-            "createdAt": u.created_at.isoformat(),
+            "email"              : u.email,
+            "name"               : u.name,
+            "company"            : u.company,
+            "role"               : u.role,
+            "plan"               : u.plan,
+            "credits"            : u.credits,
+            "verified"           : u.verified,
+            "createdAt"          : u.created_at.isoformat(),
+            "onboardingRole"     : u.onboarding_role,
+            "onboardingProcess"  : u.onboarding_process,
+            "onboardingVolume"   : u.onboarding_volume,
         }
         for u in users
     ]

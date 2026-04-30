@@ -81,3 +81,6 @@ export const getAssessment = (id) =>
 
 export const updateNarrative = (id, narrative) =>
   api.patch(`/assessment/${id}/narrative`, { narrative });
+
+export const saveOnboarding = (data) =>
+  api.post("/auth/onboarding", data);

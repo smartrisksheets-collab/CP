@@ -2,26 +2,28 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import Upload from "../components/steps/Upload.jsx";
-import Extraction from "../components/steps/Extraction.jsx";
-import CPTerms from "../components/steps/CPTerms.jsx";
 import ReviewData from "../components/steps/ReviewData.jsx";
 import Scores from "../components/steps/Scores.jsx";
 import Result from "../components/steps/Result.jsx";
 import Dashboard from "../components/Dashboard.jsx";
 import { LogOut, BookOpen, LayoutDashboard, X, Zap, Shield, MessageCircle, ChevronDown, User } from "lucide-react";
 import { getQuotaStatus } from "../api/client.js";
+import Onboarding, { useOnboardingDone } from "../components/Onboarding.jsx";
 import { useNavigate } from "react-router-dom";
 
-const STEPS = ["Upload", "CP Terms", "Review Data", "Scores", "Result"];
+const STEPS = ["Upload", "Review Data", "Scores", "Result"];
 
 export default function AppPage() {
   const { user, logout }  = useAuth();
   const { tenant }        = useTenant();
 
-  const [step, setStep]               = useState(0);          // 0-3 = main steps
-  const [extracting, setExtracting]   = useState(false);      // extraction loading screen
-  const [figures, setFigures]         = useState({});
-  const [clientInfo, setClientInfo]   = useState({});
+  const [step, setStep]               = useState(0);
+  const [figures, setFigures]         = useState(() => {
+    try { const s = sessionStorage.getItem("sr_figures"); return s ? JSON.parse(s) : {}; } catch { return {}; }
+  });
+  const [clientInfo, setClientInfo]   = useState(() => {
+    try { const s = sessionStorage.getItem("sr_clientInfo"); return s ? JSON.parse(s) : {}; } catch { return {}; }
+  });
   const [scoreResult, setScoreResult] = useState(null);
   const [assessmentId, setAssessmentId] = useState(null);
   const [narrative, setNarrative]     = useState(null);
@@ -34,18 +36,27 @@ export default function AppPage() {
   const [mobileMenu, setMobileMenu]   = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [quota, setQuota]             = useState(null);
+  const [showOnboarding, setShowOnboarding] = useState(() => !useOnboardingDone());
 
   useEffect(() => {
     getQuotaStatus().then((res) => setQuota(res.data)).catch(() => {});
-  }, [scoreResult]); // refresh after every completed assessment
+  }, [scoreResult]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem("sr_figures", JSON.stringify(figures)); } catch {}
+  }, [figures]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem("sr_clientInfo", JSON.stringify(clientInfo)); } catch {}
+  }, [clientInfo]);
   function startNew() {
     setStep(0);
-    setExtracting(false);
     setFigures({});
     setClientInfo({});
     setScoreResult(null);
     setAssessmentId(null);
     setNarrative(null);
+    try { sessionStorage.removeItem("sr_figures"); sessionStorage.removeItem("sr_clientInfo"); } catch {}
   }
 
   // ── Header ───────────────────────────────────────────────
@@ -135,7 +146,7 @@ export default function AppPage() {
   );
 
   // ── Stepper ──────────────────────────────────────────────
-  const mobileMenuEl = !extracting && mobileMenu && (
+  const mobileMenuEl = mobileMenu && (
     <div style={{ background:"var(--primary)", borderTop:"1px solid #2a3870" }}>
       {STEPS.map((label, i) => {
         const active = i === step;
@@ -164,7 +175,7 @@ export default function AppPage() {
     </div>
   );
 
-  const stepper = !extracting && (
+  const stepper = (
     <div style={{
       display:"flex", background:"#fff",
       borderBottom:"1px solid #E0E0E0",
@@ -200,89 +211,63 @@ export default function AppPage() {
 
   // ── Main content ─────────────────────────────────────────
   let content;
-  if (extracting) {
-    content = (
-      <Extraction onDone={(figs) => {
-        setFigures(figs);
-        setExtracting(false);
-        setStep(1);
-      }} />
-    );
-  } else if (step === 0) {
+  if (step === 0) {
     content = (
       <Upload
         clientInfo={clientInfo}
         onClientInfoChange={setClientInfo}
-        onExtractStart={(info, extractPromise) => {
-          setClientInfo(info);
-          setExtracting(true);
-          extractPromise
-            .then((figs) => {
-              setFigures(figs);
-              setExtracting(false);
-              setStep(1);
-            })
-            .catch((e) => {
-              setExtracting(false);
-              const detail = e.response?.data?.detail;
-              if (detail?.quotaExceeded) {
-                setQuotaMsg(detail.message || "You have 0 credits remaining.");
-              } else {
-                setQuotaMsg(typeof detail === "string" ? detail : "Extraction failed. Please try again.");
-              }
-            });
+        figures={figures}
+        onFiguresChange={setFigures}
+        onContinue={() => setStep(1)}
+        onExtracted={(figs, updatedInfo) => {
+          setFigures(figs);
+          if (updatedInfo) setClientInfo(updatedInfo);
         }}
+        onQuotaError={(msg) => setQuotaMsg(msg)}
       />
     );
   } else if (step === 1) {
     content = (
-      <CPTerms
+      <ReviewData
         figures={figures}
-        onFiguresChange={setFigures}
+        onChange={setFigures}
         onBack={() => setStep(0)}
         onNext={() => setStep(2)}
       />
     );
   } else if (step === 2) {
     content = (
-      <ReviewData
-        figures={figures}
-        onChange={setFigures}
-        onBack={() => setStep(1)}
-        onNext={() => setStep(3)}
-      />
-    );
-  } else if (step === 3) {
-    content = (
       <Scores
         figures={figures}
         scoreResult={scoreResult}
         onScored={setScoreResult}
         onQuotaExceeded={(msg) => setQuotaMsg(msg)}
-        onBack={() => setStep(2)}
+        onBack={() => setStep(1)}
         onNext={(result, id, narr) => {
           setScoreResult(result);
           setAssessmentId(id);
           setNarrative(narr);
-          setStep(4);
+          setStep(3);
         }}
         clientInfo={clientInfo}
       />
     );
-  } else if (step === 4) {
+  } else if (step === 3) {
     content = (
       <Result
         scoreResult={scoreResult}
         assessmentId={assessmentId}
         narrative={narrative}
         clientInfo={clientInfo}
-        onBack={() => setStep(3)}
+        onBack={() => setStep(2)}
         onNew={startNew}
       />
     );
   }
 
   if (showGuide) return <UserGuidePage onBack={() => setShowGuide(false)} />;
+
+  if (showOnboarding) return <Onboarding onDone={() => setShowOnboarding(false)} />;
 
   return (
     <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", paddingBottom:40 }}>

@@ -105,7 +105,7 @@ const css = {
   grid3  : { display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 },
 };
 
-export default function CPTerms({ figures, onFiguresChange, onBack, onNext }) {
+export default function CPTerms({ figures, onFiguresChange, onBack, onNext, clientName }) {
   const [file,       setFile]       = useState(null);
   const [validating, setValidating] = useState(false);
   const [fileError,  setFileError]  = useState("");
@@ -175,6 +175,12 @@ export default function CPTerms({ figures, onFiguresChange, onBack, onNext }) {
 
   return (
     <div>
+      {clientName && (
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+          <span style={{ fontSize:13, color:"#5A5A5A" }}>Client: <strong style={{ color:"#1F2854" }}>{clientName.replace(/\b\w/g, c => c.toUpperCase())}</strong></span>
+          <span style={{ fontSize:12, color:"#888", border:"1px solid #E0E0E0", borderRadius:20, padding:"3px 12px" }}>Optional — skip if not applicable</span>
+        </div>
+      )}
       <div style={{ fontSize:13, color:"#5A5A5A", marginBottom:14 }}>
         Upload the indicative terms email PDF to auto-fill the fields below, or enter them manually. This section is <strong>optional</strong> — click Skip if not applicable.
       </div>

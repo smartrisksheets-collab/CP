@@ -21,7 +21,8 @@ export default function AdminDashboard() {
   const [error, setError]     = useState("");
 
   // Credit adjustment modal
-  const [adjustModal, setAdjustModal] = useState(null); // { email, credits }
+  const [adjustModal, setAdjustModal] = useState(null);
+  const [userModal,   setUserModal]   = useState(null); // { email, credits }
   const [adjustAmt, setAdjustAmt]     = useState("");
   const [adjustReason, setAdjustReason] = useState("");
   const [adjusting, setAdjusting]     = useState(false);
@@ -168,7 +169,13 @@ export default function AdminDashboard() {
               <tbody>
                 {users.map((u) => (
                   <tr key={u.email}>
-                    <td style={css.td}><strong style={{ color:"var(--primary)" }}>{u.email}</strong></td>
+                     <td style={css.td}>
+                      <strong
+                        onClick={() => setUserModal(u)}
+                        style={{ color:"var(--primary)", cursor:"pointer", textDecoration:"underline", textDecorationStyle:"dotted" }}>
+                        {u.email}
+                      </strong>
+                    </td>
                     <td style={css.td}>{u.name || "—"}</td>
                     <td style={css.td}>{u.company || "—"}</td>
                     <td style={css.td}>
@@ -221,6 +228,37 @@ export default function AdminDashboard() {
       </div>
 
       {/* Credit Adjustment Modal */}
+      {userModal && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+          <div style={{ background:"#fff", borderRadius:12, width:"100%", maxWidth:440, padding:"28px 32px", position:"relative", boxShadow:"0 16px 60px rgba(0,0,0,0.2)" }}>
+            <button onClick={() => setUserModal(null)} style={{ position:"absolute", top:14, right:16, background:"none", border:"none", cursor:"pointer", color:"#888" }}>
+              ✕
+            </button>
+            <div style={{ fontSize:16, fontWeight:"bold", color:"var(--primary)", marginBottom:4 }}>{userModal.name || "—"}</div>
+            <div style={{ fontSize:12, color:"#888", marginBottom:20 }}>{userModal.email}</div>
+
+            <div style={{ fontSize:11, fontWeight:"bold", color:"#5A5A5A", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:10 }}>Onboarding Responses</div>
+
+            {userModal.onboardingRole || userModal.onboardingProcess || userModal.onboardingVolume ? (
+              <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                {[
+                  ["Role",           userModal.onboardingRole],
+                  ["Current process",userModal.onboardingProcess],
+                  ["Monthly volume", userModal.onboardingVolume],
+                ].map(([label, val]) => (
+                  <div key={label} style={{ background:"#F8F8F8", borderRadius:6, padding:"10px 14px" }}>
+                    <div style={{ fontSize:11, color:"#888", marginBottom:3 }}>{label}</div>
+                    <div style={{ fontSize:13, color:"#1F2854", fontWeight:500 }}>{val || "—"}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize:13, color:"#aaa", fontStyle:"italic" }}>No onboarding responses recorded.</div>
+            )}
+          </div>
+        </div>
+      )}
+
       {adjustModal && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
           <div style={{ background:"#fff", borderRadius:10, padding:"28px 32px", maxWidth:400, width:"100%", boxShadow:"0 8px 32px rgba(0,0,0,0.2)" }}>

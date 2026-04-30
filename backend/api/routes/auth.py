@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, update
 from jose import jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr
@@ -14,7 +14,7 @@ import resend
 from fastapi import Request
 from api.db import SessionLocal
 from api.models import Tenant, User, OTP
-from api.deps import get_db, get_current_user, JWT_SECRET, JWT_ALGORITHM, limiter
+from api.deps import get_db, get_current_user, get_current_user, JWT_SECRET, JWT_ALGORITHM, limiter
 
 router = APIRouter()
 
@@ -263,6 +263,33 @@ async def me(
 
 
 # ── POST /auth/logout ─────────────────────────────────────────
+class OnboardingBody(BaseModel):
+    role    : Optional[str] = None
+    process : Optional[str] = None
+    volume  : Optional[str] = None
+
+@router.post("/onboarding")
+async def save_onboarding(
+    body         : OnboardingBody,
+    current_user : dict         = Depends(get_current_user),
+    db           : AsyncSession = Depends(get_db),
+):
+    await db.execute(
+        update(User)
+        .where(and_(
+            User.email     == current_user["email"],
+            User.tenant_id == current_user["tenant_id"],
+        ))
+        .values(
+            onboarding_role    = body.role,
+            onboarding_process = body.process,
+            onboarding_volume  = body.volume,
+        )
+    )
+    await db.commit()
+    return { "ok": True }
+
+
 @router.post("/logout")
 async def logout():
     # JWT is stateless — logout is handled client-side by deleting the token

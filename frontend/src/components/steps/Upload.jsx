@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { Upload as UploadIcon, CheckCircle, Loader, AlertTriangle, AlertCircle, X } from "lucide-react";
 import { extractFigures } from "../../api/client.js";
+import CPTerms from "./CPTerms.jsx";
 
 const RATINGS = ["","AAA","AA+","AA","AA-","A+","A","A-","BBB+","BBB","BBB-","BB+","BB","BB-","B+","B","B-","CCC","CC","C","D"];
 
@@ -342,7 +343,7 @@ function ConfirmModal({ year, onConfirm, onCancel }) {
 // ── Main component ────────────────────────────────────────
 const BLANK = { validating: false, warnings: [], error: "" };
 
-export default function Upload({ clientInfo, onClientInfoChange, onExtractStart }) {
+export default function Upload({ clientInfo, onClientInfoChange, onExtracted, onQuotaError, figures, onFiguresChange, onContinue }) {
   const [finFile, setFinFile] = useState(null);
   const [ratFile, setRatFile] = useState(null);
 
@@ -352,8 +353,9 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtractStart 
   const [confirm,   setConfirm]   = useState(null);
   const [showModal, setShowModal] = useState(false);
   const nameGuard = () => { if (!info.clientName?.trim()) { setShowModal(true); return true; } return false; };
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState("");
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState("");
+  const [subStep,  setSubStep]  = useState(0);
 
   const info = clientInfo;
   const set  = (k, v) => onClientInfoChange({ ...info, [k]: v });
@@ -414,32 +416,47 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtractStart 
     fd.append("financial_pdf", finFile);
     if (ratFile) fd.append("rating_pdf", ratFile);
 
-    const promise = extractFigures(fd)
-      .then((res) => {
-        const data = res.data;
-        const update = {};
-        if (data.ratingData) {
-          update.extractedRating = data.ratingData;
-          update.creditRating    = data.ratingData.longTermRating || info.creditRating;
-        }
-        if (data.cpTerms) {
-          update.cpTerms = data.cpTerms;
-        }
-        if (Object.keys(update).length) {
-          onClientInfoChange({ ...info, ...update });
-        }
-        return data.figures;
-      })
-      .finally(() => setLoading(false));
-
-    onExtractStart({
-      ...info,
-      reviewDate: formatReviewDate(info.reviewDate) || new Date().toLocaleDateString("en-NG", { day:"2-digit", month:"short", year:"numeric" }),
-    }, promise);
+    try {
+      const res  = await extractFigures(fd);
+      const data = res.data;
+      const updatedInfo = {
+        ...info,
+        reviewDate: formatReviewDate(info.reviewDate) || new Date().toLocaleDateString("en-NG", { day:"2-digit", month:"short", year:"numeric" }),
+      };
+      if (data.ratingData) {
+        updatedInfo.extractedRating = data.ratingData;
+        updatedInfo.creditRating    = data.ratingData.longTermRating || info.creditRating;
+      }
+      if (data.cpTerms) updatedInfo.cpTerms = data.cpTerms;
+      onClientInfoChange(updatedInfo);
+      onExtracted(data.figures, updatedInfo);
+      setSubStep(1);
+    } catch (e) {
+      const detail = e.response?.data?.detail;
+      if (detail?.quotaExceeded) {
+        onQuotaError(detail.message || "You have 0 credits remaining.");
+      } else {
+        setError(typeof detail === "string" ? detail : "Extraction failed. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
   const anyValidating = finV.validating || ratV.validating;
   const canExtract    = !!finFile && !!info.clientName?.trim() && !loading && !anyValidating;
+
+  if (subStep === 1) {
+    return (
+      <CPTerms
+        figures={figures}
+        onFiguresChange={onFiguresChange}
+        onBack={() => setSubStep(0)}
+        onNext={onContinue}
+        clientName={info.clientName}
+      />
+    );
+  }
 
   return (
     <div>
