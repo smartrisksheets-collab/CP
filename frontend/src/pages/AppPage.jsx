@@ -6,7 +6,7 @@ import ReviewData from "../components/steps/ReviewData.jsx";
 import Scores from "../components/steps/Scores.jsx";
 import Result from "../components/steps/Result.jsx";
 import Dashboard from "../components/Dashboard.jsx";
-import { LogOut, BookOpen, LayoutDashboard, X, Zap, Shield, MessageCircle, ChevronDown, User } from "lucide-react";
+import { LogOut, BookOpen, LayoutDashboard, X, Zap, Shield, MessageCircle, ChevronDown, User, Mail } from "lucide-react";
 import { getQuotaStatus } from "../api/client.js";
 import Onboarding, { useOnboardingDone } from "../components/Onboarding.jsx";
 import { useNavigate } from "react-router-dom";
@@ -34,7 +34,8 @@ export default function AppPage() {
   const [legalModal, setLegalModal]   = useState(null);
   const [quotaMsg, setQuotaMsg]       = useState(null);
   const [mobileMenu, setMobileMenu]   = useState(false);
-  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showUserMenu,    setShowUserMenu]    = useState(false);
+  const [showContact,     setShowContact]     = useState(false);
   const [quota, setQuota]             = useState(null);
   const [showOnboarding, setShowOnboarding] = useState(() => !useOnboardingDone());
 
@@ -302,8 +303,11 @@ export default function AppPage() {
               {label}
             </button>
           ))}
-          <a href="mailto:info@smartrisksheets.com" style={{ color:"#999", textDecoration:"none" }}
-             onMouseEnter={e => e.target.style.color="#ccc"} onMouseLeave={e => e.target.style.color="#999"}>Contact</a>
+          <button onClick={() => setShowContact(true)}
+            style={{ background:"none", border:"none", color:"#999", fontSize:11, cursor:"pointer", padding:0 }}
+            onMouseEnter={e => e.target.style.color="#ccc"} onMouseLeave={e => e.target.style.color="#999"}>
+            Contact
+          </button>
         </div>
       </div>
 
@@ -338,6 +342,42 @@ export default function AppPage() {
         <Modal onClose={() => setShowDash(false)} title="Past Assessments">
           <Dashboard />
         </Modal>
+      )}
+
+      {/* Contact modal */}
+      {showContact && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}
+             onClick={(e) => e.target === e.currentTarget && setShowContact(false)}>
+          <div style={{ background:"#fff", borderRadius:12, width:"100%", maxWidth:420, padding:"32px 28px", position:"relative", boxShadow:"0 24px 80px rgba(0,0,0,0.25)", textAlign:"center" }}>
+            <button onClick={() => setShowContact(false)} style={{ position:"absolute", top:14, right:18, background:"none", border:"none", cursor:"pointer", color:"#888" }}>
+              <X size={18} />
+            </button>
+            <div style={{ fontSize:17, fontWeight:"bold", color:"var(--primary)", marginBottom:6 }}>Get in touch</div>
+            <div style={{ fontSize:13, color:"#888", marginBottom:28 }}>Choose how you'd like to reach us.</div>
+            <div style={{ display:"flex", gap:16, justifyContent:"center", marginBottom:20 }}>
+              <a href="mailto:info@smartrisksheets.com"
+                style={{ flex:1, maxWidth:160, display:"flex", flexDirection:"column", alignItems:"center", gap:10, padding:"20px 16px", border:"1px solid #E0E0E0", borderRadius:10, textDecoration:"none", background:"#fff", transition:"all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor="#01b88e"; e.currentTarget.style.background="#f0faf7"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor="#E0E0E0"; e.currentTarget.style.background="#fff"; }}>
+                <Mail size={28} color="#1F2854" strokeWidth={1.5} />
+                <div style={{ fontSize:13, fontWeight:"bold", color:"#1F2854" }}>Email us</div>
+                <div style={{ fontSize:11, color:"#888" }}>info@smartrisksheets.com</div>
+              </a>
+              <a href="https://wa.me/2349052288923" target="_blank" rel="noreferrer"
+                style={{ flex:1, maxWidth:160, display:"flex", flexDirection:"column", alignItems:"center", gap:10, padding:"20px 16px", border:"1px solid #E0E0E0", borderRadius:10, textDecoration:"none", background:"#fff", transition:"all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor="#25D366"; e.currentTarget.style.background="#f0fdf4"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor="#E0E0E0"; e.currentTarget.style.background="#fff"; }}>
+                <MessageCircle size={28} color="#25D366" strokeWidth={1.5} />
+                <div style={{ fontSize:13, fontWeight:"bold", color:"#1F2854" }}>WhatsApp</div>
+                <div style={{ fontSize:11, color:"#888" }}>Eddu SmartRisk</div>
+              </a>
+            </div>
+            <div style={{ fontSize:11, color:"#aaa", lineHeight:1.7 }}>
+              WhatsApp for quick help during assessments · Email for account and billing queries<br />
+              We typically respond within a few hours on business days.
+            </div>
+          </div>
+        </div>
       )}
 
       {/* FAQ modal */}

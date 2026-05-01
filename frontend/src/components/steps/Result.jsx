@@ -138,7 +138,8 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
       {/* Score breakdown */}
       <div style={css.card}>
         <div style={css.title}>Score Breakdown</div>
-        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+        <div style={{ overflowX:"auto", width:"100%" }}>
+        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13, minWidth:480 }}>
           <thead>
             <tr>
               <th style={css.th}>Ratio</th>
@@ -150,6 +151,7 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
           </thead>
           <tbody>{ratioRows}</tbody>
         </table>
+        </div>
       </div>
 
       {/* Narrative */}
