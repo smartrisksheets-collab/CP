@@ -128,7 +128,7 @@ export default function Pricing() {
           Simple, transparent pricing.
         </h1>
         <p style={{ fontSize:15, color:C.grey, maxWidth:480, margin:"0 auto", lineHeight:1.7 }}>
-          Start with 2 free assessments — no credit card, no commitment. Buy credits when you are ready. Credits are valid for 12 months and work across all pack sizes.
+          Looks like you're finding it useful. Pick a pack below and keep your assessments running. Credits are valid for 12 months and work across all pack sizes.
         </p>
       </div>
 
