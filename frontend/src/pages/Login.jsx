@@ -259,7 +259,7 @@ export default function Login() {
                    style={{ height:36, width:"auto", objectFit:"contain" }} />
             </div>
           )}
-          <div style={S.heroLabel}>Credit Risk Intelligence</div>
+          <div style={S.heroLabel}>Commercial Paper Assessment</div>
           <h1 style={S.heroHeading}>
             Analyse listings.<br/>
             Score clients.<br/>
