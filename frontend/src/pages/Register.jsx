@@ -88,7 +88,7 @@ export default function Register() {
                  style={{ height:36, width:"auto", objectFit:"contain", marginBottom:28 }} />
           )}
           <div style={{ fontSize:11, fontWeight:600, letterSpacing:"0.1em", textTransform:"uppercase", color:"var(--accent)", border:"1px solid rgba(var(--accent-rgb),0.3)", padding:"5px 12px", borderRadius:20, display:"inline-block", marginBottom:14 }}>
-            Credit Risk Intelligence
+            Commercial Paper Assessment
           </div>
           <h1 style={{ fontSize:28, fontWeight:700, color:"#fff", lineHeight:1.2, marginBottom:14, fontFamily:"'Playfair Display', serif" }}>
             Start assessing.<br />
