@@ -263,11 +263,11 @@ export default function Login() {
           <h1 style={S.heroHeading}>
             Analyse listings.<br/>
             Score clients.<br/>
-            <span style={{ color:"var(--accent)" }}>In seconds.</span>
+            <span style={{ color:"var(--accent)" }}>In Mins.</span>
           </h1>
           <p style={S.heroSub}>
             Analyse Commercial Paper offerings in 4 quick steps.
-            Cut your assessment time in half and score your clients in seconds.
+            Cut your assessment time in half and score your clients in less than 5 mins.
           </p>
           <div style={S.statStrip}>
             <div style={S.stat}><div style={S.statVal}>4</div><div style={S.statLbl}>Simple steps</div></div>
