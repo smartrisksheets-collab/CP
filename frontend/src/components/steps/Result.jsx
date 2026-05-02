@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { generateReport } from "../../api/client.js";
-import { Download, Loader, Plus, Eye } from "lucide-react";
+import { Download, Loader, Plus, Eye, AlertTriangle } from "lucide-react";
 import ReportPreview from "../ReportPreview.jsx";
 
 function scoreColor(score, max) {
@@ -32,6 +32,7 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
   const [downloading, setDownloading] = useState(false);
   const [dlError, setDlError]         = useState("");
   const [showPreview, setShowPreview] = useState(false);
+  const [confirmNew,  setConfirmNew]  = useState(false);
 
   const eligible = scoreResult?.eligible;
   const score    = scoreResult?.total_score ?? 0;
@@ -75,7 +76,7 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
 
     return (
       <>
-        {newCat && <tr key={`cat-${i}`}><td colSpan={4} style={css.cat}>{cat}</td></tr>}
+        {newCat && <tr key={`cat-${i}`}><td colSpan={5} style={css.cat}>{cat}</td></tr>}
         <tr key={i}>
           <td style={css.td}>{r.name}</td>
           <td style={css.td}>{r.display_value}</td>
@@ -100,7 +101,7 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
           <span style={{ fontSize:11, fontWeight:"bold", color:"#888", textTransform:"uppercase", letterSpacing:"0.05em" }}>{label}</span>
           {rating && <span style={{ fontSize:11, padding:"2px 8px", borderRadius:999, background:"#EEF4FF", color:col, border:"1px solid #9DBFEA" }}>{rating}</span>}
         </div>
-        <p style={{ fontSize:13, lineHeight:1.7, color:"#333" }}>{review}</p>
+        <p style={{ fontSize:13, lineHeight:1.7, color:"#333", wordBreak:"break-word", overflowWrap:"anywhere" }}>{review}</p>
       </div>
     );
   }
@@ -136,9 +137,8 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
       </div>
 
       {/* Score breakdown */}
-      <div style={css.card}>
+      <div style={{ ...css.card, overflowX:"auto" }}>
         <div style={css.title}>Score Breakdown</div>
-        <div style={{ overflowX:"auto", width:"100%" }}>
         <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13, minWidth:480 }}>
           <thead>
             <tr>
@@ -151,7 +151,6 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
           </thead>
           <tbody>{ratioRows}</tbody>
         </table>
-        </div>
       </div>
 
       {/* Narrative */}
@@ -191,7 +190,7 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
           {downloading ? <Loader size={14} style={{ animation:"spin 0.8s linear infinite" }} /> : <Download size={14} />}
           {downloading ? "Generating PDF..." : "Export Report"}
         </button>
-        <button onClick={onNew} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #1F2854", background:"#1F2854", color:"#fff", fontFamily:"Arial,sans-serif", display:"flex", alignItems:"center", gap:6 }}>
+        <button onClick={() => setConfirmNew(true)} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #1F2854", background:"#1F2854", color:"#fff", fontFamily:"Arial,sans-serif", display:"flex", alignItems:"center", gap:6 }}>
           <Plus size={14} /> New Assessment
         </button>
       </div>
@@ -206,6 +205,23 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
         />
       )}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      {confirmNew && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:99999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+          <div style={{ background:"#fff", borderRadius:10, padding:"28px 32px", maxWidth:420, width:"100%", boxShadow:"0 16px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+              <AlertTriangle size={22} color="#d4820a" />
+              <div style={{ fontSize:15, fontWeight:"bold", color:"#1F2854" }}>Start New Assessment?</div>
+            </div>
+            <p style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.75, marginBottom:20 }}>
+              This will clear all current data including the score, narrative, and client details. Make sure you have downloaded your report before proceeding.
+            </p>
+            <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+              <button onClick={() => setConfirmNew(false)} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#5A5A5A", fontFamily:"Arial,sans-serif" }}>Cancel</button>
+              <button onClick={onNew} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"none", background:"#1F2854", color:"#fff", fontFamily:"Arial,sans-serif", fontWeight:600 }}>Yes, start new</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

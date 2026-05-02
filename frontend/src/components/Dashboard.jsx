@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { getHistory, generateReport, getAssessment, updateNarrative } from "../api/client.js";
-import { Loader, Download, Eye, X, Save } from "lucide-react";
+import { getHistory, generateReport, getAssessment, updateNarrative, deleteAssessment } from "../api/client.js";
+import { Loader, Download, Eye, X, Save, Trash2, Search } from "lucide-react";
 
 async function parseAxiosError(e, fallback) {
   try {
@@ -14,23 +14,47 @@ async function parseAxiosError(e, fallback) {
 }
 
 export default function Dashboard() {
-  const [rows, setRows]       = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState("");
+  const [rows, setRows]               = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState("");
   const [downloading, setDownloading] = useState(null);
   const [viewing, setViewing]         = useState(null);
   const [loadingView, setLoadingView] = useState(null);
   const [errModal, setErrModal]       = useState("");
+  const [deleting, setDeleting]       = useState(null);
+  const [search, setSearch]           = useState("");
+  const [page, setPage]               = useState(1);
+  const [hasMore, setHasMore]         = useState(true);
 
   const th = { textAlign:"left", fontSize:11, fontWeight:"bold", color:"#888", padding:"8px 10px", borderBottom:"2px solid #E8E8E8", textTransform:"uppercase" };
   const td = { padding:"10px", borderBottom:"1px solid #F0F0F0", fontSize:13 };
 
   useEffect(() => {
-    getHistory()
-      .then((res) => setRows(res.data))
+    getHistory(page, 20)
+      .then((res) => {
+        setRows((prev) => page === 1 ? res.data : [...prev, ...res.data]);
+        setHasMore(res.data.length === 20);
+      })
       .catch(() => setError("Failed to load history."))
       .finally(() => setLoading(false));
-  }, []);
+  }, [page]);
+
+  async function handleDelete(r) {
+    if (!window.confirm(`Delete assessment for "${r.clientName}"? This cannot be undone.`)) return;
+    setDeleting(r.id);
+    try {
+      await deleteAssessment(r.id);
+      setRows((prev) => prev.filter((x) => x.id !== r.id));
+    } catch {
+      setErrModal("Failed to delete assessment. Please try again.");
+    } finally {
+      setDeleting(null);
+    }
+  }
+
+  const filtered = rows.filter((r) =>
+    !search || (r.clientName || "").toLowerCase().includes(search.toLowerCase())
+  );
 
   if (loading) return (
     <div style={{ textAlign:"center", padding:40 }}>
@@ -41,9 +65,13 @@ export default function Dashboard() {
 
   if (error) return <div style={{ color:"#791F1F", fontSize:13 }}>{error}</div>;
 
-  if (!rows.length) return (
-    <div style={{ fontSize:13, color:"#888", textAlign:"center", padding:24 }}>
-      No past assessments yet. Complete your first assessment to see it here.
+  if (!rows.length && !loading) return (
+    <div style={{ textAlign:"center", padding:"40px 24px" }}>
+      <div style={{ width:48, height:48, borderRadius:"50%", background:"#F5F5F2", border:"1px solid #E0E0E0", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 14px" }}>
+        <Search size={20} color="#aaa" />
+      </div>
+      <div style={{ fontSize:14, fontWeight:"bold", color:"#1F2854", marginBottom:6 }}>No assessments yet</div>
+      <div style={{ fontSize:13, color:"#888" }}>Complete your first assessment and it will appear here.</div>
     </div>
   );
 
@@ -77,7 +105,20 @@ export default function Dashboard() {
   }
 
   return (
-    <div style={{ overflowX:"auto" }}>
+    <div>
+      {/* Search */}
+      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14, padding:"0 2px" }}>
+        <div style={{ position:"relative", flex:1 }}>
+          <Search size={13} style={{ position:"absolute", left:10, top:"50%", transform:"translateY(-50%)", color:"#aaa" }} />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by client name…"
+            style={{ width:"100%", padding:"8px 10px 8px 30px", fontSize:13, border:"1px solid #D8D8D8", borderRadius:6, fontFamily:"Arial,sans-serif", color:"#1F2854", boxSizing:"border-box" }}
+          />
+        </div>
+      </div>
+      <div style={{ overflowX:"auto" }}>
       <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
         <thead>
           <tr>
@@ -90,7 +131,7 @@ export default function Dashboard() {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => {
+          {filtered.map((r) => {
             const eligible = r.eligible;
             return (
               <tr key={r.id}>
@@ -111,16 +152,18 @@ export default function Dashboard() {
                 <td style={{ ...td, textAlign:"center" }}>
                   <div style={{ display:"flex", gap:6, justifyContent:"center" }}>
                     <button onClick={() => handleView(r)} disabled={!!loadingView}
-                      title="View & edit assessment"
                       style={{ background:"none", border:"1px solid #D0D0D0", borderRadius:5, padding:"4px 8px", cursor:"pointer", color:"var(--primary)", display:"inline-flex", alignItems:"center", gap:4, fontSize:11 }}>
                       {loadingView === r.id ? <Loader size={12} style={{ animation:"spin 0.8s linear infinite" }} /> : <Eye size={12} />}
                       View
                     </button>
                     <button onClick={() => handleDownload(r)} disabled={!!downloading}
-                      title="Download PDF report"
                       style={{ background:"none", border:"1px solid #D0D0D0", borderRadius:5, padding:"4px 8px", cursor:"pointer", color:"var(--primary)", display:"inline-flex", alignItems:"center", gap:4, fontSize:11, opacity: downloading && downloading !== r.id ? 0.4 : 1 }}>
                       {downloading === r.id ? <Loader size={12} style={{ animation:"spin 0.8s linear infinite" }} /> : <Download size={12} />}
                       PDF
+                    </button>
+                    <button onClick={() => handleDelete(r)} disabled={!!deleting}
+                      style={{ background:"none", border:"1px solid #F09595", borderRadius:5, padding:"4px 8px", cursor:"pointer", color:"#A32D2D", display:"inline-flex", alignItems:"center", gap:4, fontSize:11, opacity: deleting && deleting !== r.id ? 0.4 : 1 }}>
+                      {deleting === r.id ? <Loader size={12} style={{ animation:"spin 0.8s linear infinite" }} /> : <Trash2 size={12} />}
                     </button>
                   </div>
                 </td>
@@ -129,8 +172,17 @@ export default function Dashboard() {
           })}
         </tbody>
       </table>
-    {viewing && <AssessmentModal data={viewing} onClose={() => setViewing(null)} onSaved={(updated) => setViewing(updated)} onError={setErrModal} />}
-    {errModal && <ErrModal msg={errModal} onClose={() => setErrModal("")} />}
+      </div>
+      {hasMore && !search && (
+        <div style={{ textAlign:"center", marginTop:14 }}>
+          <button onClick={() => setPage(p => p + 1)} disabled={loading}
+            style={{ padding:"7px 20px", fontSize:12, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#1F2854", fontFamily:"Arial,sans-serif" }}>
+            {loading ? "Loading…" : "Load more"}
+          </button>
+        </div>
+      )}
+      {viewing && <AssessmentModal data={viewing} onClose={() => setViewing(null)} onSaved={(updated) => setViewing(updated)} onError={setErrModal} />}
+      {errModal && <ErrModal msg={errModal} onClose={() => setErrModal("")} />}
     </div>
   );
 }
@@ -174,8 +226,9 @@ const CATEGORIES = {
 };
 
 function AssessmentModal({ data, onClose, onSaved, onError }) {
-  const [narr, setNarr]     = useState(data.narrative || {});
-  const [saving, setSaving] = useState(false);
+  const [narr, setNarr]         = useState(data.narrative || {});
+  const [saving, setSaving]     = useState(false);
+  const [showFigures, setShowFigures] = useState(false);
   const [saved, setSaved]   = useState(false);
   const [dlBusy, setDlBusy] = useState(false);
 
@@ -240,7 +293,7 @@ function AssessmentModal({ data, onClose, onSaved, onError }) {
   return (
     <div onClick={e => e.target === e.currentTarget && onClose()}
          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
-      <div style={{ background:"#fff", borderRadius:12, width:"100%", maxWidth:780, maxHeight:"90vh", overflowY:"auto", overflowX:"hidden", padding:"32px 36px", boxSizing:"border-box", position:"relative", boxShadow:"0 24px 80px rgba(0,0,0,0.25)" }}>
+      <div style={{ background:"#fff", borderRadius:12, width:"100%", maxWidth:1060, maxHeight:"90vh", overflowY:"auto", overflowX:"hidden", padding:"32px 36px", boxSizing:"border-box", position:"relative", boxShadow:"0 24px 80px rgba(0,0,0,0.25)" }}>
         <button onClick={onClose} style={{ position:"absolute", top:14, right:18, background:"none", border:"none", cursor:"pointer", color:"#888" }}><X size={18} /></button>
 
         <h2 style={{ fontSize:18, fontWeight:"bold", color:"var(--primary)", marginBottom:4 }}>{data.clientName}</h2>
@@ -265,6 +318,28 @@ function AssessmentModal({ data, onClose, onSaved, onError }) {
                 <tbody>{ratioRows}</tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* Figures toggle */}
+        {data.figures && (
+          <div style={{ marginBottom:20 }}>
+            <button onClick={() => setShowFigures(v => !v)}
+              style={{ fontSize:12, color:"var(--primary)", background:"none", border:"1px solid #D0D0D0", borderRadius:5, padding:"5px 12px", cursor:"pointer", fontFamily:"Arial,sans-serif" }}>
+              {showFigures ? "Hide" : "View"} Extracted Figures
+            </button>
+            {showFigures && (
+              <div style={{ marginTop:10, display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))", gap:8 }}>
+                {Object.entries(data.figures)
+                  .filter(([k, v]) => v !== null && v !== undefined && typeof v === "number")
+                  .map(([k, v]) => (
+                    <div key={k} style={{ padding:"8px 10px", borderRadius:6, background:"#F5F5F2", border:"1px solid #E8E8E8" }}>
+                      <div style={{ fontSize:10, color:"#888", textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:2 }}>{k.replace(/([A-Z])/g," $1").trim()}</div>
+                      <div style={{ fontSize:13, fontWeight:"bold", color:"#1F2854" }}>{Number(v).toLocaleString()}</div>
+                    </div>
+                  ))}
+              </div>
+            )}
           </div>
         )}
 

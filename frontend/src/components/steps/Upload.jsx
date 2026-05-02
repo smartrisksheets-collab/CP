@@ -1,9 +1,19 @@
-import { useState, useRef } from "react";
-import { Upload as UploadIcon, CheckCircle, Loader, AlertTriangle, AlertCircle, X } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Upload as UploadIcon, CheckCircle, Loader, AlertTriangle, AlertCircle, X, ChevronRight } from "lucide-react";
 import { extractFigures } from "../../api/client.js";
 import CPTerms from "./CPTerms.jsx";
 
 const RATINGS = ["","AAA","AA+","AA","AA-","A+","A","A-","BBB+","BBB","BBB-","BB+","BB","BB-","B+","B","B-","CCC","CC","C","D"];
+
+const EXTRACT_MESSAGES = [
+  "Sending to extraction engine…",
+  "Reading financial statements…",
+  "Extracting income statement figures…",
+  "Extracting balance sheet figures…",
+  "Checking standalone vs group figures…",
+  "Computing EBITDA…",
+  "Finalising extraction…",
+];
 
 // ── Keyword lists ─────────────────────────────────────────
 const FIN_KW = [
@@ -340,10 +350,41 @@ function ConfirmModal({ year, onConfirm, onCancel }) {
   );
 }
 
+function ReExtractModal({ type, onConfirm, onCancel }) {
+  const isDeduction = type === "deduction";
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:99999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+      <div style={{ background:"#fff", borderRadius:10, padding:"28px 32px", maxWidth:440, width:"100%", boxShadow:"0 16px 60px rgba(0,0,0,0.2)" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+          <AlertTriangle size={22} color={isDeduction ? "#A32D2D" : "#d4820a"} />
+          <div style={{ fontSize:15, fontWeight:"bold", color:"#1F2854" }}>
+            {isDeduction ? "Additional Credit Required" : "Re-extraction Warning"}
+          </div>
+        </div>
+        <p style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.75, marginBottom:20 }}>
+          {isDeduction
+            ? "You have already extracted this document twice. Proceeding will deduct 1 credit from your balance. Please verify your uploaded document is correct before continuing."
+            : "You have already extracted this document once. Re-extracting will overwrite your previous results. This one re-extraction is free — verify your document before proceeding."}
+        </p>
+        <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+          <button onClick={onCancel}
+            style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#5A5A5A", fontFamily:"Arial,sans-serif" }}>
+            Cancel
+          </button>
+          <button onClick={onConfirm}
+            style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"none", background: isDeduction ? "#A32D2D" : "var(--primary)", color:"#fff", fontFamily:"Arial,sans-serif", fontWeight:600 }}>
+            {isDeduction ? "Proceed & Deduct Credit" : "Re-extract"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────
 const BLANK = { validating: false, warnings: [], error: "" };
 
-export default function Upload({ clientInfo, onClientInfoChange, onExtracted, onQuotaError, figures, onFiguresChange, onContinue }) {
+export default function Upload({ clientInfo, onClientInfoChange, onExtracted, onQuotaError, figures, onFiguresChange, onContinue, draftId }) {
   const [finFile, setFinFile] = useState(null);
   const [ratFile, setRatFile] = useState(null);
 
@@ -355,10 +396,34 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
   const nameGuard = () => { if (!info.clientName?.trim()) { setShowModal(true); return true; } return false; };
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState("");
-  const [subStep,  setSubStep]  = useState(0);
+  const [msgIdx,   setMsgIdx]   = useState(0);
+  const [subStep,  setSubStep]  = useState(() => {
+    try { return parseInt(sessionStorage.getItem("sr_uploadSubStep") || "0"); } catch { return 0; }
+  });
+  const [extractionCount,  setExtractionCount]  = useState(() => {
+    try { return parseInt(sessionStorage.getItem("sr_extractionCount") || "0"); } catch { return 0; }
+  });
+  const [extractedFileKey, setExtractedFileKey] = useState(() => {
+    try { return sessionStorage.getItem("sr_extractedFileKey") || ""; } catch { return ""; }
+  });
+  const [reExtractModal, setReExtractModal] = useState(null); // null | "warning" | "deduction"
 
   const info = clientInfo;
   const set  = (k, v) => onClientInfoChange({ ...info, [k]: v });
+
+  function goToSubStep(n) {
+    setSubStep(n);
+    try { sessionStorage.setItem("sr_uploadSubStep", String(n)); } catch {}
+  }
+
+  useEffect(() => {
+    if (!loading) { setMsgIdx(0); return; }
+    const t = setInterval(() => setMsgIdx(i => Math.min(i + 1, EXTRACT_MESSAGES.length - 1)), 8000);
+    return () => clearInterval(t);
+  }, [loading]);
+
+  const currentFileKey = finFile ? `${finFile.name}-${finFile.size}` : "";
+  const fileChanged    = !!extractedFileKey && !!currentFileKey && currentFileKey !== extractedFileKey;
 
   // ── File handlers ───────────────────────────────────────
   async function handleFinFile(file) {
@@ -406,16 +471,15 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
 
 
   // ── Extract ─────────────────────────────────────────────
-  async function handleExtract() {
-    if (!info.clientName?.trim()) { setError("Client name is required."); return; }
-    if (!finFile)                  { setError("Please upload the financial statement PDF."); return; }
+  async function doExtract() {
     setError("");
     setLoading(true);
-
+    setMsgIdx(0);
     const fd = new FormData();
     fd.append("financial_pdf", finFile);
-    if (ratFile) fd.append("rating_pdf", ratFile);
-
+    if (ratFile)         fd.append("rating_pdf",  ratFile);
+    if (info.clientName) fd.append("client_name", info.clientName);
+    if (draftId)         fd.append("draft_id",    String(draftId));
     try {
       const res  = await extractFigures(fd);
       const data = res.data;
@@ -429,8 +493,16 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
       }
       if (data.cpTerms) updatedInfo.cpTerms = data.cpTerms;
       onClientInfoChange(updatedInfo);
-      onExtracted(data.figures, updatedInfo);
-      setSubStep(1);
+      onExtracted(data.figures, updatedInfo, data.draftId || null);
+      const newCount = extractionCount + 1;
+      const fileKey  = `${finFile.name}-${finFile.size}`;
+      setExtractionCount(newCount);
+      setExtractedFileKey(fileKey);
+      try {
+        sessionStorage.setItem("sr_extractionCount", String(newCount));
+        sessionStorage.setItem("sr_extractedFileKey", fileKey);
+      } catch {}
+      goToSubStep(1);
     } catch (e) {
       const detail = e.response?.data?.detail;
       if (detail?.quotaExceeded) {
@@ -443,15 +515,26 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
     }
   }
 
+  function handleExtract() {
+    if (!info.clientName?.trim()) { setError("Client name is required."); return; }
+    if (!finFile)                  { setError("Please upload the financial statement PDF."); return; }
+    if (extractionCount === 1)     { setReExtractModal("warning");   return; }
+    if (extractionCount >= 2)      { setReExtractModal("deduction"); return; }
+    doExtract();
+  }
+
   const anyValidating = finV.validating || ratV.validating;
-  const canExtract    = !!finFile && !!info.clientName?.trim() && !loading && !anyValidating;
+  const hasExtracted  = extractionCount > 0;
+  const canGoNext     = hasExtracted && !fileChanged;
+  const canExtract    = !!finFile && !!info.clientName?.trim() && !loading && !anyValidating && (!hasExtracted || fileChanged);
+  const progressPct   = loading ? Math.min(88, (msgIdx / (EXTRACT_MESSAGES.length - 1)) * 88) : 0;
 
   if (subStep === 1) {
     return (
       <CPTerms
         figures={figures}
         onFiguresChange={onFiguresChange}
-        onBack={() => setSubStep(0)}
+        onBack={() => goToSubStep(0)}
         onNext={onContinue}
         clientName={info.clientName}
       />
@@ -525,11 +608,39 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
       </div>
 
       <div style={css.actions}>
-        <button style={canExtract ? css.btn : css.btnDis} disabled={!canExtract} onClick={handleExtract}>
-          {loading
-            ? <><Loader size={14} style={{ verticalAlign:"middle", marginRight:6, animation:"spin 0.8s linear infinite" }} />Extracting...</>
-            : anyValidating ? "Validating…" : "Extract with AI"}
-        </button>
+        {canGoNext && !loading && (
+          <button
+            onClick={() => goToSubStep(1)}
+            style={{ ...css.btn, background:"transparent", color:"#1F2854", border:"1px solid #1F2854", display:"flex", alignItems:"center", gap:6 }}
+          >
+            Continue to CP Terms <ChevronRight size={14} />
+          </button>
+        )}
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"stretch" }}>
+          <button
+            style={canExtract ? { ...css.btn, display:"flex", alignItems:"center", gap:8, borderRadius: loading ? "6px 6px 0 0" : 6 } : { ...css.btnDis, display:"flex", alignItems:"center", gap:8 }}
+            disabled={!canExtract}
+            onClick={handleExtract}
+          >
+            {loading
+              ? <><Loader size={14} style={{ animation:"spin 0.8s linear infinite", flexShrink:0 }} />{EXTRACT_MESSAGES[msgIdx]}</>
+              : anyValidating ? "Validating…"
+              : fileChanged && hasExtracted ? "Re-extract with AI"
+              : "Extract"}
+          </button>
+          {loading && (
+            <div style={{ height:3, background:"rgba(255,255,255,0.25)", borderRadius:"0 0 6px 6px", overflow:"hidden" }}>
+              <div style={{ height:"100%", background:"var(--accent)", width:`${progressPct}%`, transition:"width 0.9s ease", borderRadius:"0 0 6px 6px" }} />
+            </div>
+          )}
+          {fileChanged && hasExtracted && !loading && (
+            <div style={{ fontSize:11, color: extractionCount >= 2 ? "#A32D2D" : "#854F0B", marginTop:4, textAlign:"right" }}>
+              {extractionCount >= 2
+                ? "⚠ Another re-extraction will cost 1 credit"
+                : "⚠ File changed — first re-extraction is free"}
+            </div>
+          )}
+        </div>
       </div>
 
       {confirm && (
@@ -537,6 +648,13 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
           year={confirm.year}
           onConfirm={handleConfirm}
           onCancel={handleCancelConfirm}
+        />
+      )}
+      {reExtractModal && (
+        <ReExtractModal
+          type={reExtractModal}
+          onConfirm={() => { setReExtractModal(null); doExtract(); }}
+          onCancel={() => setReExtractModal(null)}
         />
       )}
     </div>

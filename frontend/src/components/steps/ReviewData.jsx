@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { updateDraftFigures } from "../../api/client.js";
 
 const AI  = { background:"#EEF4FF", borderColor:"#9DBFEA" };
 const MAN = { background:"#ecfdf5", borderColor:"#01b88e" };
 
-function Field({ label, id, figures, onChange, manual, readonly, step, placeholder }) {
+function Field({ label, id, figures, onChange, manual, readonly, step, placeholder, required }) {
   const val = figures[id];
   const style = {
     width:"100%", padding:"8px 10px", fontSize:13, border:"1px solid",
@@ -13,7 +14,10 @@ function Field({ label, id, figures, onChange, manual, readonly, step, placehold
   };
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
-      <label style={{ fontSize:12, color:"#5A5A5A" }}>{label}</label>
+      <label style={{ fontSize:12, color:"#5A5A5A" }}>
+        {label}
+        {required && <span style={{ color:"#A32D2D", marginLeft:3 }}>*</span>}
+      </label>
       <input
         style={style}
         type="number"
@@ -27,8 +31,21 @@ function Field({ label, id, figures, onChange, manual, readonly, step, placehold
   );
 }
 
-export default function ReviewData({ figures, onChange, onBack, onNext }) {
-  const [error, setError] = useState("");
+export default function ReviewData({ figures, onChange, onBack, onNext, draftId }) {
+  const [error, setError]         = useState("");
+  const [autoSaved, setAutoSaved] = useState(false);
+  const debounceRef               = useRef(null);
+
+  useEffect(() => {
+    if (!draftId || !Object.keys(figures).length) return;
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      updateDraftFigures(draftId, figures)
+        .then(() => { setAutoSaved(true); setTimeout(() => setAutoSaved(false), 2000); })
+        .catch(() => {});
+    }, 1500);
+    return () => clearTimeout(debounceRef.current);
+  }, [figures, draftId]);
 
   function set(id, val) {
     const next = { ...figures, [id]: val };
@@ -65,9 +82,10 @@ export default function ReviewData({ figures, onChange, onBack, onNext }) {
     <div>
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12, flexWrap:"wrap", gap:8 }}>
         <div style={{ fontSize:13, color:"#5A5A5A" }}>Review all figures carefully before computing scores.</div>
-        <div style={{ display:"flex", gap:8 }}>
+        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
           <span style={{ fontSize:11, padding:"3px 10px", borderRadius:999, background:"#EEF4FF", color:"#1A5276", border:"1px solid #9DBFEA" }}>Blue = AI extracted</span>
           <span style={{ fontSize:11, padding:"3px 10px", borderRadius:999, background:"#ecfdf5", color:"#065f46", border:"1px solid #6ee7b7" }}>Green = needs entry</span>
+          {autoSaved && <span style={{ fontSize:11, color:"#01b88e" }}>✓ Draft saved</span>}
         </div>
       </div>
 
@@ -88,8 +106,8 @@ export default function ReviewData({ figures, onChange, onBack, onNext }) {
       <div style={css.card}>
         <div style={css.title}>Income Statement</div>
         <div style={css.grid}>
-          <Field label="Revenue (₦'000)" id="revenue" figures={figures} onChange={set} />
-          <Field label="Prior Year Revenue (₦'000)" id="priorYearRevenue" figures={figures} onChange={set} manual placeholder="Required for growth rate" />
+          <Field label="Revenue (₦'000)" id="revenue" figures={figures} onChange={set} required />
+          <Field label="Prior Year Revenue (₦'000)" id="priorYearRevenue" figures={figures} onChange={set} manual placeholder="Enter for Revenue Growth Rate score" required />
           <Field label="Net Income (₦'000)" id="netIncome" figures={figures} onChange={set} />
           <Field label="EBIT (₦'000)" id="ebit" figures={figures} onChange={set} />
           <Field label="Depreciation & Amortisation (₦'000)" id="depreciationAndAmortisation" figures={figures} onChange={set} placeholder="From cash flow or notes" />
@@ -104,8 +122,8 @@ export default function ReviewData({ figures, onChange, onBack, onNext }) {
           <Field label="Inventory (₦'000)" id="inventory" figures={figures} onChange={set} />
           <Field label="Prepaid Expenses (₦'000)" id="prepaidExpenses" figures={figures} onChange={set} />
           <Field label="Current Assets (₦'000)" id="currentAssets" figures={figures} onChange={set} />
-          <Field label="Total Assets (₦'000)" id="totalAssets" figures={figures} onChange={set} />
-          <Field label="Current Liabilities (₦'000)" id="currentLiabilities" figures={figures} onChange={set} />
+          <Field label="Total Assets (₦'000)" id="totalAssets" figures={figures} onChange={set} required />
+          <Field label="Current Liabilities (₦'000)" id="currentLiabilities" figures={figures} onChange={set} required />
           <Field label="Total Liabilities (₦'000)" id="totalLiabilities" figures={figures} onChange={set} />
           <Field label="Short-term Debt (₦'000)" id="shortTermDebt" figures={figures} onChange={set} />
           <Field label="Long-term Debt (₦'000)" id="longTermDebt" figures={figures} onChange={set} />

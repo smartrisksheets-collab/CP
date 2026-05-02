@@ -17,17 +17,38 @@ export default function AppPage() {
   const { user, logout }  = useAuth();
   const { tenant }        = useTenant();
 
-  const [step, setStep]               = useState(0);
-  const [figures, setFigures]         = useState(() => {
-    try { const s = sessionStorage.getItem("sr_figures"); return s ? JSON.parse(s) : {}; } catch { return {}; }
-  });
-  const [clientInfo, setClientInfo]   = useState(() => {
-    try { const s = sessionStorage.getItem("sr_clientInfo"); return s ? JSON.parse(s) : {}; } catch { return {}; }
-  });
-  const [scoreResult, setScoreResult] = useState(null);
-  const [assessmentId, setAssessmentId] = useState(null);
-  const [narrative, setNarrative]     = useState(null);
+  function ss(key, fallback) {
+    try { const s = sessionStorage.getItem(key); return s ? JSON.parse(s) : fallback; } catch { return fallback; }
+  }
+
+  const [step, setStepRaw]                     = useState(() => ss("sr_step", 0));
+  const [figures, setFigures]                   = useState(() => ss("sr_figures", {}));
+  const [clientInfo, setClientInfo]             = useState(() => ss("sr_clientInfo", {}));
+  const [scoreResult, setScoreResult]           = useState(() => ss("sr_scoreResult", null));
+  const [assessmentId, setAssessmentId]         = useState(() => ss("sr_assessmentId", null));
+  const [narrative, setNarrative]               = useState(() => ss("sr_narrative", null));
+  const [extractedFigures, setExtractedFigures] = useState(() => ss("sr_extractedFigures", null));
+  const [scoredFiguresKey, setScoredFiguresKey] = useState(() => ss("sr_scoredFiguresKey", null));
+  const [draftId,   setDraftId]   = useState(() => { try { const d = sessionStorage.getItem("sr_draftId"); return d ? parseInt(d) : null; } catch { return null; } });
+  const [draftOffer, setDraftOffer] = useState(null);
   const navigate = useNavigate();
+
+  function setStep(n) {
+    setStepRaw(n);
+    try { sessionStorage.setItem("sr_step", JSON.stringify(n)); } catch {}
+  }
+
+  // Unsaved-changes guard
+  useEffect(() => {
+    const handler = (e) => {
+      if (step > 0 && step < 3) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [step]);
   const [showDash, setShowDash]       = useState(false);
   const [showGuide, setShowGuide]     = useState(false);
   const [showFaq, setShowFaq]         = useState(false);
@@ -44,20 +65,82 @@ export default function AppPage() {
   }, [scoreResult]);
 
   useEffect(() => {
-    try { sessionStorage.setItem("sr_figures", JSON.stringify(figures)); } catch {}
-  }, [figures]);
+    if (draftId || Object.keys(figures).length > 0) return;
+    import("../api/client.js").then(({ getDraft }) => {
+      getDraft()
+        .then((res) => { if (res.data) setDraftOffer(res.data); })
+        .catch(() => {});
+    });
+  }, []);
 
+  useEffect(() => {
+    try { sessionStorage.setItem("sr_figures",    JSON.stringify(figures));    } catch {}
+  }, [figures]);
   useEffect(() => {
     try { sessionStorage.setItem("sr_clientInfo", JSON.stringify(clientInfo)); } catch {}
   }, [clientInfo]);
+  useEffect(() => {
+    try { sessionStorage.setItem("sr_scoreResult",    JSON.stringify(scoreResult));    } catch {}
+  }, [scoreResult]);
+  useEffect(() => {
+    try { sessionStorage.setItem("sr_assessmentId",   JSON.stringify(assessmentId));   } catch {}
+  }, [assessmentId]);
+  useEffect(() => {
+    try { sessionStorage.setItem("sr_narrative",      JSON.stringify(narrative));      } catch {}
+  }, [narrative]);
+  useEffect(() => {
+    try { sessionStorage.setItem("sr_extractedFigures", JSON.stringify(extractedFigures)); } catch {}
+  }, [extractedFigures]);
+  useEffect(() => {
+    try { sessionStorage.setItem("sr_scoredFiguresKey", JSON.stringify(scoredFiguresKey)); } catch {}
+  }, [scoredFiguresKey]);
+
   function startNew() {
-    setStep(0);
+    if (draftId) {
+      import("../api/client.js").then(({ deleteAssessment }) => {
+        deleteAssessment(draftId).catch(() => {});
+      });
+    }
+    setStepRaw(0);
     setFigures({});
     setClientInfo({});
     setScoreResult(null);
     setAssessmentId(null);
     setNarrative(null);
-    try { sessionStorage.removeItem("sr_figures"); sessionStorage.removeItem("sr_clientInfo"); } catch {}
+    setExtractedFigures(null);
+    setScoredFiguresKey(null);
+    setDraftId(null);
+    setDraftOffer(null);
+    try {
+      [
+        "sr_step","sr_figures","sr_clientInfo","sr_scoreResult",
+        "sr_assessmentId","sr_narrative","sr_extractedFigures",
+        "sr_scoredFiguresKey","sr_draftId","sr_uploadSubStep",
+        "sr_extractionCount","sr_extractedFileKey",
+      ].forEach(k => sessionStorage.removeItem(k));
+    } catch {}
+  }
+
+  function handleDraftResume(draft) {
+    setFigures(draft.figures || {});
+    setClientInfo({ clientName: draft.clientName });
+    setDraftId(draft.id);
+    try {
+      sessionStorage.setItem("sr_figures",    JSON.stringify(draft.figures || {}));
+      sessionStorage.setItem("sr_clientInfo", JSON.stringify({ clientName: draft.clientName }));
+      sessionStorage.setItem("sr_draftId",    String(draft.id));
+      sessionStorage.setItem("sr_uploadSubStep",    "1");
+      sessionStorage.setItem("sr_extractionCount",  "1");
+    } catch {}
+    setDraftOffer(null);
+    setStep(1);
+  }
+
+  function handleDraftDiscard(draft) {
+    import("../api/client.js").then(({ deleteAssessment }) => {
+      deleteAssessment(draft.id).catch(() => {});
+    });
+    setDraftOffer(null);
   }
 
   // ── Header ───────────────────────────────────────────────
@@ -220,10 +303,16 @@ export default function AppPage() {
         figures={figures}
         onFiguresChange={setFigures}
         onContinue={() => setStep(1)}
-        onExtracted={(figs, updatedInfo) => {
+        onExtracted={(figs, updatedInfo, newDraftId) => {
           setFigures(figs);
+          setExtractedFigures(figs);
           if (updatedInfo) setClientInfo(updatedInfo);
+          if (newDraftId) {
+            setDraftId(newDraftId);
+            try { sessionStorage.setItem("sr_draftId", String(newDraftId)); } catch {}
+          }
         }}
+        draftId={draftId}
         onQuotaError={(msg) => setQuotaMsg(msg)}
       />
     );
@@ -234,20 +323,25 @@ export default function AppPage() {
         onChange={setFigures}
         onBack={() => setStep(0)}
         onNext={() => setStep(2)}
+        draftId={draftId}
       />
     );
   } else if (step === 2) {
     content = (
       <Scores
         figures={figures}
+        extractedFigures={extractedFigures}
         scoreResult={scoreResult}
+        scoredFiguresKey={scoredFiguresKey}
         onScored={setScoreResult}
         onQuotaExceeded={(msg) => setQuotaMsg(msg)}
         onBack={() => setStep(1)}
-        onNext={(result, id, narr) => {
+        draftId={draftId}
+        onNext={(result, id, narr, figuresKey) => {
           setScoreResult(result);
-          setAssessmentId(id);
-          setNarrative(narr);
+          if (id !== null) setAssessmentId(id);
+          if (narr !== null) setNarrative(narr);
+          setScoredFiguresKey(figuresKey);
           setStep(3);
         }}
         clientInfo={clientInfo}
@@ -283,6 +377,26 @@ export default function AppPage() {
       {mobileMenuEl}
       <div className="sr-stepper">{stepper}</div>
       <div style={{ maxWidth:960, margin:"0 auto", width:"100%", padding:"24px 24px 0" }}>
+        {draftOffer && (
+          <div style={{ marginBottom:16, padding:"14px 18px", borderRadius:8, background:"#FEF6E7", border:"1px solid #F0C060", display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, flexWrap:"wrap" }}>
+            <div>
+              <div style={{ fontSize:13, fontWeight:"bold", color:"#7A4F00", marginBottom:2 }}>Unfinished assessment found</div>
+              <div style={{ fontSize:12, color:"#7A4F00" }}>
+                {draftOffer.clientName || "Unnamed client"} — started {new Date(draftOffer.createdAt).toLocaleDateString("en-NG", { day:"2-digit", month:"short", year:"numeric" })}
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:8 }}>
+              <button onClick={() => handleDraftDiscard(draftOffer)}
+                style={{ padding:"7px 16px", fontSize:12, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#7A4F00", fontFamily:"Arial,sans-serif" }}>
+                Discard
+              </button>
+              <button onClick={() => handleDraftResume(draftOffer)}
+                style={{ padding:"7px 16px", fontSize:12, borderRadius:6, cursor:"pointer", border:"none", background:"#7A4F00", color:"#fff", fontFamily:"Arial,sans-serif", fontWeight:600 }}>
+                Resume
+              </button>
+            </div>
+          </div>
+        )}
         {content}
       </div>
 
@@ -339,7 +453,7 @@ export default function AppPage() {
 
       {/* Dashboard modal */}
       {showDash && (
-        <Modal onClose={() => setShowDash(false)} title="Past Assessments">
+        <Modal onClose={() => setShowDash(false)} title="Past Assessments" maxWidth={1100}>
           <Dashboard />
         </Modal>
       )}
@@ -369,7 +483,7 @@ export default function AppPage() {
                 onMouseLeave={e => { e.currentTarget.style.borderColor="#E0E0E0"; e.currentTarget.style.background="#fff"; }}>
                 <MessageCircle size={28} color="#25D366" strokeWidth={1.5} />
                 <div style={{ fontSize:13, fontWeight:"bold", color:"#1F2854" }}>WhatsApp</div>
-                <div style={{ fontSize:11, color:"#888" }}>Eddu SmartRisk</div>
+                <div style={{ fontSize:11, color:"#888" }}>SmartRisk</div>
               </a>
             </div>
             <div style={{ fontSize:11, color:"#aaa", lineHeight:1.7 }}>
@@ -418,14 +532,14 @@ function HdrBtn({ icon, label, onClick }) {
   );
 }
 
-function Modal({ onClose, title, children }) {
+function Modal({ onClose, title, children, maxWidth = 760 }) {
   return (
     <div style={{
       position:"fixed", inset:0, background:"rgba(0,0,0,0.5)",
       zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:24,
     }}>
       <div style={{
-        background:"#fff", borderRadius:12, width:"100%", maxWidth:760,
+        background:"#fff", borderRadius:12, width:"100%", maxWidth,
         maxHeight:"85vh", overflow:"auto", padding:"32px 36px", position:"relative",
         boxShadow:"0 24px 80px rgba(0,0,0,0.25)",
       }}>

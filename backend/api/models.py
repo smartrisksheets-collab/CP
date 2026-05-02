@@ -50,7 +50,8 @@ class User(Base):
     company      : Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     role         : Mapped[str]           = mapped_column(Text, default="user")   # user | admin | superadmin
     plan         : Mapped[str]           = mapped_column(Text, default="free")   # last pack purchased
-    credits      : Mapped[int]           = mapped_column(Integer, default=0)     # current credit balance
+    credits            : Mapped[int]           = mapped_column(Integer, default=0)
+    credits_expire_at  : Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     verified           : Mapped[bool]           = mapped_column(Boolean, default=False)
     onboarding_role    : Mapped[Optional[str]]  = mapped_column(Text, nullable=True)
     onboarding_process : Mapped[Optional[str]]  = mapped_column(Text, nullable=True)
@@ -106,11 +107,16 @@ class Assessment(Base):
     total_score   : Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     max_score     : Mapped[int]           = mapped_column(Integer, default=56)
     eligible      : Mapped[Optional[bool]]= mapped_column(Boolean, nullable=True)
-    figures       : Mapped[Optional[dict]]= mapped_column(JSONB, nullable=True)
-    ratios        : Mapped[Optional[list]]= mapped_column(JSONB, nullable=True)
-    narrative     : Mapped[Optional[dict]]= mapped_column(JSONB, nullable=True)
-    pdf_url       : Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at    : Mapped[datetime]      = mapped_column(DateTime(timezone=True), server_default=func.now())
+    figures            : Mapped[Optional[dict]]= mapped_column(JSONB, nullable=True)
+    extracted_figures  : Mapped[Optional[dict]]= mapped_column(JSONB, nullable=True)  # AI-extracted, pre-edit
+    ratios             : Mapped[Optional[list]]= mapped_column(JSONB, nullable=True)
+    narrative          : Mapped[Optional[dict]]= mapped_column(JSONB, nullable=True)
+    pdf_url            : Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    review_date        : Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status             : Mapped[str]                = mapped_column(Text, default="complete")
+    deleted_at         : Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at         : Mapped[datetime]           = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at         : Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
     tenant        : Mapped["Tenant"]      = relationship(back_populates="assessments")
 

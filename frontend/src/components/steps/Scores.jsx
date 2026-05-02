@@ -1,6 +1,14 @@
 import { useState, useEffect } from "react";
 import { runAssessment } from "../../api/client.js";
-import { Loader } from "lucide-react";
+import { Loader, Zap, ChevronRight } from "lucide-react";
+
+const RUN_MESSAGES = [
+  "Validating figures…",
+  "Computing ratios…",
+  "Running scoring model…",
+  "Generating risk narrative…",
+  "Finalising assessment…",
+];
 
 function scoreColor(score, max) {
   if (score === max) return "#1E7E34";
@@ -62,14 +70,31 @@ const CATEGORIES = {
   "Altman Z-Score"         : "Corporate Bankruptcy",
 };
 
-export default function Scores({ figures, scoreResult, onScored, onBack, onNext, onQuotaExceeded, clientInfo }) {
+function makeFiguresKey(figures) {
+  return JSON.stringify(Object.entries(figures).sort());
+}
+
+export default function Scores({ figures, extractedFigures, scoreResult, scoredFiguresKey, onScored, onBack, onNext, onQuotaExceeded, clientInfo, draftId }) {
   const [local]    = useState(() => computeLocal(figures));
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
+  const [msgIdx, setMsgIdx]   = useState(0);
+
+  const currentKey   = makeFiguresKey(figures);
+  const hasResult    = !!scoreResult;
+  const figuresMatch = scoredFiguresKey === currentKey;
+  const canProceed   = hasResult && figuresMatch;
+
+  useEffect(() => {
+    if (!loading) { setMsgIdx(0); return; }
+    const t = setInterval(() => setMsgIdx(i => Math.min(i + 1, RUN_MESSAGES.length - 1)), 7000);
+    return () => clearInterval(t);
+  }, [loading]);
 
   async function handleViewResult() {
     setLoading(true);
     setError("");
+    setMsgIdx(0);
 
     // Convert interest rates to decimal for backend if entered as percentage
     const f = { ...figures };
@@ -77,12 +102,13 @@ export default function Scores({ figures, scoreResult, onScored, onBack, onNext,
     if (f.longTermInterestRate  > 1) f.longTermInterestRate  = f.longTermInterestRate  / 100;
 
     try {
-      const res = await runAssessment(f, clientInfo);
+      const res = await runAssessment(f, clientInfo, extractedFigures, draftId);
       const d   = res.data;
       onNext(
         { ratios: d.ratios, total_score: d.totalScore, eligible: d.eligible, max_score: d.maxScore },
         d.assessmentId,
         d.narrative,
+        currentKey,
       );
     } catch (e) {
       const detail = e.response?.data?.detail;
@@ -165,12 +191,38 @@ export default function Scores({ figures, scoreResult, onScored, onBack, onNext,
         </table>
       </div>
 
-      <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:20 }}>
+      <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:20, alignItems:"center" }}>
         <button onClick={onBack} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#1F2854", fontFamily:"Arial,sans-serif" }}>Back</button>
-        <button onClick={handleViewResult} disabled={loading} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor: loading ? "not-allowed" : "pointer", border:"1px solid #1F2854", background: loading ? "#888" : "#1F2854", color:"#fff", fontFamily:"Arial,sans-serif", display:"flex", alignItems:"center", gap:6 }}>
-          {loading && <Loader size={14} style={{ animation:"spin 0.8s linear infinite" }} />}
-          {loading ? "Running assessment..." : "View Result"}
-        </button>
+
+        {canProceed && !loading && (
+          <button
+            onClick={() => onNext(scoreResult, null, null, currentKey)}
+            style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #1F2854", background:"transparent", color:"#1F2854", fontFamily:"Arial,sans-serif", display:"flex", alignItems:"center", gap:6 }}>
+            Continue to Result <ChevronRight size={14} />
+          </button>
+        )}
+
+        {!canProceed && (
+          <div style={{ display:"flex", flexDirection:"column", alignItems:"stretch" }}>
+            <button onClick={handleViewResult} disabled={loading}
+              style={{ padding:"9px 20px", fontSize:13, borderRadius: loading ? "6px 6px 0 0" : 6, cursor: loading ? "not-allowed" : "pointer", border:"1px solid #1F2854", background: loading ? "#2a3870" : "#1F2854", color:"#fff", fontFamily:"Arial,sans-serif", display:"flex", alignItems:"center", gap:8 }}>
+              {loading
+                ? <><Loader size={14} style={{ animation:"spin 0.8s linear infinite", flexShrink:0 }} />{RUN_MESSAGES[msgIdx]}</>
+                : <><Zap size={14} /> View Result <span style={{ fontSize:10, padding:"1px 6px", borderRadius:999, background:"rgba(255,255,255,0.15)", marginLeft:2 }}>1 credit</span></>
+              }
+            </button>
+            {loading && (
+              <div style={{ height:3, background:"rgba(31,40,84,0.15)", borderRadius:"0 0 6px 6px", overflow:"hidden" }}>
+                <div style={{ height:"100%", background:"var(--accent)", width:`${Math.min(88, (msgIdx / (RUN_MESSAGES.length - 1)) * 88)}%`, transition:"width 0.9s ease" }} />
+              </div>
+            )}
+            {hasResult && !figuresMatch && (
+              <div style={{ fontSize:11, color:"#854F0B", marginTop:4, textAlign:"right" }}>
+                ⚠ Figures changed — re-run to get updated result
+              </div>
+            )}
+          </div>
+        )}
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>

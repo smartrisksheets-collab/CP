@@ -63,8 +63,15 @@ export const extractFigures = (formData) =>
 export const extractCpTerms = (formData) =>
   api.post("/assessment/extract-cp", formData, { headers: { "Content-Type": "multipart/form-data" } });
 
-export const runAssessment = (figures, clientInfo) =>
-  api.post("/assessment/run", { figures, clientInfo }, { timeout: 120000 });
+export const runAssessment = (figures, clientInfo, extractedFigures = null, draftId = null) =>
+  api.post("/assessment/run", { figures, clientInfo, extractedFigures, draftId }, { timeout: 180000 });
+
+export const getDraft = () =>
+  api.get("/assessment/draft");
+
+export const updateDraftFigures = (draftId, figures) =>
+  api.patch(`/assessment/${draftId}/figures`, { figures });
+
 
 export const generateReport = (assessmentId, narrativeOverrides = {}) =>
   api.post(
@@ -73,8 +80,11 @@ export const generateReport = (assessmentId, narrativeOverrides = {}) =>
     { responseType: "blob" }
   );
 
-export const getHistory = () =>
-  api.get("/assessment/history");
+export const getHistory = (page = 1, pageSize = 20) =>
+  api.get("/assessment/history", { params: { page, page_size: pageSize } });
+
+export const deleteAssessment = (id) =>
+  api.delete(`/assessment/${id}`);
 
 export const getAssessment = (id) =>
   api.get(`/assessment/${id}`);

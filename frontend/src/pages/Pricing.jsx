@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import { getQuotaStatus } from "../api/client.js";
-import { Loader, ArrowLeft, Check, Mail } from "lucide-react";
+import { Loader, ArrowLeft, Check, Mail, MessageCircle, X } from "lucide-react";
 import axios from "axios";
 
 const BASE_URL    = import.meta.env.VITE_API_BASE_URL || "";
@@ -63,11 +63,12 @@ export default function Pricing() {
   const navigate   = useNavigate();
   const hostname   = window.location.hostname;
 
-  const [packs,   setPacks]   = useState([]);
-  const [quota,   setQuota]   = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [paying,  setPaying]  = useState(null);
-  const [error,   setError]   = useState("");
+  const [packs,       setPacks]       = useState([]);
+  const [quota,       setQuota]       = useState(null);
+  const [loading,     setLoading]     = useState(true);
+  const [paying,      setPaying]      = useState(null);
+  const [error,       setError]       = useState("");
+  const [showContact, setShowContact] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -256,7 +257,7 @@ export default function Pricing() {
           <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8, flexShrink:0 }}>
             <div style={{ fontSize:13, color:C.muted, fontWeight:600 }}>Custom pricing</div>
             <button
-              onClick={() => window.location.href = "mailto:info@smartrisksheets.com"}
+              onClick={() => setShowContact(true)}
               style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 20px", background:"#fff", color:C.navy, border:`1.5px solid ${C.navy}`, borderRadius:8, fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"Arial,sans-serif" }}
             >
               <Mail size={13} /> Contact us →
@@ -268,11 +269,47 @@ export default function Pricing() {
       {/* ── Footer ── */}
       <div style={{ textAlign:"center", marginTop:32, fontSize:12, color:C.muted, lineHeight:1.8, padding:"0 24px" }}>
         Payments processed securely via Paystack. Credit packs are one-time purchases — no subscription, no auto-renewal.<br />
-        Credits are valid for 12 months. Questions? Email{" "}
-        <a href="mailto:info@smartrisksheets.com" style={{ color:C.emerald, textDecoration:"none" }}>
-          info@smartrisksheets.com
-        </a>
+        Credits are valid for 12 months. Questions?{" "}
+        <button onClick={() => setShowContact(true)} style={{ background:"none", border:"none", color:C.emerald, fontSize:12, cursor:"pointer", textDecoration:"underline", padding:0, fontFamily:"Arial,sans-serif" }}>
+          Get in touch
+        </button>
       </div>
+
+      {/* ── Contact modal ── */}
+      {showContact && (
+        <div onClick={(e) => e.target === e.currentTarget && setShowContact(false)}
+          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+          <div style={{ background:"#fff", borderRadius:12, width:"100%", maxWidth:420, padding:"32px 28px", position:"relative", boxShadow:"0 24px 80px rgba(0,0,0,0.25)", textAlign:"center" }}>
+            <button onClick={() => setShowContact(false)} style={{ position:"absolute", top:14, right:18, background:"none", border:"none", cursor:"pointer", color:"#888" }}>
+              <X size={18} />
+            </button>
+            <div style={{ fontSize:17, fontWeight:"bold", color:C.navy, marginBottom:6 }}>Get in touch</div>
+            <div style={{ fontSize:13, color:"#888", marginBottom:28 }}>Choose how you'd like to reach us.</div>
+            <div style={{ display:"flex", gap:16, justifyContent:"center", marginBottom:20 }}>
+              <a href="mailto:info@smartrisksheets.com"
+                style={{ flex:1, maxWidth:160, display:"flex", flexDirection:"column", alignItems:"center", gap:10, padding:"20px 16px", border:"1px solid #E0E0E0", borderRadius:10, textDecoration:"none", background:"#fff", transition:"all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor="#01b88e"; e.currentTarget.style.background="#f0faf7"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor="#E0E0E0"; e.currentTarget.style.background="#fff"; }}>
+                <Mail size={28} color={C.navy} strokeWidth={1.5} />
+                <div style={{ fontSize:13, fontWeight:"bold", color:C.navy }}>Email us</div>
+                <div style={{ fontSize:11, color:"#888" }}>info@smartrisksheets.com</div>
+              </a>
+              <a href="https://wa.me/2349052288923" target="_blank" rel="noreferrer"
+                style={{ flex:1, maxWidth:160, display:"flex", flexDirection:"column", alignItems:"center", gap:10, padding:"20px 16px", border:"1px solid #E0E0E0", borderRadius:10, textDecoration:"none", background:"#fff", transition:"all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor="#25D366"; e.currentTarget.style.background="#f0fdf4"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor="#E0E0E0"; e.currentTarget.style.background="#fff"; }}>
+                <MessageCircle size={28} color="#25D366" strokeWidth={1.5} />
+                <div style={{ fontSize:13, fontWeight:"bold", color:C.navy }}>WhatsApp</div>
+                <div style={{ fontSize:11, color:"#888" }}>SmartRisk</div>
+              </a>
+            </div>
+            <div style={{ fontSize:11, color:"#aaa", lineHeight:1.7 }}>
+              WhatsApp for quick help · Email for account and billing queries<br />
+              We typically respond within a few hours on business days.
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

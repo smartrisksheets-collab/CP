@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 const MESSAGES = [
-  "Sending document to AI...",
+  "Sending document...",
   "Reading financial statements...",
   "Extracting income statement figures...",
   "Extracting balance sheet figures...",

@@ -137,13 +137,16 @@ export default function CPTerms({ figures, onFiguresChange, onBack, onNext, clie
       return;
     }
     setFileWarns(result.warnings || []);
+    // User must now click "Extract Fields" manually
+  }
 
-    // Auto-extract
+  async function handleExtract() {
+    if (!file) return;
     setExtracting(true);
     setExtractErr("");
     try {
       const fd = new FormData();
-      fd.append("cp_terms_pdf", f);
+      fd.append("cp_terms_pdf", file);
       const res  = await extractCpTerms(fd);
       const data = res.data?.cpTerms || {};
       setFields((prev) => {
@@ -154,7 +157,7 @@ export default function CPTerms({ figures, onFiguresChange, onBack, onNext, clie
         return merged;
       });
     } catch {
-      setExtractErr("AI extraction failed — please fill in the fields manually.");
+      setExtractErr("Extraction failed — please fill in the fields manually.");
     } finally {
       setExtracting(false);
     }
@@ -213,7 +216,7 @@ export default function CPTerms({ figures, onFiguresChange, onBack, onNext, clie
             >
               <UploadIcon size={32} style={{ margin:"0 auto 10px", opacity:0.35, display:"block" }} />
               <div style={{ fontSize:14, fontWeight:"bold", color:"#1F2854", marginBottom:4 }}>Click to upload indicative terms email</div>
-              <div style={{ fontSize:12, color:"#888" }}>Forwarded CP email PDF — AI will extract all fields below</div>
+              <div style={{ fontSize:12, color:"#888" }}>Forwarded CP email PDF — CP terms will be extracted into the fields below .</div>
             </div>
           </>
         )}
@@ -231,10 +234,16 @@ export default function CPTerms({ figures, onFiguresChange, onBack, onNext, clie
             <span>{w}</span>
           </div>
         ))}
+        {file && !extracting && (
+          <button onClick={handleExtract}
+            style={{ marginTop:8, padding:"8px 14px", fontSize:12, borderRadius:6, cursor:"pointer", border:"1px solid #1F2854", background:"#1F2854", color:"#fff", fontFamily:"Arial,sans-serif", display:"flex", alignItems:"center", gap:6 }}>
+            <Loader size={12} style={{ opacity:0 }} /> Extract Fields from PDF
+          </button>
+        )}
         {extracting && (
           <div style={{ marginTop:8, padding:"8px 12px", borderRadius:6, background:"#F0F4FF", border:"1px solid #9DBFEA", fontSize:12, color:"#1A5276", display:"flex", gap:8, alignItems:"center" }}>
             <Loader size={13} style={{ animation:"spin 0.8s linear infinite", flexShrink:0 }} />
-            Extracting terms with AI…
+            Extracting fields…
           </div>
         )}
         {extractErr && (

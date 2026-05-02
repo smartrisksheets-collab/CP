@@ -6,7 +6,7 @@ import os
 from typing import Optional
 
 CLAUDE_MODEL   = "claude-sonnet-4-5"
-CLAUDE_TIMEOUT = 90  # seconds
+CLAUDE_TIMEOUT = 150  # seconds — narrative generation needs more headroom
 MAX_RETRIES    = 3
 
 client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
@@ -63,8 +63,17 @@ async def _call_with_pdf(base64_pdf: str, prompt: str) -> str:
             raise RuntimeError("Claude rate limit reached. Please wait 30 seconds and try again.")
 
         except asyncio.TimeoutError:
-            raise RuntimeError(f"Claude did not respond within {CLAUDE_TIMEOUT}s. Please try again.")
+            if attempt < MAX_RETRIES:
+                await asyncio.sleep(5)
+                continue
+            raise RuntimeError("Claude took too long to respond. Please try again in a moment.")
 
+        except anthropic.APIStatusError as e:
+            if e.status_code in (529, 500, 503) and attempt < MAX_RETRIES:
+                await asyncio.sleep(delay)
+                delay *= 2
+                continue
+            raise RuntimeError(f"Claude API error ({e.status_code}): {e.message}")
         except anthropic.APIError as e:
             raise RuntimeError(f"Claude API error: {e}")
 
@@ -92,8 +101,17 @@ async def _call_text_only(prompt: str) -> str:
             raise RuntimeError("Claude rate limit reached. Please wait 30 seconds and try again.")
 
         except asyncio.TimeoutError:
-            raise RuntimeError(f"Claude did not respond within {CLAUDE_TIMEOUT}s. Please try again.")
+            if attempt < MAX_RETRIES:
+                await asyncio.sleep(5)
+                continue
+            raise RuntimeError("Claude took too long to respond. Please try again in a moment.")
 
+        except anthropic.APIStatusError as e:
+            if e.status_code in (529, 500, 503) and attempt < MAX_RETRIES:
+                await asyncio.sleep(delay)
+                delay *= 2
+                continue
+            raise RuntimeError(f"Claude API error ({e.status_code}): {e.message}")
         except anthropic.APIError as e:
             raise RuntimeError(f"Claude API error: {e}")
 
