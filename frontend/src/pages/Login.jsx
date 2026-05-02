@@ -272,7 +272,7 @@ export default function Login() {
           <div style={S.statStrip}>
             <div style={S.stat}><div style={S.statVal}>4</div><div style={S.statLbl}>Simple steps</div></div>
             <div style={S.stat}><div style={S.statVal}>10</div><div style={S.statLbl}>Ratio metrics</div></div>
-            <div style={S.stat}><div style={S.statVal}>~60s</div><div style={S.statLbl}>Per assessment</div></div>
+            <div style={S.stat}><div style={S.statVal}><5 mins</div><div style={S.statLbl}>Per assessment</div></div>
           </div>
           <div style={S.steps}>
             {[
