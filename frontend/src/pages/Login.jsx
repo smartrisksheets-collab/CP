@@ -304,7 +304,7 @@ export default function Login() {
         <div style={S.card}>
           <div style={S.eyebrow}>{tenant?.loginEyebrow || "Analyst Portal"}</div>
           <h2 style={S.heading}>Welcome back</h2>
-          <p style={S.sub}>{tenant?.loginSubtext || "Sign in to access your Commercial Paper risk assessment tool."}</p>
+          <p style={S.sub}>{tenant?.loginSubtext || "Sign in and start scoring."}</p>
 
           {/* ACCESS CODE STEP */}
           {step === STEPS.CODE && (
