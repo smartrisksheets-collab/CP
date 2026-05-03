@@ -156,7 +156,7 @@ export default function Register() {
 
               <div style={{ marginBottom:16 }}>
                 <label style={{ display:"block", fontSize:12, fontWeight:500, color:"#1a1a2e", marginBottom:6 }}>Full Name *</label>
-                <input style={inp(errors.name)} type="text" placeholder="e.g. Chidi Okonkwo"
+                <input style={inp(errors.name)} type="text" placeholder="e.g. Tunde Azikiwe"
                   value={form.name} onChange={e => set("name", e.target.value)}
                   onKeyDown={e => e.key === "Enter" && handleSubmit()} autoFocus />
                 {errors.name && <div style={{ fontSize:12, color:"#dc2626", marginTop:4 }}>{errors.name}</div>}
