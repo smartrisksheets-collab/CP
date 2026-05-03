@@ -92,13 +92,13 @@ export default function Register() {
           </div>
           <h1 style={{ fontSize:28, fontWeight:700, color:"#fff", lineHeight:1.2, marginBottom:14, fontFamily:"'Playfair Display', serif" }}>
             Start assessing.<br />
-            <span style={{ color:"var(--accent)" }}>In seconds.</span>
+            <span style={{ color:"var(--accent)" }}>In minutes.</span>
           </h1>
           <p style={{ fontSize:14, color:"rgba(255,255,255,0.55)", lineHeight:1.7, maxWidth:360, marginBottom:24 }}>
             Create your account and get 2 free assessment credits — no card required.
           </p>
           {[
-            "AI-powered financial statement extraction",
+            "Lightening fast financial statement extraction",
             "10-ratio quantitative scoring model",
             "Professional PDF report generation",
             "Nigerian capital markets calibrated",
