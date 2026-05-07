@@ -305,15 +305,17 @@ def _build_elements(assessment: Assessment):
     else:
         distress = n.get("futureRisksReview", "")
 
-    # Strengths / Weaknesses
-    strengths, weaknesses = [], []
-    for r in ratios:
-        sc = r.get("score", 0); mx = r.get("max_score", 0)
-        nm = r.get("name","");   dv = r.get("display_value",""); bd = r.get("band","")
-        if sc == mx and mx > 0:
-            strengths.append(f"{nm} of {dv} ({bd}) earns the maximum {sc} out of {mx} points.")
-        elif sc <= 0:
-            weaknesses.append(f"{nm} of {dv} ({bd}) scores {sc} out of {mx}, dragging the total score.")
+    # Prefer AI-generated explanatory strengths/weaknesses; fall back to mechanical
+    strengths  = list(n.get("strengths")  or [])
+    weaknesses = list(n.get("weaknesses") or [])
+    if not strengths or not weaknesses:
+        for r in ratios:
+            sc = r.get("score", 0); mx = r.get("max_score", 0)
+            nm = r.get("name","");   dv = r.get("display_value",""); bd = r.get("band","")
+            if sc == mx and mx > 0 and len(strengths) < 4:
+                strengths.append(f"{nm} of {dv} ({bd}) earns the maximum {sc} out of {mx} points.")
+            elif sc <= 0 and len(weaknesses) < 4:
+                weaknesses.append(f"{nm} of {dv} ({bd}) scores {sc} out of {mx}, dragging the total score.")
     if not strengths and n.get("financialStandingReview"):
         strengths.append(n["financialStandingReview"].split(".")[0] + ".")
     if not weaknesses and n.get("futureRisksReview"):
@@ -451,7 +453,25 @@ def _build_elements(assessment: Assessment):
 
     # ── 6. SCORING BREAKDOWN ──────────────────────────────────
     E.append(_sec_hdr("SCORING BREAKDOWN BY DIMENSION", ST))
-    E.append(Spacer(1, 8))
+    E.append(Spacer(1, 4))
+
+    _ch = lambda t, align=TA_LEFT: Paragraph(t, ParagraphStyle(
+        "colhdr", fontName="Helvetica-Bold", fontSize=7,
+        textColor=C_GREY, leading=9, alignment=align))
+    col_hdr = Table([[
+        _ch("RATIO"), _ch("RESULT"), _ch("BAND", TA_CENTER),
+        _ch(""), _ch("WEIGHT", TA_RIGHT),
+    ]], colWidths=[_SC_NAME, _SC_VAL, _SC_BAND, _SC_BAR, _SC_SCR])
+    col_hdr.setStyle(TableStyle([
+        ("BACKGROUND",    (0,0), (-1,-1), C_CREAM),
+        ("LEFTPADDING",   (0,0), (-1,-1), 10),
+        ("RIGHTPADDING",  (0,0), (-1,-1), 6),
+        ("TOPPADDING",    (0,0), (-1,-1), 4),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+        ("LINEBELOW",     (0,0), (-1,-1), 0.5, C_BORDER),
+    ]))
+    E.append(col_hdr)
+    E.append(Spacer(1, 4))
 
     for dim_name, cat in DIMS:
         dim_ratios = [r for r in ratios if r.get("category") == cat]

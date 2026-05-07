@@ -95,6 +95,27 @@ export default function AppPage() {
     try { sessionStorage.setItem("sr_scoredFiguresKey", JSON.stringify(scoredFiguresKey)); } catch {}
   }, [scoredFiguresKey]);
 
+  function handleNewAssessment() {
+    if (draftId) {
+      import("../api/client.js").then(({ deleteAssessment }) => {
+        deleteAssessment(draftId).catch(() => {});
+      });
+    }
+    setFigures({});
+    setScoreResult(null);
+    setAssessmentId(null);
+    setNarrative(null);
+    setExtractedFigures(null);
+    setScoredFiguresKey(null);
+    setDraftId(null);
+    try {
+      ["sr_figures","sr_scoreResult","sr_assessmentId","sr_narrative",
+       "sr_extractedFigures","sr_scoredFiguresKey","sr_draftId",
+       "sr_extractionCount","sr_extractedFileKey",
+      ].forEach(k => sessionStorage.removeItem(k));
+    } catch {}
+  }
+
   function startNew() {
     if (draftId) {
       import("../api/client.js").then(({ deleteAssessment }) => {
@@ -314,6 +335,8 @@ export default function AppPage() {
         }}
         draftId={draftId}
         onQuotaError={(msg) => setQuotaMsg(msg)}
+        hasDownstreamData={!!(scoreResult || narrative)}
+        onNewAssessment={handleNewAssessment}
       />
     );
   } else if (step === 1) {

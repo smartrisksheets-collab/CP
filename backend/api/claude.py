@@ -196,6 +196,14 @@ It appears in TWO sections of the balance sheet. You MUST check BOTH:
 - auditorName: Name of the audit firm from the independent auditors report.
 - auditOpinion: Clean / Qualified / Emphasis of matter.
 
+=== PRIOR YEAR FIGURES (COMPANY prior year column — for year-on-year analysis) ===
+Extract from the COMPANY prior year column only (typically labelled 2023):
+- priorYearNetIncome: Profit for the year / Profit after taxation, prior year COMPANY column.
+- priorYearEBIT: Operating profit / Profit from operations, prior year COMPANY column.
+- priorYearTotalDebt: Sum of short-term and long-term borrowings, prior year COMPANY column.
+- priorYearTotalAssets: Total assets, prior year COMPANY column.
+- priorYearShareholdersEquity: Total equity attributable to shareholders, prior year COMPANY column.
+
 Return ONLY this JSON — no other text:
 {"revenue":number,"priorYearRevenue":number,"netIncome":number,"ebit":number,
 "depreciationAndAmortisation":number,"cash":number,"inventory":number,"prepaidExpenses":number,
@@ -203,7 +211,9 @@ Return ONLY this JSON — no other text:
 "shortTermDebt":number,"longTermDebt":number,"totalDebt":number,
 "shareholdersEquity":number,"retainedEarnings":number,
 "shortTermInterestRate":number,"longTermInterestRate":number,
-"reportingPeriod":string,"auditorName":string,"auditOpinion":string}"""
+"reportingPeriod":string,"auditorName":string,"auditOpinion":string,
+"priorYearNetIncome":number,"priorYearEBIT":number,"priorYearTotalDebt":number,
+"priorYearTotalAssets":number,"priorYearShareholdersEquity":number}"""
 
 
 async def extract_figures(base64_pdf: str) -> dict:
@@ -301,30 +311,40 @@ async def generate_narrative(figures: dict, ratios: list, client_info: dict) -> 
     net_dte = f"{net_debt / n(f.get('ebitda')):.2f}" if n(f.get("ebitda")) > 0 else "N/A"
     de      = f"{td / n(f.get('shareholdersEquity')) * 100:.1f}" if n(f.get("shareholdersEquity")) > 0 else "N/A"
 
+    # ── Prior year derived metrics ────────────────────────────
+    py_rev    = n(f.get("priorYearRevenue"))
+    py_ni     = n(f.get("priorYearNetIncome"))
+    py_ebit   = n(f.get("priorYearEBIT"))
+    py_td     = n(f.get("priorYearTotalDebt"))
+    py_assets = n(f.get("priorYearTotalAssets"))
+    py_eq     = n(f.get("priorYearShareholdersEquity"))
+
+    def chg(curr, prior):
+        try:
+            return f"{((curr - prior) / abs(prior) * 100):+.1f}%" if prior else "N/A"
+        except: return "N/A"
+
     ratio_lines = "\n".join(
         f"  • {r['name']}: {r['display_value']} | Band: {r['band']} | Score: {r['score']}/{r['max_score']}"
         for r in ratios
     )
 
-    prompt = f"""You are a senior Nigerian capital markets credit analyst writing a risk assessment narrative
-for a credit risk report on a Commercial Paper or Promissory Note issuance.
+    prompt = f"""You are a senior Nigerian capital markets credit analyst writing a concise risk assessment.
 
 COMPANY: {client_info.get('clientName')}
 EXTERNAL CREDIT RATING: {client_info.get('creditRating') or 'Not provided'}
 REVIEW DATE: {client_info.get('reviewDate')}
 
-VERIFIED FINANCIAL FIGURES (₦'000):
-  Revenue:             {fmt(f.get('revenue'))}
-  Net Income:          {fmt(f.get('netIncome'))}
+FINANCIAL FIGURES — CURRENT vs PRIOR YEAR (₦'000):
+  Revenue:             {fmt(f.get('revenue'))}  |  Prior: {fmt(py_rev)}  |  Change: {chg(n(f.get('revenue')), py_rev)}
+  Net Income:          {fmt(f.get('netIncome'))}  |  Prior: {fmt(py_ni)}  |  Change: {chg(n(f.get('netIncome')), py_ni)}
+  EBIT:                {fmt(f.get('ebit'))}  |  Prior: {fmt(py_ebit)}  |  Change: {chg(n(f.get('ebit')), py_ebit)}
   EBITDA:              {fmt(f.get('ebitda'))}
-  EBIT:                {fmt(f.get('ebit'))}
   Cash & Equivalents:  {fmt(f.get('cash'))}
-  Total Assets:        {fmt(f.get('totalAssets'))}
+  Total Assets:        {fmt(f.get('totalAssets'))}  |  Prior: {fmt(py_assets)}
   Total Liabilities:   {fmt(f.get('totalLiabilities'))}
-  Shareholders Equity: {fmt(f.get('shareholdersEquity'))}
-  Short-term Debt:     {fmt(f.get('shortTermDebt'))}
-  Long-term Debt:      {fmt(f.get('longTermDebt'))}
-  Total Debt:          {fmt(td)}
+  Shareholders Equity: {fmt(f.get('shareholdersEquity'))}  |  Prior: {fmt(py_eq)}  |  Change: {chg(n(f.get('shareholdersEquity')), py_eq)}
+  Total Debt:          {fmt(td)}  |  Prior: {fmt(py_td)}  |  Change: {chg(td, py_td)}
   Retained Earnings:   {fmt(f.get('retainedEarnings'))}
 
 DERIVED METRICS:
@@ -342,22 +362,32 @@ SCORING RESULT:
   Total Score: {client_info.get('totalScore')} / 56
   Eligible: {'YES — meets the 34-point cut-off' if client_info.get('eligible') else 'NO — below the 34-point cut-off'}
 
-Write six narrative sections for the credit risk report. Each should be 3–5 sentences.
-Use formal Nigerian capital markets analyst language. Ground every statement in the specific
-numbers above. Do not invent figures. Use ₦ for Naira. Write in third person.
+INSTRUCTIONS:
+- Each narrative section: 2–3 sentences MAXIMUM.
+- Sentence 1: Name the PRIMARY metric driving this status and cite its exact value.
+- Sentence 2: State what this means for the issuer's debt service capacity or credit risk.
+- Sentence 3 (only if prior year data is not N/A): State the most material year-on-year change.
+- No filler phrases ("it is worth noting", "overall", "it should be mentioned"). Be direct.
+- Every sentence must contain at least one specific figure. Third person. ₦ for Naira.
+
+For strengths and weaknesses:
+- Each item must be exactly ONE sentence: name the metric, cite the figure, and state the business implication.
+- Do not just restate the score — explain why it matters to a creditor.
 
 Return ONLY valid JSON with no markdown and no backticks:
 {{
   "financialStanding": "Strong|Fair|Weak",
-  "financialStandingReview": "3-5 sentences on profitability, margins, ROA, revenue growth",
+  "financialStandingReview": "2-3 sentences: primary profitability metric driving this status, its YoY movement",
   "cashFlowRating": "Strong|Moderate|Weak",
-  "cashFlowReview": "3-5 sentences on EBITDA, debt service coverage, working capital, liquidity",
+  "cashFlowReview": "2-3 sentences: EBITDA or liquidity figure driving this status, what it means for debt service",
   "creditRiskLevel": "Low|Moderate|High",
-  "creditRiskReview": "3-5 sentences on leverage — debt to equity, net debt/EBITDA, interest burden",
+  "creditRiskReview": "2-3 sentences: primary leverage metric, what it means for creditors",
   "futureRiskLevel": "Low|Moderate|High",
-  "futureRisksReview": "3-5 sentences on forward-looking risks — earnings sustainability, macro, sector risks",
-  "creditRatingReview": "2-3 sentences on what the external rating means in context of this issuance and computed scores",
-  "recommendation": "2-3 sentences: overall recommendation to the investment committee with key supporting evidence"
+  "futureRisksReview": "2-3 sentences: most material forward risk grounded in current trend",
+  "creditRatingReview": "1-2 sentences: what the external rating implies for this specific issuance",
+  "recommendation": "2 sentences: clear verdict with the single most important supporting figure",
+  "strengths": ["one sentence: metric + exact figure + WHY it is a credit strength", "..."],
+  "weaknesses": ["one sentence: metric + exact figure + WHY it elevates credit risk", "..."]
 }}"""
 
     raw = await _call_text_only(prompt)

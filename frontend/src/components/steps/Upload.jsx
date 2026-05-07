@@ -21,6 +21,7 @@ const FIN_KW = [
   "cash","liabilities","balance sheet","income statement",
   "financial statements","earnings","equity","borrowings",
   "depreciation","ebitda","turnover","comprehensive income",
+  "naira","n'000","ngn","ifrs","independent auditor",
 ];
 
 const CP_REQUIRED_KW = [
@@ -36,7 +37,7 @@ const CP_PROSPECTUS_KW = [
 ];
 
 const UNAUDITED_KW = [
-  "unaudited","management accounts","management report",
+  "unaudited","management accounts",
   "interim financial","half year report","half-year report",
   "quarterly report","unaudited interim",
 ];
@@ -45,6 +46,19 @@ const RAT_KW = [
   "credit rating","rating agency","rating assigned","rating action",
   "issuer rating","national scale","long-term rating","short-term rating",
   "rating rationale","rating outlook","agusto","gcr","datapro","fitch","moody",
+];
+
+// C — Dual-section constants
+const BS_KW = [
+  "total assets","current assets","non-current assets","statement of financial position",
+  "balance sheet","shareholders equity","total equity","total liabilities",
+  "property plant and equipment",
+];
+const IS_KW = [
+  "revenue","turnover","profit","loss","income statement",
+  "statement of comprehensive income","statement of profit or loss",
+  "gross profit","operating profit","profit before tax","profit after tax",
+  "earnings","comprehensive income",
 ];
 
 // ── PDF.js ────────────────────────────────────────────────
@@ -78,11 +92,13 @@ async function extractText(file, maxPages = 15) {
 
 // ── Helpers ───────────────────────────────────────────────
 function tokenScore(name, text) {
+  const STOP = new Set(["of","the","and","for","in","a","an","plc","ltd","limited","co","company","nigeria","nig","group","holdings","international"]);
   const tok  = (s) => s.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(Boolean);
-  const aSet = new Set(tok(name));
+  const meaningful = tok(name).filter(t => !STOP.has(t) && t.length > 1);
+  if (!meaningful.length) return 1; // all stopwords — skip check
+  const aSet = new Set(meaningful);
   const bTok = tok(text);
-  if (!aSet.size || !bTok.length) return 0;
-  const matches = bTok.filter((t) => aSet.has(t)).length;
+  const matches = bTok.filter(t => aSet.has(t)).length;
   return matches / aSet.size;
 }
 
@@ -119,7 +135,17 @@ async function runFinValidation(file, clientName) {
     return { ok: true, warnings: ["Scanned or image-based PDF detected. Text extraction was limited — review all figures carefully on the next screen."] };
   }
 
-  if (countKw(text, FIN_KW) < 4) {
+  const lc = text.toLowerCase();
+
+  // C — Require both balance sheet AND income statement evidence
+  const hasBS = BS_KW.some(k => lc.includes(k));
+  const hasIS = IS_KW.some(k => lc.includes(k));
+  if (!hasBS || !hasIS) {
+    const missing = !hasBS ? "Balance Sheet" : "Income Statement";
+    return { ok: false, hard: `This document does not appear to contain a ${missing}. Please upload complete audited annual financial statements including both sections.` };
+  }
+
+  if (countKw(text, FIN_KW) < 3) {
     return { ok: false, hard: "This does not appear to be a financial statement. Key financial terms were not found. Please upload the audited annual accounts." };
   }
 
@@ -127,18 +153,24 @@ async function runFinValidation(file, clientName) {
     return { ok: false, hard: "This looks like a credit rating report, not a financial statement. Please upload it in the Credit Rating PDF slot instead." };
   }
 
-  if (clientName?.trim() && tokenScore(clientName, text.slice(0, 3000)) < 0.6) {
+  if (clientName?.trim() && tokenScore(clientName, text.slice(0, 5000)) < 0.5) {
     return { ok: false, hard: `Company name mismatch — "${clientName}" was not found in this document. Please verify you have uploaded the correct financial statements.` };
   }
 
   const warnings = [];
-  const lc = text.toLowerCase();
 
-  if (UNAUDITED_KW.some((k) => lc.includes(k))) {
+  // B — Numeric density check
+  const nonSpace = text.replace(/\s/g, "");
+  if ((text.match(/\d/g) || []).length / (nonSpace.length || 1) < 0.02) {
+    warnings.push("Very few numbers were detected in this document. Verify this is a complete financial statement containing figures.");
+  }
+
+  if (UNAUDITED_KW.some(k => lc.includes(k))) {
     warnings.push("This document may be unaudited or interim accounts. SmartRisk Credit requires audited annual financial statements.");
   }
 
-  const years = (text.slice(0, 2000).match(/\b(20\d{2})\b/g) || []).map(Number);
+  // D — Full document year scan
+  const years = (text.match(/\b(20\d{2})\b/g) || []).map(Number);
   if (years.length) {
     const maxYear = Math.max(...years);
     if (new Date().getFullYear() - maxYear >= 2) {
@@ -165,11 +197,17 @@ async function runRatValidation(file, clientName) {
     return { ok: false, hard: "This does not appear to be a credit rating report. Key rating terms were not found. Please upload the rating certificate or report from Agusto & Co., GCR, DataPro, or similar." };
   }
 
-  if (clientName?.trim() && tokenScore(clientName, text.slice(0, 3000)) < 0.6) {
+  if (clientName?.trim() && tokenScore(clientName, text.slice(0, 5000)) < 0.5) {
     return { ok: false, hard: `Company name mismatch — "${clientName}" was not found in this rating report. Please verify you have uploaded the correct document.` };
   }
 
   const warnings = [];
+
+  // F — Rating symbol detection
+  if (!/\b(AAA|AA[+\-]?|A[+\-]?|BBB[+\-]?|BB[+\-]?|B[+\-]?|CCC[+\-]?|CC|SD|D)\b/.test(text)) {
+    warnings.push("No rating grade symbols (e.g. AA+, BBB-) were detected. Verify this document contains an explicit rating assignment.");
+  }
+
   const DATE_PAT = `(\\d{1,2}[\\/\\-]\\d{1,2}[\\/\\-]\\d{2,4}|\\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?\\s+\\d{1,2},?\\s+\\d{4})`;
   const expiryMatch = text.match(new RegExp(`(?:expir(?:y|es|ed)|valid until|valid through|valid for|review date)[^\\n]{0,60}${DATE_PAT}`, "i"));
 
@@ -184,7 +222,7 @@ async function runRatValidation(file, clientName) {
       }
     }
   } else {
-    const years = (text.slice(0, 2000).match(/\b(20\d{2})\b/g) || []).map(Number);
+    const years = (text.match(/\b(20\d{2})\b/g) || []).map(Number);
     if (years.length) {
       const maxYear = Math.max(...years);
       if (new Date().getFullYear() - maxYear >= 2) {
@@ -228,6 +266,17 @@ async function runCPValidation(file, clientName) {
   return { ok: true, warnings };
 }
 
+// ── Progress reader ───────────────────────────────────────
+function readWithProgress(file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100)); };
+    reader.onload    = resolve;
+    reader.onerror   = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
 // ── Styles ────────────────────────────────────────────────
 const css = {
   card    : { background:"#fff", border:"1px solid #E0E0E0", borderRadius:8, padding:20, marginBottom:16 },
@@ -244,9 +293,22 @@ const css = {
 };
 
 // ── Sub-components ────────────────────────────────────────
-function UploadZone({ label, sub, file, onFile, onClear, validating, onGuard }) {
+function UploadZone({ label, sub, file, onFile, onClear, validating, onGuard, progress }) {
   const [hover, setHover] = useState(false);
   const ref = useRef();
+
+  if (progress?.show) return (
+    <div style={{ padding:"12px 14px", borderRadius:6, background:"#F8F8F8", border:"1px solid #E0E0E0" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, color:"#5A5A5A", marginBottom:4 }}>
+        <span style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:"75%" }}>{progress.name}</span>
+        <span>{progress.pct}%</span>
+      </div>
+      <div style={{ height:4, background:"#E8E8E8", borderRadius:2, overflow:"hidden" }}>
+        <div style={{ height:"100%", background:"#01b88e", width:`${progress.pct}%`, transition:"width 0.2s ease", borderRadius:2 }} />
+      </div>
+      <div style={{ fontSize:12, color:"#888", marginTop:4 }}>Reading file…</div>
+    </div>
+  );
 
   if (validating) return (
     <div style={{ padding:"12px 14px", borderRadius:6, fontSize:13, background:"#F0F4FF", color:"#1A5276", border:"1px solid #9DBFEA", display:"flex", alignItems:"center", gap:8 }}>
@@ -381,15 +443,46 @@ function ReExtractModal({ type, onConfirm, onCancel }) {
   );
 }
 
+function NewAssessmentModal({ onConfirm, onCancel }) {
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:99999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+      <div style={{ background:"#fff", borderRadius:10, padding:"28px 32px", maxWidth:440, width:"100%", boxShadow:"0 16px 60px rgba(0,0,0,0.2)" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+          <AlertTriangle size={22} color="#A32D2D" />
+          <div style={{ fontSize:15, fontWeight:"bold", color:"#1F2854" }}>Start New Assessment?</div>
+        </div>
+        <p style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.75, marginBottom:20 }}>
+          You have an assessment in progress. Uploading a new document will clear all computed scores and analysis.
+          <br /><br />
+          <strong>Make sure you have downloaded your report before continuing.</strong> Your client details will be preserved.
+        </p>
+        <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+          <button onClick={onCancel}
+            style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#5A5A5A", fontFamily:"Arial,sans-serif" }}>
+            Cancel
+          </button>
+          <button onClick={onConfirm}
+            style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"none", background:"#A32D2D", color:"#fff", fontFamily:"Arial,sans-serif", fontWeight:600 }}>
+            Clear & Upload New
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────
 const BLANK = { validating: false, warnings: [], error: "" };
+const BLANK_PROG = { show: false, pct: 0, name: "" };
 
-export default function Upload({ clientInfo, onClientInfoChange, onExtracted, onQuotaError, figures, onFiguresChange, onContinue, draftId }) {
+export default function Upload({ clientInfo, onClientInfoChange, onExtracted, onQuotaError, figures, onFiguresChange, onContinue, draftId, hasDownstreamData, onNewAssessment }) {
   const [finFile, setFinFile] = useState(null);
   const [ratFile, setRatFile] = useState(null);
 
   const [finV, setFinV] = useState(BLANK);
   const [ratV, setRatV] = useState(BLANK);
+  const [finProgress, setFinProgress] = useState(BLANK_PROG);
+  const [ratProgress, setRatProgress] = useState(BLANK_PROG);
 
   const [confirm,   setConfirm]   = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -407,9 +500,11 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
     try { return sessionStorage.getItem("sr_extractedFileKey") || ""; } catch { return ""; }
   });
   const [reExtractModal, setReExtractModal] = useState(null); // null | "warning" | "deduction"
+  const [newAssessModal,  setNewAssessModal]  = useState(null);
 
   const info = clientInfo;
   const set  = (k, v) => onClientInfoChange({ ...info, [k]: v });
+  const showRatingReminder = !!ratFile && !info.creditRating;
 
   function goToSubStep(n) {
     setSubStep(n);
@@ -422,15 +517,18 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
     return () => clearInterval(t);
   }, [loading]);
 
+  
   const currentFileKey = finFile ? `${finFile.name}-${finFile.size}` : "";
   const fileChanged    = !!extractedFileKey && !!currentFileKey && currentFileKey !== extractedFileKey;
 
   // ── File handlers ───────────────────────────────────────
-  async function handleFinFile(file) {
+  async function _processFinFile(file) {
     setFinFile(file);
+    setFinProgress({ show: true, pct: 0, name: file.name });
+    await readWithProgress(file, (pct) => setFinProgress({ show: true, pct, name: file.name }));
+    setFinProgress(BLANK_PROG);
     setFinV({ validating: true, warnings: [], error: "" });
     const result = await runFinValidation(file, info.clientName);
-
     if (result.ok === false) {
       setFinFile(null);
       setFinV({ validating: false, warnings: [], error: result.hard });
@@ -442,6 +540,23 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
       return;
     }
     setFinV({ validating: false, warnings: result.warnings, error: "" });
+  }
+
+  async function handleFinFile(file) {
+    if (hasDownstreamData) {
+      setNewAssessModal({ pendingFile: file });
+      return;
+    }
+    await _processFinFile(file);
+  }
+
+  function handleNewAssessConfirm() {
+    const file = newAssessModal.pendingFile;
+    setNewAssessModal(null);
+    setExtractionCount(0);
+    setExtractedFileKey("");
+    onNewAssessment?.();
+    _processFinFile(file);
   }
 
   function handleConfirm() {
@@ -458,9 +573,11 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
 
   async function handleRatFile(file) {
     setRatFile(file);
+    setRatProgress({ show: true, pct: 0, name: file.name });
+    await readWithProgress(file, (pct) => setRatProgress({ show: true, pct, name: file.name }));
+    setRatProgress(BLANK_PROG);
     setRatV({ validating: true, warnings: [], error: "" });
     const result = await runRatValidation(file, info.clientName);
-
     if (result.ok === false) {
       setRatFile(null);
       setRatV({ validating: false, warnings: [], error: result.hard });
@@ -518,6 +635,10 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
   function handleExtract() {
     if (!info.clientName?.trim()) { setError("Client name is required."); return; }
     if (!finFile)                  { setError("Please upload the financial statement PDF."); return; }
+    if (ratFile && !info.creditRating) {
+      setError("You uploaded a credit rating report — please select the rating from the dropdown before extracting.");
+      return;
+    }
     if (extractionCount === 1)     { setReExtractModal("warning");   return; }
     if (extractionCount >= 2)      { setReExtractModal("deduction"); return; }
     doExtract();
@@ -567,6 +688,12 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
               {RATINGS.map((r) => <option key={r} value={r}>{r || "Select rating"}</option>)}
             </select>
           </div>
+          {showRatingReminder && (
+            <div style={{ gridColumn:"span 2", padding:"8px 12px", borderRadius:6, background:"#FEF6E7", border:"1px solid #F0C060", fontSize:12, color:"#7A4F00", display:"flex", gap:8, alignItems:"flex-start" }}>
+              <AlertTriangle size={13} style={{ flexShrink:0, marginTop:1 }} />
+              <span>You uploaded a credit rating report — please select the rating from the dropdown above so it appears on the assessment. Click <strong>Extract</strong> again to continue without selecting.</span>
+            </div>
+          )}
           <div>
             <label style={css.label}>Review date</label>
             <input style={css.input} type="date"
@@ -583,9 +710,10 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
           sub="Balance sheet + income statement — PDF only"
           file={finFile}
           onFile={handleFinFile}
-          onClear={() => { setFinFile(null); setFinV(BLANK); }}
+          onClear={() => { setFinFile(null); setFinV(BLANK); setFinProgress(BLANK_PROG); }}
           validating={finV.validating}
           onGuard={nameGuard}
+          progress={finProgress}
         />
         {finV.error    && <ValidationError msg={finV.error} onClear={() => setFinV(BLANK)} />}
         {!finV.error   && <ValidationWarnings warnings={finV.warnings} />}
@@ -599,9 +727,10 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
           sub="DataPro, Agusto & Co, or similar — PDF only"
           file={ratFile}
           onFile={handleRatFile}
-          onClear={() => { setRatFile(null); setRatV(BLANK); }}
+          onClear={() => { setRatFile(null); setRatV(BLANK); setRatProgress(BLANK_PROG); }}
           validating={ratV.validating}
           onGuard={nameGuard}
+          progress={ratProgress}
         />
         {ratV.error    && <ValidationError msg={ratV.error} onClear={() => setRatV(BLANK)} />}
         {!ratV.error   && <ValidationWarnings warnings={ratV.warnings} />}
@@ -655,6 +784,12 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
           type={reExtractModal}
           onConfirm={() => { setReExtractModal(null); doExtract(); }}
           onCancel={() => setReExtractModal(null)}
+        />
+      )}
+      {newAssessModal && (
+        <NewAssessmentModal
+          onConfirm={handleNewAssessConfirm}
+          onCancel={() => { setNewAssessModal(null); }}
         />
       )}
     </div>
