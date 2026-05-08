@@ -253,7 +253,10 @@ export default function AppPage() {
 
   // ── Stepper ──────────────────────────────────────────────
   const mobileMenuEl = mobileMenu && (
-    <div style={{ background:"var(--primary)", borderTop:"1px solid #2a3870" }}>
+    <>
+      <div onClick={() => setMobileMenu(false)}
+        style={{ position:"fixed", inset:0, zIndex:98 }} />
+      <div style={{ position:"fixed", top:60, left:0, right:0, background:"var(--primary)", borderTop:"1px solid #2a3870", zIndex:99, boxShadow:"0 8px 24px rgba(0,0,0,0.3)" }}>
       <div onClick={() => { setShowDash(true); setMobileMenu(false); }}
         style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 24px", fontSize:14, color:"var(--accent)", borderBottom:"1px solid #2a3870", cursor:"pointer" }}>
         <LayoutDashboard size={16} /> Past Assessments
@@ -282,7 +285,8 @@ export default function AppPage() {
           </div>
         );
       })}
-    </div>
+      </div>
+    </>
   );
 
   const stepper = (
@@ -397,10 +401,11 @@ export default function AppPage() {
       <style>{`
         @media (max-width: 768px) {
           .sr-hamburger  { display: flex !important; }
-          .sr-footer     { padding: 6px 12px !important; font-size: 10px !important; }
-          .sr-footer > div:first-child { display: none; }
           .sr-hdr-btn    { display: none !important; }
           .sr-hdr-credits{ display: none !important; }
+          .sr-footer     { padding: 4px 10px !important; }
+          .sr-footer > div:first-child { display: none !important; }
+          .sr-footer > div:last-child  { gap: 8px !important; flex-wrap: wrap; justify-content: center; width: 100%; }
         }
         @media (max-width: 640px) {
           .sr-stepper    { display: none !important; }
