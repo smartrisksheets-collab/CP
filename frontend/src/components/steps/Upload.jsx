@@ -371,7 +371,7 @@ function ValidationWarnings({ warnings }) {
 function InfoModal({ onClose }) {
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:99999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
-      <div style={{ background:"#fff", borderRadius:10, padding:"28px 32px", maxWidth:420, width:"100%", boxShadow:"0 16px 60px rgba(0,0,0,0.2)", textAlign:"center" }}>
+      <div className="sr-modal-inner" style={{ background:"#fff", borderRadius:10, padding:"28px 32px", maxWidth:420, width:"100%", boxShadow:"0 16px 60px rgba(0,0,0,0.2)", textAlign:"center" }}>
         <div style={{ width:40, height:40, borderRadius:"50%", border:"2px solid #1F2854", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", fontSize:18, fontWeight:"bold", color:"#1F2854" }}>i</div>
         <div style={{ fontSize:15, fontWeight:"bold", color:"#1F2854", marginBottom:10 }}>Client name required</div>
         <p style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.7, marginBottom:24 }}>
@@ -398,9 +398,9 @@ function ConfirmModal({ year, onConfirm, onCancel }) {
           SmartRisk Credit recommends the most recent audited annual statements.
           Do you want to continue with this document?
         </p>
-        <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+        <div style={{ display:"flex", gap:10, justifyContent:"flex-end", flexWrap:"wrap" }}>
           <button onClick={onCancel}
-            style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#5A5A5A", fontFamily:"Arial,sans-serif" }}>
+            style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#5A5A5A", fontFamily:"Arial,sans-serif", flex:"1 1 auto" }}>
             Cancel upload
           </button>
           <button onClick={onConfirm}
@@ -429,9 +429,9 @@ function ReExtractModal({ type, onConfirm, onCancel }) {
             ? "You have already extracted this document twice. Proceeding will deduct 1 credit from your balance. Please verify your uploaded document is correct before continuing."
             : "You have already extracted this document once. Re-extracting will overwrite your previous results. This one re-extraction is free — verify your document before proceeding."}
         </p>
-        <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+        <div style={{ display:"flex", gap:10, justifyContent:"flex-end", flexWrap:"wrap" }}>
           <button onClick={onCancel}
-            style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#5A5A5A", fontFamily:"Arial,sans-serif" }}>
+            style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#5A5A5A", fontFamily:"Arial,sans-serif", flex:"1 1 auto" }}>
             Cancel
           </button>
           <button onClick={onConfirm}
@@ -457,9 +457,9 @@ function NewAssessmentModal({ onConfirm, onCancel }) {
           <br /><br />
           <strong>Make sure you have downloaded your report before continuing.</strong> Your client details will be preserved.
         </p>
-        <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+        <div style={{ display:"flex", gap:10, justifyContent:"flex-end", flexWrap:"wrap" }}>
           <button onClick={onCancel}
-            style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#5A5A5A", fontFamily:"Arial,sans-serif" }}>
+            style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#5A5A5A", fontFamily:"Arial,sans-serif", flex:"1 1 auto" }}>
             Cancel
           </button>
           <button onClick={onConfirm}
@@ -666,7 +666,12 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
 
   return (
     <div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @media (max-width: 480px) {
+          .sr-modal-inner { padding: 20px 16px !important; }
+        }
+      `}</style>
 
       {showModal && <InfoModal onClose={() => setShowModal(false)} />}
       {error && (
@@ -738,7 +743,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
         )}
       </div>
 
-      <div style={css.actions}>
+      <div style={{ ...css.actions, flexDirection: isMobile ? "column-reverse" : "row", alignItems: isMobile ? "stretch" : "center" }}>
         {canGoNext && !loading && (
           <button
             onClick={() => goToSubStep(1)}
