@@ -388,7 +388,7 @@ function InfoModal({ onClose }) {
 function ConfirmModal({ year, onConfirm, onCancel }) {
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:99999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
-      <div style={{ background:"#fff", borderRadius:10, padding:"28px 32px", maxWidth:420, width:"100%", boxShadow:"0 16px 60px rgba(0,0,0,0.2)" }}>
+      <div className="sr-modal-inner" style={{ background:"#fff", borderRadius:10, padding:"28px 32px", maxWidth:420, width:"100%", boxShadow:"0 16px 60px rgba(0,0,0,0.2)" }}>
         <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
           <AlertTriangle size={22} color="#d4820a" />
           <div style={{ fontSize:15, fontWeight:"bold", color:"#1F2854" }}>Older Financial Statement</div>
@@ -417,7 +417,7 @@ function ReExtractModal({ type, onConfirm, onCancel }) {
   const isDeduction = type === "deduction";
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:99999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
-      <div style={{ background:"#fff", borderRadius:10, padding:"28px 32px", maxWidth:440, width:"100%", boxShadow:"0 16px 60px rgba(0,0,0,0.2)" }}>
+      <div className="sr-modal-inner" style={{ background:"#fff", borderRadius:10, padding:"28px 32px", maxWidth:440, width:"100%", boxShadow:"0 16px 60px rgba(0,0,0,0.2)" }}>
         <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
           <AlertTriangle size={22} color={isDeduction ? "#A32D2D" : "#d4820a"} />
           <div style={{ fontSize:15, fontWeight:"bold", color:"#1F2854" }}>
@@ -447,7 +447,7 @@ function ReExtractModal({ type, onConfirm, onCancel }) {
 function NewAssessmentModal({ onConfirm, onCancel }) {
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:99999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
-      <div style={{ background:"#fff", borderRadius:10, padding:"28px 32px", maxWidth:440, width:"100%", boxShadow:"0 16px 60px rgba(0,0,0,0.2)" }}>
+      <div className="sr-modal-inner" style={{ background:"#fff", borderRadius:10, padding:"28px 32px", maxWidth:440, width:"100%", boxShadow:"0 16px 60px rgba(0,0,0,0.2)" }}>
         <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
           <AlertTriangle size={22} color="#A32D2D" />
           <div style={{ fontSize:15, fontWeight:"bold", color:"#1F2854" }}>Start New Assessment?</div>
