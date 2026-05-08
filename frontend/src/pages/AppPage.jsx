@@ -7,6 +7,7 @@ import Scores from "../components/steps/Scores.jsx";
 import Result from "../components/steps/Result.jsx";
 import Dashboard from "../components/Dashboard.jsx";
 import { LogOut, BookOpen, LayoutDashboard, X, Zap, Shield, MessageCircle, ChevronDown, User, Mail } from "lucide-react";
+import LegalModal from "../components/LegalModal.jsx";
 import { getQuotaStatus } from "../api/client.js";
 import Onboarding, { useOnboardingDone } from "../components/Onboarding.jsx";
 import { useNavigate } from "react-router-dom";
@@ -183,7 +184,7 @@ export default function AppPage() {
       </div>
       <div style={{ display:"flex", alignItems:"center", gap:8 }}>
         {quota && (
-          <div style={{
+          <div className="sr-hdr-credits" style={{
             fontSize:11, padding:"4px 10px", borderRadius:5,
             background: quota.allowed ? "rgba(1,184,142,0.15)" : "rgba(162,45,45,0.2)",
             border: `1px solid ${quota.allowed ? "rgba(1,184,142,0.4)" : "rgba(162,45,45,0.4)"}`,
@@ -253,6 +254,10 @@ export default function AppPage() {
   // ── Stepper ──────────────────────────────────────────────
   const mobileMenuEl = mobileMenu && (
     <div style={{ background:"var(--primary)", borderTop:"1px solid #2a3870" }}>
+      <div onClick={() => { setShowDash(true); setMobileMenu(false); }}
+        style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 24px", fontSize:14, color:"var(--accent)", borderBottom:"1px solid #2a3870", cursor:"pointer" }}>
+        <LayoutDashboard size={16} /> Past Assessments
+      </div>
       {STEPS.map((label, i) => {
         const active = i === step;
         const done   = i < step;
@@ -390,16 +395,29 @@ export default function AppPage() {
   return (
     <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", paddingBottom:40 }}>
       <style>{`
+        @media (max-width: 768px) {
+          .sr-hamburger  { display: flex !important; }
+          .sr-footer     { padding: 6px 12px !important; font-size: 10px !important; }
+          .sr-footer > div:first-child { display: none; }
+          .sr-hdr-btn    { display: none !important; }
+          .sr-hdr-credits{ display: none !important; }
+        }
         @media (max-width: 640px) {
-          .sr-hamburger { display: flex !important; }
-          .sr-stepper   { display: none !important; }
-          .sr-hdr-btn   { display: none !important; }
+          .sr-stepper    { display: none !important; }
+        }
+        @media (min-width: 769px) {
+          .sr-content-pad { padding: 24px 24px 0 !important; }
+        }
+        @media (min-width: 641px) and (max-width: 768px) {
+          .sr-stepper-scroll { overflow-x: auto; scrollbar-width: none; }
+          .sr-stepper-scroll::-webkit-scrollbar { display: none; }
+          .sr-stepper-scroll > div { min-width: 130px; }
         }
       `}</style>
       {header}
       {mobileMenuEl}
-      <div className="sr-stepper">{stepper}</div>
-      <div style={{ maxWidth:960, margin:"0 auto", width:"100%", padding:"24px 24px 0" }}>
+      <div className="sr-stepper sr-stepper-scroll">{stepper}</div>
+      <div style={{ maxWidth:960, margin:"0 auto", width:"100%", padding:"16px 12px 0" }} className="sr-content-pad">
         {draftOffer && (
           <div style={{ marginBottom:16, padding:"14px 18px", borderRadius:8, background:"#FEF6E7", border:"1px solid #F0C060", display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, flexWrap:"wrap" }}>
             <div>
@@ -424,7 +442,7 @@ export default function AppPage() {
       </div>
 
       {/* Footer */}
-      <div style={{
+      <div className="sr-footer" style={{
         background:"var(--primary)", color:"#999", fontSize:11,
         padding:"10px 24px", position:"fixed", bottom:0, left:0, right:0,
         display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:6,
@@ -579,75 +597,7 @@ function Modal({ onClose, title, children, maxWidth = 760 }) {
   );
 }
 
-const LEGAL = {
-  "lm-privacy": {
-    title: "Privacy Policy", date: "April 2026",
-    body: [
-      ["1. Who we are", "SmartRisk Sheets Technologies Limited ('SmartRisk', 'we', 'our') operates the SmartRisk Credit platform at score.smartrisksheets.com."],
-      ["2. What we collect", "We collect your email address at login to verify authorised access. We do not collect payment card details (handled by Paystack). We do not collect the contents of uploaded financial documents beyond the active session."],
-      ["3. How we use it", "Your email is used solely to manage access to the platform. Assessment results (client name, scores) are logged to a secure record for your organisation. We do not sell, rent, or share your data with third parties."],
-      ["4. Data retention", "Uploaded financial documents are not stored beyond your active session. Email addresses are retained for as long as your account is active. You may request deletion at any time."],
-      ["5. Security", "Data in transit is encrypted via HTTPS/TLS. Access to backend systems is restricted to authorised personnel only."],
-      ["6. Your rights", "You have the right to access, correct, or request deletion of your personal data at any time. Email support@smartrisksheets.com with the subject line \"Data Request.\" We will respond within 10 working days."],
-      ["7. Cookies", "We use essential session cookies only — no tracking, no advertising, no third-party cookies."],
-      ["8. Contact", "General enquiries: info@smartrisksheets.com\nData deletion or complaints: support@smartrisksheets.com"],
-    ]
-  },
-  "lm-terms": {
-    title: "Terms of Use", date: "April 2026",
-    body: [
-      ["1. Acceptance", "By using SmartRisk Credit you agree to these terms. If you do not agree, discontinue use immediately."],
-      ["2. Nature of the service", "SmartRisk Credit is an AI-assisted quantitative credit risk scoring tool designed for Nigerian capital markets professionals. It is intended to support — not replace — professional credit analysis and judgment."],
-      ["3. Not financial advice", "All scores, ratios, narratives, and PDF reports generated by this tool are for informational and internal reference purposes only. They do not constitute financial advice, investment recommendations, or a substitute for regulated credit analysis. SmartRisk Sheets Technologies Limited accepts no liability for any decision made on the basis of outputs from this tool."],
-      ["4. Intellectual property", "The SmartRisk Credit scoring model, benchmarks, weighting methodology, and report templates are proprietary to SmartRisk Sheets Technologies Limited. You may not reproduce, reverse-engineer, or redistribute any part of the scoring engine."],
-      ["5. Dispute resolution", "Contact support@smartrisksheets.com with subject \"Formal Complaint.\" We acknowledge within 5 working days and aim to resolve within 30 days."],
-      ["6. Governing law", "These terms are governed by the laws of the Federal Republic of Nigeria."],
-    ]
-  },
-  "lm-disclaimer": {
-    title: "Disclaimer", date: "April 2026",
-    body: [
-      ["", "SmartRisk Credit generates quantitative credit risk scores based on financial data extracted from uploaded documents. The outputs of this tool — including scores, ratio analyses, narratives, and PDF reports — are for internal reference and decision support only."],
-      ["", "These outputs do not constitute a credit rating, financial advice, or an investment recommendation. They should not be relied upon as the sole basis for any investment, lending, or credit decision."],
-      ["", "SmartRisk Sheets Technologies Limited makes no representation or warranty, express or implied, as to the accuracy, completeness, or fitness for purpose of any output generated by this tool. The company shall not be liable for any loss or damage — direct, indirect, or consequential — arising from reliance on any output produced by SmartRisk Credit."],
-      ["", "Users are responsible for independently verifying all extracted figures against source financial statements before relying on any assessment output."],
-    ]
-  },
-  "lm-legal": {
-    title: "Legal Notice", date: "April 2026",
-    body: [
-      ["1. Company identity", "SmartRisk Sheets Technologies Limited is the legal entity responsible for operating the SmartRisk Credit platform at score.smartrisksheets.com."],
-      ["2. Registered details", "SmartRisk Sheets Technologies Limited is incorporated in the Federal Republic of Nigeria under the Companies and Allied Matters Act (CAMA). RC Number: 9170218."],
-      ["3. Platform ownership", "All content on this platform — including scoring methodology, report templates, ratio benchmarks, and software — is owned by or licensed to SmartRisk Sheets Technologies Limited. Unauthorised reproduction or distribution is prohibited."],
-      ["4. Regulatory status", "SmartRisk Credit is a technology tool providing quantitative financial analysis for internal use by capital markets professionals. It is not a licensed credit rating agency and does not provide regulated financial advice under Nigerian law."],
-      ["5. Governing law", "This Legal Notice and all matters relating to this platform are governed by the laws of the Federal Republic of Nigeria."],
-      ["6. Contact", "General enquiries: info@smartrisksheets.com\nComplaints & data requests: support@smartrisksheets.com"],
-    ]
-  },
-};
 
-function LegalModal({ id, onClose }) {
-  const doc = LEGAL[id];
-  if (!doc) return null;
-  return (
-    <div onClick={(e) => e.target === e.currentTarget && onClose()}
-         style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:99999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
-      <div style={{ background:"#fff", borderRadius:12, maxWidth:640, width:"100%", maxHeight:"80vh", overflowY:"auto", padding:"36px 40px", position:"relative", boxShadow:"0 24px 80px rgba(0,0,0,0.25)" }}>
-        <button onClick={onClose} style={{ position:"absolute", top:14, right:18, background:"none", border:"none", fontSize:22, cursor:"pointer", color:"#888", lineHeight:1 }}>
-          <X size={18} />
-        </button>
-        <h2 style={{ fontSize:20, fontWeight:"bold", color:"var(--primary)", marginBottom:6 }}>{doc.title}</h2>
-        <div style={{ fontSize:12, color:"#888", marginBottom:22 }}>Last updated: {doc.date}</div>
-        {doc.body.map(([heading, text], i) => (
-          <div key={i}>
-            {heading && <h3 style={{ fontSize:14, fontWeight:"bold", color:"var(--primary)", margin:"18px 0 6px" }}>{heading}</h3>}
-            <p style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.75, marginBottom:10, whiteSpace:"pre-line" }}>{text}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function FaqContent() {
   const faqs = [

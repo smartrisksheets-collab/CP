@@ -1,4 +1,5 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+input, select, textarea, button { max-width: 100%; box-sizing: border-box; }
 
 :root {
   --primary      : #1F2854;
@@ -22,4 +23,32 @@ body {
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
+}
+
+/* ── Mobile / Tablet responsiveness ──────────────────────── */
+.sr-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 768px) {
+  /* Step nav scrollable on tablet */
+  .sr-stepper-scroll {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .sr-stepper-scroll::-webkit-scrollbar { display: none; }
+  .sr-stepper-scroll > div { min-width: 130px; }
+
+  /* Modal inner padding reduction */
+  .sr-modal-inner { padding: 20px 16px !important; }
+
+  /* Hide credits pill, show hamburger on tablet too */
+  .sr-hdr-credits { display: none !important; }
+}
+
+@media (max-width: 480px) {
+  .sr-stepper-scroll > div { min-width: 100px; font-size: 11px !important; padding: 10px 8px !important; }
+  .sr-modal-inner { padding: 16px 12px !important; }
 }

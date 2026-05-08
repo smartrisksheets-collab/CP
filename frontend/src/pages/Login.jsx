@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Lock, Check, Loader } from "lucide-react";
+import LegalModal from "../components/LegalModal.jsx";
+import { useIsMobile } from "../hooks/useBreakpoint.js";
 import { useTenant } from "../context/TenantContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { requestOTP, verifyOTP } from "../api/client.js";
@@ -116,6 +118,7 @@ export default function Login() {
   const { login }     = useAuth();
   const navigate      = useNavigate();
   const hostname      = window.location.hostname;
+  const isMobile      = useIsMobile(900);
 
   const requiresCode  = tenant?.requiresCode ?? false;
 
@@ -130,7 +133,8 @@ export default function Login() {
   const [otpFocus, setOtpFocus]   = useState(null);
   const [otpErr, setOtpErr]       = useState("");
   const [loading, setLoading]     = useState(false);
-  const [resendCd, setResendCd]   = useState(0);
+  const [resendCd,   setResendCd]   = useState(0);
+  const [legalModal, setLegalModal] = useState(null);
 
   // ── Access code ───────────────────────────────────────────
   function handleCodeChange(val) {
@@ -244,13 +248,24 @@ export default function Login() {
 
   // ── Render ────────────────────────────────────────────────
   return (
-    <div style={S.wrapper}>
+    <div style={{
+        ...S.wrapper,
+        flexDirection: isMobile ? "column" : "row",
+        height: isMobile ? "auto" : "100vh",
+        minHeight: "100vh",
+        overflowY: isMobile ? "auto" : "hidden",
+      }}>
 
       {/* LEFT PANEL */}
-      <div style={S.left}>
+      <div style={{
+        ...S.left,
+        flex: isMobile ? "none" : "0 0 55%",
+        padding: isMobile ? "20px 20px 14px" : "32px 48px",
+        justifyContent: isMobile ? "flex-start" : "space-between",
+      }}>
         <div style={S.accentBar} />
-        <div style={S.ring1} />
-        <div style={S.ring2} />
+        {!isMobile && <div style={S.ring1} />}
+        {!isMobile && <div style={S.ring2} />}
 
         <div style={{ position:"relative", zIndex:2 }}>
           {tenant?.logoUrl && (
@@ -260,21 +275,22 @@ export default function Login() {
             </div>
           )}
           <div style={S.heroLabel}>Commercial Paper Assessment</div>
-          <h1 style={S.heroHeading}>
-            Analyse listings.<br/>
-            Score clients.<br/>
+          <h1 style={{ ...S.heroHeading, fontSize: isMobile ? 20 : 30, marginBottom: isMobile ? 8 : 14 }}>
+            Analyse listings.{" "}Score clients.{" "}
             <span style={{ color:"var(--accent)" }}>In Mins.</span>
           </h1>
-          <p style={S.heroSub}>
-            Analyse Commercial Paper offerings in 4 quick steps.
-            Cut your assessment time in half and score your clients in less than 5 mins.
-          </p>
-          <div style={S.statStrip}>
+          {!isMobile && (
+            <p style={S.heroSub}>
+              Analyse Commercial Paper offerings in 4 quick steps.
+              Cut your assessment time in half and score your clients in less than 5 mins.
+            </p>
+          )}
+          <div style={{ ...S.statStrip, marginBottom: isMobile ? 0 : 20 }}>
             <div style={S.stat}><div style={S.statVal}>4</div><div style={S.statLbl}>Simple steps</div></div>
             <div style={S.stat}><div style={S.statVal}>10</div><div style={S.statLbl}>Ratio metrics</div></div>
             <div style={S.stat}><div style={S.statVal}>5 mins</div><div style={S.statLbl}>Per assessment</div></div>
           </div>
-          <div style={S.steps}>
+          {!isMobile && <div style={S.steps}>
             {[
               ["Upload financial statement",  "AI extracts all key figures automatically"],
               ["Review & confirm data",        "Verify AI-extracted figures in one screen"],
@@ -289,18 +305,18 @@ export default function Login() {
                 </div>
               </div>
             ))}
-          </div>
+          </div>}
         </div>
 
-        <div style={{ position:"relative", zIndex:2, marginTop:20, paddingTop:16, borderTop:"1px solid rgba(255,255,255,0.06)" }}>
+        {!isMobile && <div style={{ position:"relative", zIndex:2, marginTop:20, paddingTop:16, borderTop:"1px solid rgba(255,255,255,0.06)" }}>
           <div style={{ fontSize:11, color:"rgba(255,255,255,0.25)" }}>
             Powered by <span style={{ color:"rgba(255,255,255,0.4)" }}>SmartRisk Sheets Technologies Limited</span>
           </div>
-        </div>
+        </div>}
       </div>
 
       {/* RIGHT PANEL */}
-      <div style={S.right}>
+      <div style={{ ...S.right, padding: isMobile ? "32px 20px" : "48px 56px" }}>
         <div style={S.card}>
           <div style={S.eyebrow}>{tenant?.loginEyebrow || "Analyst Portal"}</div>
           <h2 style={S.heading}>Welcome back</h2>
@@ -438,7 +454,16 @@ export default function Login() {
             <a href="mailto:support@smartrisksheets.com" style={S.footerLink}>
               Support
             </a>
+            <br /><br />
+            {[["Privacy","lm-privacy"],["Terms","lm-terms"],["Disclaimer","lm-disclaimer"],["Legal Notice","lm-legal"]].map(([label, id]) => (
+              <span key={id}>
+                <span onClick={() => setLegalModal(id)}
+                  style={{ ...S.footerLink, cursor:"pointer" }}>{label}</span>
+                {id !== "lm-legal" && <span style={{ margin:"0 5px", color:"#d1d5db" }}>·</span>}
+              </span>
+            ))}
           </div>
+          {legalModal && <LegalModal id={legalModal} onClose={() => setLegalModal(null)} />}
         </div>
       </div>
 

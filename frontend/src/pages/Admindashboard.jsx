@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useIsMobile } from "../hooks/useBreakpoint.js";
 import { Users, BarChart2, ArrowLeft, Plus, Minus, Shield, RefreshCw, Loader } from "lucide-react";
 import axios from "axios";
 
@@ -13,6 +14,7 @@ function authHeader() {
 export default function AdminDashboard() {
   const { user }  = useAuth();
   const navigate  = useNavigate();
+  const isMobile  = useIsMobile();
 
   const [tab, setTab]         = useState("users");
   const [users, setUsers]     = useState([]);
@@ -88,12 +90,12 @@ export default function AdminDashboard() {
 
   const css = {
     page   : { minHeight:"100vh", background:"#F5F5F2", paddingBottom:60 },
-    header : { background:"var(--primary)", padding:"12px 24px", display:"flex", alignItems:"center", justifyContent:"space-between" },
+    header : { background:"var(--primary)", padding: isMobile ? "10px 12px" : "12px 24px", display:"flex", alignItems:"center", justifyContent:"space-between" },
     card   : { background:"#fff", border:"1px solid #E0E0E0", borderRadius:8, padding:20, marginBottom:16 },
     th     : { textAlign:"left", fontSize:11, fontWeight:"bold", color:"#888", padding:"8px 12px", borderBottom:"2px solid #E8E8E8", textTransform:"uppercase" },
     td     : { padding:"10px 12px", borderBottom:"1px solid #F0F0F0", fontSize:13, verticalAlign:"middle" },
     tab    : (active) => ({ padding:"10px 20px", fontSize:13, fontWeight: active ? "bold" : "normal", color: active ? "var(--primary)" : "#888", background:"transparent", border:"none", borderBottom: active ? "2px solid var(--accent)" : "2px solid transparent", cursor:"pointer", fontFamily:"Arial,sans-serif" }),
-    stat   : { background:"#fff", border:"1px solid #E0E0E0", borderRadius:8, padding:20, flex:1, minWidth:160 },
+    stat   : { background:"#fff", border:"1px solid #E0E0E0", borderRadius:8, padding:20, flex:1, minWidth: isMobile ? 120 : 160 },
     btn    : (color) => ({ padding:"5px 12px", fontSize:11, fontWeight:600, border:`1px solid ${color}`, color:color, background:"transparent", borderRadius:5, cursor:"pointer", display:"inline-flex", alignItems:"center", gap:4, fontFamily:"Arial,sans-serif" }),
   };
 
@@ -261,7 +263,7 @@ export default function AdminDashboard() {
 
       {adjustModal && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
-          <div style={{ background:"#fff", borderRadius:10, padding:"28px 32px", maxWidth:400, width:"100%", boxShadow:"0 8px 32px rgba(0,0,0,0.2)" }}>
+          <div style={{ background:"#fff", borderRadius:10, padding: isMobile ? "20px 16px" : "28px 32px", maxWidth:400, width:"100%", boxShadow:"0 8px 32px rgba(0,0,0,0.2)" }}>
             <h3 style={{ fontSize:15, fontWeight:"bold", color:"var(--primary)", marginBottom:4 }}>Adjust Credits</h3>
             <div style={{ fontSize:12, color:"#888", marginBottom:20 }}>{adjustModal.email} · Current balance: {adjustModal.credits}</div>
 
@@ -282,7 +284,7 @@ export default function AdminDashboard() {
 
             {adjustErr && <div style={{ fontSize:12, color:"#791F1F", marginBottom:12 }}>{adjustErr}</div>}
 
-            <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+            <div style={{ display:"flex", flexDirection: isMobile ? "column-reverse" : "row", gap:10, justifyContent:"flex-end" }}>
               <button onClick={() => setAdjustModal(null)} style={{ padding:"9px 18px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#1F2854", fontFamily:"Arial,sans-serif" }}>
                 Cancel
               </button>

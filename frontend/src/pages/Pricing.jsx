@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
 import { getQuotaStatus } from "../api/client.js";
 import { Loader, ArrowLeft, Check, Mail, MessageCircle, X } from "lucide-react";
+import { useIsMobile } from "../hooks/useBreakpoint.js";
 import axios from "axios";
 
 const BASE_URL    = import.meta.env.VITE_API_BASE_URL || "";
@@ -58,6 +59,8 @@ const C = {
 };
 
 export default function Pricing() {
+  const isMobile = useIsMobile(640);
+  const isTablet = useIsMobile(960);
   const { user }   = useAuth();
   const { tenant } = useTenant();
   const navigate   = useNavigate();
@@ -103,7 +106,7 @@ export default function Pricing() {
       <style>{`@keyframes spin { to { transform:rotate(360deg); } }`}</style>
 
       {/* ── Header ── */}
-      <div style={{ background:C.navy, padding:"14px 32px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+      <div style={{ background:C.navy, padding: isMobile ? "12px 16px" : "14px 32px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
         <button
           onClick={() => navigate(user ? "/" : "/login")}
           style={{ display:"flex", alignItems:"center", gap:6, color:"#ccc", fontSize:13, cursor:"pointer", background:"none", border:"none", fontFamily:"Arial,sans-serif" }}
@@ -145,7 +148,7 @@ export default function Pricing() {
           <Loader size={28} style={{ animation:"spin 0.8s linear infinite", color:C.emerald }} />
         </div>
       ) : null}
-      {!loading && <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:20, maxWidth:960, margin:"0 auto", padding:"0 24px" }}>
+      {!loading && <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : isTablet ? "repeat(2,1fr)" : "repeat(3,1fr)", gap:16, maxWidth:960, margin:"0 auto", padding:"0 12px" }}>
         {packs.sort((a,b) => PACK_ORDER.indexOf(a.key) - PACK_ORDER.indexOf(b.key)).map((pack) => {
           const key  = pack.key;
           const s    = PACK_STATIC[key] || {};

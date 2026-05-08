@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useIsMobile } from "../../hooks/useBreakpoint.js";
 import { Upload as UploadIcon, CheckCircle, Loader, AlertTriangle, AlertCircle, X, ChevronRight, SkipForward } from "lucide-react";
 import { extractCpTerms } from "../../api/client.js";
 
@@ -106,6 +107,9 @@ const css = {
 };
 
 export default function CPTerms({ figures, onFiguresChange, onBack, onNext, clientName }) {
+  const isMobile = useIsMobile();
+  const g2 = { ...css.grid2, gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr" };
+  const g3 = { ...css.grid3, gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr" };
   const [file,       setFile]       = useState(null);
   const [validating, setValidating] = useState(false);
   const [fileError,  setFileError]  = useState("");
@@ -157,7 +161,7 @@ export default function CPTerms({ figures, onFiguresChange, onBack, onNext, clie
         return merged;
       });
     } catch {
-      setExtractErr("Extraction failed — please fill in the fields manually.");
+      setExtractErr("Extraction failed — please try again after a few seconds or fill manually.");
     } finally {
       setExtracting(false);
     }
@@ -259,13 +263,13 @@ export default function CPTerms({ figures, onFiguresChange, onBack, onNext, clie
 
         {/* Tranche table */}
         <div style={{ marginBottom:16 }}>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 }}>
+          <div style={g3}>
             <div style={{ fontSize:12, fontWeight:"bold", color:"#5A5A5A", paddingBottom:6, borderBottom:"2px solid #E0E0E0" }}></div>
             <div style={{ fontSize:12, fontWeight:"bold", color:"#5A5A5A", paddingBottom:6, borderBottom:"2px solid #E0E0E0", textAlign:"center" }}>Tranche A</div>
             <div style={{ fontSize:12, fontWeight:"bold", color:"#5A5A5A", paddingBottom:6, borderBottom:"2px solid #E0E0E0", textAlign:"center" }}>Tranche B</div>
           </div>
           {TRANCHE_FIELDS.map(({ keyA, keyB, label }) => (
-            <div key={keyA} style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12, marginTop:10 }}>
+            <div key={keyA} style={{ ...g3, marginTop:10 }}>
               <label style={{ ...css.label, marginBottom:0, alignSelf:"center" }}>{label}</label>
               <input style={css.input} value={fields[keyA] || ""} onChange={(e) => set(keyA, e.target.value)} placeholder="—" />
               <input style={css.input} value={fields[keyB] || ""} onChange={(e) => set(keyB, e.target.value)} placeholder="— (if 2nd tranche)" />
@@ -274,7 +278,7 @@ export default function CPTerms({ figures, onFiguresChange, onBack, onNext, clie
         </div>
 
         {/* Shared fields */}
-        <div style={css.grid2}>
+        <div style={g2}>
           {SHARED_FIELDS.filter((f) => !f.wide).map(({ key, label }) => (
             <div key={key}>
               <label style={css.label}>{label}</label>
@@ -290,17 +294,17 @@ export default function CPTerms({ figures, onFiguresChange, onBack, onNext, clie
         ))}
       </div>
 
-      <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:20 }}>
+      <div style={{ display:"flex", flexDirection: isMobile ? "column-reverse" : "row", gap:10, justifyContent:"flex-end", marginTop:20 }}>
         <button onClick={onBack}
-          style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#1F2854", fontFamily:"Arial,sans-serif" }}>
+          style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#1F2854", fontFamily:"Arial,sans-serif", textAlign:"center" }}>
           Back
         </button>
         <button onClick={handleSkip}
-          style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#888", fontFamily:"Arial,sans-serif", display:"flex", alignItems:"center", gap:6 }}>
+          style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#888", fontFamily:"Arial,sans-serif", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
           <SkipForward size={14} /> Skip
         </button>
         <button onClick={handleContinue}
-          style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #1F2854", background:"#1F2854", color:"#fff", fontFamily:"Arial,sans-serif", display:"flex", alignItems:"center", gap:6 }}>
+          style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #1F2854", background:"#1F2854", color:"#fff", fontFamily:"Arial,sans-serif", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
           Continue <ChevronRight size={14} />
         </button>
       </div>

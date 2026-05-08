@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useIsMobile } from "../../hooks/useBreakpoint.js";
 import { runAssessment } from "../../api/client.js";
 import { Loader, Zap, ChevronRight } from "lucide-react";
 
@@ -75,6 +76,8 @@ function makeFiguresKey(figures) {
 }
 
 export default function Scores({ figures, extractedFigures, scoreResult, scoredFiguresKey, onScored, onBack, onNext, onQuotaExceeded, clientInfo, draftId }) {
+  const isMobile  = useIsMobile(640);
+  const isTablet  = useIsMobile(960);
   const [local]    = useState(() => computeLocal(figures));
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
@@ -191,8 +194,8 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
         </table>
       </div>
 
-      <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:20, alignItems:"center" }}>
-        <button onClick={onBack} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#1F2854", fontFamily:"Arial,sans-serif" }}>Back</button>
+      <div style={{ display:"flex", flexDirection: isMobile ? "column-reverse" : "row", gap:10, justifyContent:"flex-end", marginTop:20, alignItems: isMobile ? "stretch" : "center" }}>
+        <button onClick={onBack} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#1F2854", fontFamily:"Arial,sans-serif", textAlign:"center" }}>Back</button>
 
         {canProceed && !loading && (
           <button

@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useIsMobile } from "../hooks/useBreakpoint.js";
+import LegalModal from "../components/LegalModal.jsx";
 import { Loader, Check } from "lucide-react";
 import { useTenant } from "../context/TenantContext.jsx";
 import axios from "axios";
@@ -9,6 +11,8 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 export default function Register() {
   const { tenant } = useTenant();
   const hostname   = window.location.hostname;
+  const isMobile   = useIsMobile(900);
+  const [legalModal, setLegalModal] = useState(null);
 
   const [form, setForm]         = useState({ name:"", email:"", company:"" });
   const [errors, setErrors]     = useState({});
@@ -74,10 +78,10 @@ export default function Register() {
   });
 
   return (
-    <div style={{ display:"flex", height:"100vh", width:"100vw", overflow:"hidden" }}>
+    <div style={{ display:"flex", flexDirection: isMobile ? "column" : "row", minHeight:"100vh", width:"100vw", overflowY: isMobile ? "auto" : "hidden", overflowX:"hidden" }}>
 
       {/* LEFT */}
-      <div style={{ flex:"0 0 55%", background:"var(--primary)", position:"relative", display:"flex", flexDirection:"column", justifyContent:"space-between", padding:"32px 48px", overflow:"hidden" }}>
+      <div style={{ flex: isMobile ? "none" : "0 0 55%", background:"var(--primary)", position:"relative", display:"flex", flexDirection:"column", justifyContent: isMobile ? "flex-start" : "space-between", padding: isMobile ? "20px 20px 14px" : "32px 48px", overflow:"hidden" }}>
         <div style={{ position:"absolute", top:0, left:0, width:4, height:"100%", background:"var(--accent)" }} />
         <div style={{ position:"absolute", width:600, height:600, borderRadius:"50%", border:"1px solid rgba(var(--accent-rgb),0.12)", top:-180, right:-180 }} />
         <div style={{ position:"absolute", width:400, height:400, borderRadius:"50%", border:"1px solid rgba(var(--accent-rgb),0.08)", bottom:-100, left:-100 }} />
@@ -94,31 +98,37 @@ export default function Register() {
             Start assessing.<br />
             <span style={{ color:"var(--accent)" }}>In minutes.</span>
           </h1>
-          <p style={{ fontSize:14, color:"rgba(255,255,255,0.55)", lineHeight:1.7, maxWidth:360, marginBottom:24 }}>
-            Create your account and get 2 free assessment credits — no card required.
-          </p>
-          {[
-            "Lightening fast financial statement extraction",
-            "10-ratio quantitative scoring model",
-            "Professional PDF report generation",
-            "Nigerian capital markets calibrated",
-          ].map((f, i) => (
-            <div key={i} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
-              <div style={{ width:20, height:20, borderRadius:"50%", background:"rgba(var(--accent-rgb),0.2)", border:"1px solid rgba(var(--accent-rgb),0.4)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                <Check size={11} color="var(--accent)" strokeWidth={2.5} />
-              </div>
-              <span style={{ fontSize:13, color:"rgba(255,255,255,0.75)" }}>{f}</span>
-            </div>
-          ))}
+          {!isMobile && (
+            <>
+              <p style={{ fontSize:14, color:"rgba(255,255,255,0.55)", lineHeight:1.7, maxWidth:360, marginBottom:24 }}>
+                Create your account and get 2 free assessment credits — no card required.
+              </p>
+              {[
+                "Lightening fast financial statement extraction",
+                "10-ratio quantitative scoring model",
+                "Professional PDF report generation",
+                "Nigerian capital markets calibrated",
+              ].map((f, i) => (
+                <div key={i} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
+                  <div style={{ width:20, height:20, borderRadius:"50%", background:"rgba(var(--accent-rgb),0.2)", border:"1px solid rgba(var(--accent-rgb),0.4)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                    <Check size={11} color="var(--accent)" strokeWidth={2.5} />
+                  </div>
+                  <span style={{ fontSize:13, color:"rgba(255,255,255,0.75)" }}>{f}</span>
+                </div>
+              ))}
+            </>
+          )}
         </div>
 
-        <div style={{ position:"relative", zIndex:2, fontSize:11, color:"rgba(255,255,255,0.25)", marginTop:20, paddingTop:16, borderTop:"1px solid rgba(255,255,255,0.06)" }}>
-          Powered by <span style={{ color:"rgba(255,255,255,0.4)" }}>SmartRisk Sheets Technologies Limited</span>
-        </div>
+        {!isMobile && (
+          <div style={{ position:"relative", zIndex:2, fontSize:11, color:"rgba(255,255,255,0.25)", marginTop:20, paddingTop:16, borderTop:"1px solid rgba(255,255,255,0.06)" }}>
+            Powered by <span style={{ color:"rgba(255,255,255,0.4)" }}>SmartRisk Sheets Technologies Limited</span>
+          </div>
+        )}
       </div>
 
       {/* RIGHT */}
-      <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:"48px 56px", background:"#f9f6ef", overflowY:"auto" }}>
+      <div style={{ flex: isMobile ? "none" : "1", display:"flex", alignItems: isMobile ? "flex-start" : "center", justifyContent:"center", padding: isMobile ? "28px 20px 48px" : "48px 56px", background:"#f9f6ef", overflowY:"auto" }}>
         <div style={{ width:"100%", maxWidth:400 }}>
           <div style={{ fontSize:11, fontWeight:600, letterSpacing:"0.1em", textTransform:"uppercase", color:"var(--accent)", marginBottom:10 }}>
             {tenant?.loginEyebrow || "Analyst Portal"}
@@ -194,10 +204,11 @@ export default function Register() {
 
               <div style={{ marginTop:12, fontSize:11, color:"#9ca3af", textAlign:"center", lineHeight:1.6 }}>
                 By creating an account you agree to our{" "}
-                <a href="https://smartrisksheets.com/terms" target="_blank" rel="noreferrer" style={{ color:"var(--accent)" }}>Terms</a>
+                <span onClick={() => setLegalModal("lm-terms")} style={{ color:"var(--accent)", cursor:"pointer" }}>Terms</span>
                 {" & "}
-                <a href="https://smartrisksheets.com/privacy" target="_blank" rel="noreferrer" style={{ color:"var(--accent)" }}>Privacy Policy</a>.
+                <span onClick={() => setLegalModal("lm-privacy")} style={{ color:"var(--accent)", cursor:"pointer" }}>Privacy Policy</span>.
               </div>
+              {legalModal && <LegalModal id={legalModal} onClose={() => setLegalModal(null)} />}
             </>
           )}
         </div>

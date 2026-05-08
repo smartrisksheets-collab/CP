@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useIsMobile } from "../hooks/useBreakpoint.js";
 import { getHistory, generateReport, getAssessment, updateNarrative, deleteAssessment } from "../api/client.js";
 import { Loader, Download, Eye, X, Save, Trash2, Search } from "lucide-react";
 
@@ -226,6 +227,7 @@ const CATEGORIES = {
 };
 
 function AssessmentModal({ data, onClose, onSaved, onError }) {
+  const isMobile = useIsMobile();
   const [narr, setNarr]         = useState(data.narrative || {});
   const [saving, setSaving]     = useState(false);
   const [showFigures, setShowFigures] = useState(false);
@@ -293,7 +295,7 @@ function AssessmentModal({ data, onClose, onSaved, onError }) {
   return (
     <div onClick={e => e.target === e.currentTarget && onClose()}
          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
-      <div style={{ background:"#fff", borderRadius:12, width:"100%", maxWidth:1060, maxHeight:"90vh", overflowY:"auto", overflowX:"hidden", padding:"32px 36px", boxSizing:"border-box", position:"relative", boxShadow:"0 24px 80px rgba(0,0,0,0.25)" }}>
+      <div style={{ background:"#fff", borderRadius:12, width:"100%", maxWidth:1060, maxHeight:"90vh", overflowY:"auto", overflowX:"hidden", padding: isMobile ? "20px 14px" : "32px 36px", boxSizing:"border-box", position:"relative", boxShadow:"0 24px 80px rgba(0,0,0,0.25)" }}>
         <button onClick={onClose} style={{ position:"absolute", top:14, right:18, background:"none", border:"none", cursor:"pointer", color:"#888" }}><X size={18} /></button>
 
         <h2 style={{ fontSize:18, fontWeight:"bold", color:"var(--primary)", marginBottom:4 }}>{data.clientName}</h2>
@@ -358,14 +360,14 @@ function AssessmentModal({ data, onClose, onSaved, onError }) {
         ))}
 
         {/* Actions */}
-        <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:8 }}>
+        <div style={{ display:"flex", flexDirection: isMobile ? "column" : "row", gap:10, justifyContent:"flex-end", marginTop:8 }}>
           <button onClick={handleSave} disabled={saving}
-            style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor: saving ? "not-allowed" : "pointer", border:"1px solid var(--primary)", background:"transparent", color:"var(--primary)", fontFamily:"Arial,sans-serif", display:"flex", alignItems:"center", gap:6 }}>
+            style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor: saving ? "not-allowed" : "pointer", border:"1px solid var(--primary)", background:"transparent", color:"var(--primary)", fontFamily:"Arial,sans-serif", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
             {saving ? <Loader size={13} style={{ animation:"spin 0.8s linear infinite" }} /> : <Save size={13} />}
             {saved ? "Saved ✓" : saving ? "Saving…" : "Save Narrative"}
           </button>
           <button onClick={handleDownload} disabled={dlBusy}
-            style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor: dlBusy ? "not-allowed" : "pointer", border:"none", background:"var(--accent)", color:"#fff", fontFamily:"Arial,sans-serif", fontWeight:600, display:"flex", alignItems:"center", gap:6 }}>
+            style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor: dlBusy ? "not-allowed" : "pointer", border:"none", background:"var(--accent)", color:"#fff", fontFamily:"Arial,sans-serif", fontWeight:600, display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
             {dlBusy ? <Loader size={13} style={{ animation:"spin 0.8s linear infinite" }} /> : <Download size={13} />}
             {dlBusy ? "Generating…" : "Download PDF"}
           </button>

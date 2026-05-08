@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useIsMobile } from "../../hooks/useBreakpoint.js";
 import { generateReport } from "../../api/client.js";
 import { Download, Loader, Plus, Eye, AlertTriangle } from "lucide-react";
 import ReportPreview from "../ReportPreview.jsx";
@@ -28,6 +29,7 @@ const CATEGORIES = {
 };
 
 export default function Result({ scoreResult, assessmentId, narrative: initialNarrative, clientInfo, onBack, onNew }) {
+  const isMobile = useIsMobile();
   const [narrative, setNarrative] = useState(initialNarrative);
   const [downloading, setDownloading] = useState(false);
   const [dlError, setDlError]         = useState("");
@@ -179,8 +181,8 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
         </div>
       )}
 
-      <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:20, flexWrap:"wrap" }}>
-        <button onClick={onBack} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#1F2854", fontFamily:"Arial,sans-serif" }}>
+      <div style={{ display:"flex", flexDirection: isMobile ? "column-reverse" : "row", gap:10, justifyContent:"flex-end", marginTop:20, flexWrap: isMobile ? "nowrap" : "wrap" }}>
+        <button onClick={onBack} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#1F2854", fontFamily:"Arial,sans-serif", textAlign:"center" }}>
           Back to Scores
         </button>
         <button onClick={() => setShowPreview(true)} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #1F2854", background:"transparent", color:"#1F2854", fontFamily:"Arial,sans-serif", display:"flex", alignItems:"center", gap:6 }}>
@@ -215,9 +217,9 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
             <p style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.75, marginBottom:20 }}>
               This will clear all current data including the score, narrative, and client details. Make sure you have downloaded your report before proceeding.
             </p>
-            <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
-              <button onClick={() => setConfirmNew(false)} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#5A5A5A", fontFamily:"Arial,sans-serif" }}>Cancel</button>
-              <button onClick={onNew} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"none", background:"#1F2854", color:"#fff", fontFamily:"Arial,sans-serif", fontWeight:600 }}>Yes, start new</button>
+            <div style={{ display:"flex", flexDirection: isMobile ? "column-reverse" : "row", gap:10, justifyContent:"flex-end" }}>
+              <button onClick={() => setConfirmNew(false)} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#5A5A5A", fontFamily:"Arial,sans-serif", textAlign:"center" }}>Cancel</button>
+              <button onClick={onNew} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"none", background:"#1F2854", color:"#fff", fontFamily:"Arial,sans-serif", fontWeight:600, textAlign:"center" }}>Yes, start new</button>
             </div>
           </div>
         </div>

@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { Upload as UploadIcon, CheckCircle, Loader, AlertTriangle, AlertCircle, X, ChevronRight } from "lucide-react";
+import { useIsMobile } from "../../hooks/useBreakpoint.js";
 import { extractFigures } from "../../api/client.js";
 import CPTerms from "./CPTerms.jsx";
 
-const RATINGS = ["","AAA","AA+","AA","AA-","A+","A","A-","BBB+","BBB","BBB-","BB+","BB","BB-","B+","B","B-","CCC","CC","C","D"];
+const RATINGS = ["","AAA","AA+","AA","AA-","A+","A","A-", "A3", "BBB+","BBB","BBB-","BB+","BB","BB-","B+","B","B-","CCC","CC","C","D"];
 
 const EXTRACT_MESSAGES = [
   "Sending to extraction engine…",
@@ -284,7 +285,7 @@ const css = {
   grid    : { display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))", gap:12 },
   label   : { fontSize:12, color:"#5A5A5A", display:"block", marginBottom:4 },
   input   : { width:"100%", padding:"8px 10px", fontSize:13, border:"1px solid #D8D8D8", borderRadius:6, background:"#fff", color:"#1F2854", fontFamily:"Arial,sans-serif", boxSizing:"border-box" },
-  select  : { width:"100%", padding:"8px 10px", fontSize:13, border:"1px solid #D8D8D8", borderRadius:6, background:"#fff", color:"#1F2854", fontFamily:"Arial,sans-serif" },
+  select  : { width:"100%", padding:"8px 10px", fontSize:13, border:"1px solid #D8D8D8", borderRadius:6, background:"#fff", color:"#1F2854", fontFamily:"Arial,sans-serif", boxSizing:"border-box" },
   zone    : (hover) => ({ border:`2px dashed ${hover ? "var(--accent)" : "#D0D0D0"}`, borderRadius:8, padding:"36px 16px", textAlign:"center", cursor:"pointer", background: hover ? "#F8F8F5" : "transparent", transition:"all 0.15s" }),
   done    : { padding:"10px 14px", borderRadius:6, fontSize:13, background:"#EAF3DE", color:"#27500A", border:"1px solid #97C459", display:"flex", alignItems:"center", justifyContent:"space-between" },
   actions : { display:"flex", gap:10, justifyContent:"flex-end", marginTop:20 },
@@ -502,6 +503,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
   const [reExtractModal, setReExtractModal] = useState(null); // null | "warning" | "deduction"
   const [newAssessModal,  setNewAssessModal]  = useState(null);
 
+  const isMobile = useIsMobile();
   const info = clientInfo;
   const set  = (k, v) => onClientInfoChange({ ...info, [k]: v });
   const showRatingReminder = !!ratFile && !info.creditRating;
@@ -676,7 +678,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
       {/* Client info */}
       <div style={css.card}>
         <div style={css.title}>Client Information</div>
-        <div style={css.grid}>
+        <div style={{ ...css.grid, gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill,minmax(200px,1fr))" }}>
           <div style={{ gridColumn:"span 2" }}>
             <label style={css.label}>Client name *</label>
             <input style={css.input} type="text" placeholder="e.g. Flour Mills of Nigeria Plc"
@@ -688,12 +690,6 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
               {RATINGS.map((r) => <option key={r} value={r}>{r || "Select rating"}</option>)}
             </select>
           </div>
-          {showRatingReminder && (
-            <div style={{ gridColumn:"span 2", padding:"8px 12px", borderRadius:6, background:"#FEF6E7", border:"1px solid #F0C060", fontSize:12, color:"#7A4F00", display:"flex", gap:8, alignItems:"flex-start" }}>
-              <AlertTriangle size={13} style={{ flexShrink:0, marginTop:1 }} />
-              <span>You uploaded a credit rating report — please select the rating from the dropdown above so it appears on the assessment. Click <strong>Extract</strong> again to continue without selecting.</span>
-            </div>
-          )}
           <div>
             <label style={css.label}>Review date</label>
             <input style={css.input} type="date"
@@ -734,6 +730,12 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
         />
         {ratV.error    && <ValidationError msg={ratV.error} onClear={() => setRatV(BLANK)} />}
         {!ratV.error   && <ValidationWarnings warnings={ratV.warnings} />}
+        {showRatingReminder && (
+          <div style={{ marginTop:10, padding:"8px 12px", borderRadius:6, background:"#FEF6E7", border:"1px solid #F0C060", fontSize:12, color:"#7A4F00", display:"flex", gap:8, alignItems:"flex-start" }}>
+            <AlertTriangle size={13} style={{ flexShrink:0, marginTop:1 }} />
+            <span>Rating report uploaded — please select the corresponding rating from the <strong>Credit rating (external)</strong> dropdown above so it appears on the assessment.</span>
+          </div>
+        )}
       </div>
 
       <div style={css.actions}>
