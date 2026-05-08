@@ -54,7 +54,8 @@ function SplashScreen({ onContinue }) {
     <div style={{
       position:"fixed", inset:0, background:"#1F2854",
       zIndex:999999, display:"flex", alignItems:"center",
-      justifyContent:"center", padding:"40px 24px",
+      justifyContent:"center", padding:"24px 20px",
+      overflowY:"auto",
     }}>
       <div style={{ maxWidth:680, width:"100%", textAlign:"center" }}>
         {tenant?.logoUrl && (
@@ -64,10 +65,10 @@ function SplashScreen({ onContinue }) {
         <div style={{ fontSize:22, fontWeight:"bold", color:"var(--accent)", marginBottom:2 }}>
           SmartRisk Credit
         </div>
-        <div style={{ fontSize:12, color:"#7a8db8", marginBottom:36 }}>
+        <div style={{ fontSize:12, color:"#7a8db8", marginBottom:20 }}>
           Commercial Paper Risk Assessment
         </div>
-        <div style={{ fontSize:14, color:"#c8d0e0", lineHeight:1.9, textAlign:"left", marginBottom:32 }}>
+        <div style={{ fontSize:13, color:"#c8d0e0", lineHeight:1.75, textAlign:"left", marginBottom:24 }}>
           <strong style={{ color:"#fff" }}>Important Notice</strong><br /><br />
           This tool generates quantitative credit risk scores based on financial data you provide.
           All outputs — including scores, ratio analyses, narratives, and reports — are{" "}
