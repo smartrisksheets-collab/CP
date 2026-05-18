@@ -459,7 +459,7 @@ def _build_elements(assessment: Assessment):
         "colhdr", fontName="Helvetica-Bold", fontSize=7,
         textColor=C_GREY, leading=9, alignment=align))
     col_hdr = Table([[
-        _ch("RATIO"), _ch("RESULT"), _ch("BAND", TA_CENTER),
+        _ch("RATIO"), _ch("RESULT"), _ch("BENCHMARK", TA_CENTER),
         _ch(""), _ch("WEIGHT", TA_RIGHT),
     ]], colWidths=[_SC_NAME, _SC_VAL, _SC_BAND, _SC_BAR, _SC_SCR])
     col_hdr.setStyle(TableStyle([
@@ -499,12 +499,12 @@ def _build_elements(assessment: Assessment):
             bc       = _bar_color(sc, mx)
             bnd_bg, bnd_fg = _band_colors(sc, mx)
 
-            band_p = ParagraphStyle("bnd2", fontName="Helvetica", fontSize=7,
-                                    textColor=bnd_fg, leading=9, alignment=TA_CENTER)
-            band_tbl = Table([[Paragraph(r.get("band",""), band_p)]],
+            bm_p = ParagraphStyle("bm2", fontName="Helvetica", fontSize=7,
+                                   textColor=colors.HexColor("#666666"), leading=9, alignment=TA_CENTER)
+            band_tbl = Table([[Paragraph(r.get("benchmark",""), bm_p)]],
                              colWidths=[_SC_BAND - 10])
             band_tbl.setStyle(TableStyle([
-                ("BACKGROUND",    (0,0), (-1,-1), bnd_bg),
+                ("BACKGROUND",    (0,0), (-1,-1), colors.HexColor("#F0F0F0")),
                 ("LEFTPADDING",   (0,0), (-1,-1), 4),
                 ("RIGHTPADDING",  (0,0), (-1,-1), 4),
                 ("TOPPADDING",    (0,0), (-1,-1), 2),
@@ -585,9 +585,13 @@ def _build_elements(assessment: Assessment):
 
     # ── 9. FOOTER ─────────────────────────────────────────────
     DISCLAIMER = (
-        "DISCLAIMER: Outputs of this tool are for internal reference and decision support only. They do not constitute "
-        "a credit rating, financial advice, or investment recommendation and should not be the sole basis for any credit "
-        "or investment decision. Users are responsible for independently verifying all extracted figures against source documents."
+        'IMPORTANT NOTICE: An "Eligible" result indicates the issuer meets the minimum credit quality threshold of a '
+        "standardised 10-ratio scoring model (maximum 56 points; cut-off 34 points), benchmarked against institutional "
+        'investment frameworks. A "Not Eligible" result indicates the issuer does not meet the model\'s minimum standard '
+        "for new investment consideration; it is not a credit rating and does not constitute a prediction of default. "
+        "Investors holding existing paper from a Not Eligible issuer should treat this as a monitoring signal, not a loss "
+        "forecast. This report is prepared for decision-support purposes only and does not constitute financial advice. "
+        "Confidential — for authorised personnel only."
     )
 
     disc_style = ParagraphStyle("disc", fontName=_CURRENCY_FONT, fontSize=6.5, leading=9,

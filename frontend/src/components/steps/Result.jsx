@@ -81,14 +81,18 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
         {newCat && <tr key={`cat-${i}`}><td colSpan={5} style={css.cat}>{cat}</td></tr>}
         <tr key={i}>
           <td style={css.td}>{r.name}</td>
-          <td style={css.td}>{r.display_value}</td>
-          <td style={css.td}>
-            <span style={{ fontSize:11, padding:"2px 8px", borderRadius:999, background:bg, color:col, whiteSpace:"nowrap" }}>
-              {r.band}
+          <td style={{ ...css.td, textAlign:"center" }}>
+            <span style={{ fontSize:11, padding:"2px 8px", borderRadius:999, background:"#F0F0F0", color:"#666", whiteSpace:"nowrap" }}>
+              {r.benchmark}
             </span>
           </td>
-          <td style={{ ...css.td, textAlign:"right", fontWeight:"bold", color:col }}>{r.score}</td>
-          <td style={{ ...css.td, textAlign:"right", color:"#888" }}>{r.max_score}</td>
+          <td style={{ ...css.td, textAlign:"center" }}>
+            <span style={{ fontSize:11, padding:"2px 8px", borderRadius:999, background:bg, color:col, whiteSpace:"nowrap" }}>
+              {r.display_value}
+            </span>
+          </td>
+          <td style={{ ...css.td, textAlign:"center", fontWeight:"bold", color:col }}>{r.score}</td>
+          <td style={{ ...css.td, textAlign:"center", color:"#888" }}>{r.max_score}</td>
         </tr>
       </>
     );
@@ -135,7 +139,7 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
       <div style={{ display:"flex", gap:10, marginBottom:16, flexWrap:"wrap" }}>
         <div style={css.metric}><div style={{ fontSize:11, color:"#888", marginBottom:6, textTransform:"uppercase" }}>Total Score</div><div style={{ fontSize:22, fontWeight:"bold", color:"var(--primary)" }}>{score}</div></div>
         <div style={css.metric}><div style={{ fontSize:11, color:"#888", marginBottom:6, textTransform:"uppercase" }}>Max Score</div><div style={{ fontSize:22, fontWeight:"bold", color:"var(--primary)" }}>56</div></div>
-        <div style={css.metric}><div style={{ fontSize:11, color:"#888", marginBottom:6, textTransform:"uppercase" }}>Cut-off</div><div style={{ fontSize:22, fontWeight:"bold", color:"var(--primary)" }}>60%</div></div>
+        <div style={css.metric}><div style={{ fontSize:11, color:"#888", marginBottom:6, textTransform:"uppercase" }}>Cut-off</div><div style={{ fontSize:22, fontWeight:"bold", color:"var(--primary)" }}>34</div></div>
       </div>
 
       {/* Score breakdown */}
@@ -145,10 +149,10 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
           <thead>
             <tr>
               <th style={css.th}>Ratio</th>
-              <th style={css.th}>Result</th>
-              <th style={css.th}>Band</th>
-              <th style={{ ...css.th, textAlign:"right" }}>Score</th>
-              <th style={{ ...css.th, textAlign:"right" }}>Max</th>
+              <th style={{ ...css.th, textAlign:"center" }}>Benchmark</th>
+              <th style={{ ...css.th, textAlign:"center" }}>Result</th>
+              <th style={{ ...css.th, textAlign:"center" }}>Score</th>
+              <th style={{ ...css.th, textAlign:"center" }}>Max</th>
             </tr>
           </thead>
           <tbody>{ratioRows}</tbody>

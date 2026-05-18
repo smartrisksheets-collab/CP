@@ -35,16 +35,16 @@ function computeLocal(f) {
   const td = n(f.shortTermDebt) + n(f.longTermDebt);
 
   const checks = [
-    { name:"Acid-Test Ratio",           max:2,  val:(n(f.cash)+n(f.inventory)-n(f.prepaidExpenses))/Math.max(n(f.currentLiabilities),1), fmt:(v)=>v.toFixed(2)+"x", band:(v)=>v<1?"< 1x":v<=1.5?"1 - 1.5x":"> 1.5x", score:(v)=>v<1?-2:v<=1.5?1:2 },
-    { name:"Net Income Margin",         max:4,  val:(n(f.netIncome)/Math.max(n(f.revenue),1))*100,   fmt:(v)=>v.toFixed(1)+"%", band:(v)=>v<10?"< 10%":v<=15?"10.1-15%":v<=20?"15.1-20%":"> 20%",      score:(v)=>v<10?0:v<=15?2:v<=20?3:4 },
-    { name:"Revenue Growth Rate",       max:5,  val:n(f.priorYearRevenue)>0?((n(f.revenue)-n(f.priorYearRevenue))/n(f.priorYearRevenue))*100:null, fmt:(v)=>v===null?"N/A":v.toFixed(1)+"%", band:(v)=>v===null?"N/A":v<0?"Negative":v<=5?"0-5%":v<=15?"6-15%":v<=30?"16-30%":"> 30%", score:(v)=>v===null?0:v<0?-3:v<=5?1:v<=15?2:v<=30?3:5 },
-    { name:"Return on Assets",          max:5,  val:(n(f.netIncome)/Math.max(n(f.totalAssets),1))*100, fmt:(v)=>v.toFixed(1)+"%", band:(v)=>v<10?"< 10%":v<=15?"10.1-15%":v<=20?"15.1-20%":v<=30?"20.1-30%":"> 30%", score:(v)=>v<10?1:v<=15?2:v<=20?3:v<=30?4:5 },
-    { name:"Debt to Asset Ratio",       max:5,  val:(td/Math.max(n(f.totalAssets),1))*100,   fmt:(v)=>v.toFixed(1)+"%", band:(v)=>v<30?"< 30%":v<=50?"30.1-50%":v<=75?"50.1-75%":v<=100?"75.1-100%":"> 100%", score:(v)=>v<30?5:v<=50?3:v<=75?2:v<=100?0:-5 },
-    { name:"Debt to Capital Ratio",     max:5,  val:(td/Math.max(td+n(f.shareholdersEquity),1))*100, fmt:(v)=>v.toFixed(1)+"%", band:(v)=>v<30?"< 30%":v<=50?"30.1-50%":v<=75?"50.1-75%":v<=100?"75.1-100%":"> 100%", score:(v)=>v<30?5:v<=50?2:v<=75?1:v<=100?0:-5 },
-    { name:"Interest Coverage Ratio",   max:6,  val:(()=>{ const int=(n(f.shortTermDebt)*stRate)+(n(f.longTermDebt)*ltRate); return int>0?n(f.ebit)/int:999; })(), fmt:(v)=>v===999?"N/A":v.toFixed(2)+"x", band:(v)=>v===999?"No debt":v<1?"< 1.0x":v<=1.5?"1.0-1.5x":v<=3?"1.6-3.0x":v<=5?"3.1-5.0x":"> 5.0x", score:(v)=>v===999?6:v<1?-5:v<=1.5?2:v<=3?4:v<=5?5:6 },
-    { name:"Debt Service Coverage",     max:7,  val:td>0?n(f.ebitda)/td:0, fmt:(v)=>v.toFixed(2)+"x", band:(v)=>v<0.5?"< 0.5x":v<=1?"0.6-1.0x":v<=3.5?"1.1-3.5x":v<=4?"3.6-4.0x":"> 4.1x", score:(v)=>v<0.5?7:v<=1?4:v<=3.5?3:v<=4?2:-5 },
-    { name:"Debt to EBITDA",            max:7,  val:n(f.ebitda)>0?(td-n(f.cash))/n(f.ebitda):0, fmt:(v)=>v.toFixed(2)+"x", band:(v)=>v<2?"< 2x":v<=3?"2.1-3.0x":v<=3.5?"3.1-3.5x":v<=4?"3.6-4.0x":"> 4.1x", score:(v)=>v<2?7:v<=3?3:v<=3.5?2:v<=4?0:-5 },
-    { name:"Altman Z-Score",            max:10, val:(()=>{ const ta=Math.max(n(f.totalAssets),1); const wc=n(f.currentAssets)-n(f.currentLiabilities); return 1.2*(wc/ta)+1.4*(n(f.retainedEarnings)/ta)+3.3*(n(f.ebit)/ta)+0.6*(n(f.shareholdersEquity)/Math.max(n(f.totalLiabilities),1))+1.0*(n(f.revenue)/ta); })(), fmt:(v)=>v.toFixed(2), band:(v)=>v<1.8?"< 1.8":v<=2.9?"1.8-2.9":"> 3", score:(v)=>v<1.8?-10:v<=2.9?5:10 },
+    { name:"Acid-Test Ratio",           benchmark:"≥ 1x",    max:2,  val:(n(f.cash)+n(f.inventory)-n(f.prepaidExpenses))/Math.max(n(f.currentLiabilities),1), fmt:(v)=>v.toFixed(2)+"x", band:(v)=>v<1?"< 1x":v<=1.5?"1 - 1.5x":"> 1.5x", score:(v)=>v<1?-2:v<=1.5?1:2 },
+    { name:"Net Income Margin",         benchmark:"≥ 20%",   max:4,  val:(n(f.netIncome)/Math.max(n(f.revenue),1))*100,   fmt:(v)=>v.toFixed(1)+"%", band:(v)=>v<10?"< 10%":v<=15?"10.1-15%":v<=20?"15.1-20%":"> 20%",      score:(v)=>v<10?0:v<=15?2:v<=20?3:4 },
+    { name:"Revenue Growth Rate",       benchmark:"> 30%",   max:5,  val:n(f.priorYearRevenue)>0?((n(f.revenue)-n(f.priorYearRevenue))/n(f.priorYearRevenue))*100:null, fmt:(v)=>v===null?"N/A":v.toFixed(1)+"%", band:(v)=>v===null?"N/A":v<0?"Negative":v<=5?"0-5%":v<=15?"6-15%":v<=30?"16-30%":"> 30%", score:(v)=>v===null?0:v<0?-3:v<=5?1:v<=15?2:v<=30?3:5 },
+    { name:"Return on Assets",          benchmark:"≥ 30%",   max:5,  val:(n(f.netIncome)/Math.max(n(f.totalAssets),1))*100, fmt:(v)=>v.toFixed(1)+"%", band:(v)=>v<10?"< 10%":v<=15?"10.1-15%":v<=20?"15.1-20%":v<=30?"20.1-30%":"> 30%", score:(v)=>v<10?1:v<=15?2:v<=20?3:v<=30?4:5 },
+    { name:"Debt to Asset Ratio",       benchmark:"< 30%",   max:5,  val:(td/Math.max(n(f.totalAssets),1))*100,   fmt:(v)=>v.toFixed(1)+"%", band:(v)=>v<30?"< 30%":v<=50?"30.1-50%":v<=75?"50.1-75%":v<=100?"75.1-100%":"> 100%", score:(v)=>v<30?5:v<=50?3:v<=75?2:v<=100?0:-5 },
+    { name:"Debt to Capital Ratio",     benchmark:"< 30%",   max:5,  val:(td/Math.max(td+n(f.shareholdersEquity),1))*100, fmt:(v)=>v.toFixed(1)+"%", band:(v)=>v<30?"< 30%":v<=50?"30.1-50%":v<=75?"50.1-75%":v<=100?"75.1-100%":"> 100%", score:(v)=>v<30?5:v<=50?2:v<=75?1:v<=100?0:-5 },
+    { name:"Interest Coverage Ratio",   benchmark:"> 5.0x",  max:6,  val:(()=>{ const int=(n(f.shortTermDebt)*stRate)+(n(f.longTermDebt)*ltRate); return int>0?n(f.ebit)/int:999; })(), fmt:(v)=>v===999?"N/A":v.toFixed(2)+"x", band:(v)=>v===999?"No debt":v<1?"< 1.0x":v<=1.5?"1.0-1.5x":v<=3?"1.6-3.0x":v<=5?"3.1-5.0x":"> 5.0x", score:(v)=>v===999?6:v<1?-5:v<=1.5?2:v<=3?4:v<=5?5:6 },
+    { name:"Debt Service Coverage",     benchmark:"< 0.5x",  max:7,  val:td>0?n(f.ebitda)/td:0, fmt:(v)=>v.toFixed(2)+"x", band:(v)=>v<0.5?"< 0.5x":v<=1?"0.6-1.0x":v<=3.5?"1.1-3.5x":v<=4?"3.6-4.0x":"> 4.1x", score:(v)=>v<0.5?7:v<=1?4:v<=3.5?3:v<=4?2:-5 },
+    { name:"Debt to EBITDA",            benchmark:"< 2x",    max:7,  val:n(f.ebitda)>0?(td-n(f.cash))/n(f.ebitda):0, fmt:(v)=>v.toFixed(2)+"x", band:(v)=>v<2?"< 2x":v<=3?"2.1-3.0x":v<=3.5?"3.1-3.5x":v<=4?"3.6-4.0x":"> 4.1x", score:(v)=>v<2?7:v<=3?3:v<=3.5?2:v<=4?0:-5 },
+    { name:"Altman Z-Score",            benchmark:"≥ 3",     max:10, val:(()=>{ const ta=Math.max(n(f.totalAssets),1); const wc=n(f.currentAssets)-n(f.currentLiabilities); return 1.2*(wc/ta)+1.4*(n(f.retainedEarnings)/ta)+3.3*(n(f.ebit)/ta)+0.6*(n(f.shareholdersEquity)/Math.max(n(f.totalLiabilities),1))+1.0*(n(f.revenue)/ta); })(), fmt:(v)=>v.toFixed(2), band:(v)=>v<1.8?"< 1.8":v<=2.9?"1.8-2.9":"> 3", score:(v)=>v<1.8?-10:v<=2.9?5:10 },
   ];
 
   let total = 0;
@@ -52,7 +52,7 @@ function computeLocal(f) {
     const v  = c.val;
     const sc = c.score(v);
     total += sc;
-    ratios.push({ name:c.name, max:c.max, displayValue:c.fmt(v), band:c.band(v), score:sc });
+    ratios.push({ name:c.name, max:c.max, benchmark:c.benchmark, displayValue:c.fmt(v), band:c.band(v), score:sc });
   }
 
   return { ratios, total, max:56, eligible: total >= 34 };
@@ -147,14 +147,18 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
         )}
         <tr key={i}>
           <td style={css.td}>{r.name}</td>
-          <td style={css.td}>{r.displayValue}</td>
-          <td style={css.td}>
-            <span style={{ fontSize:11, padding:"2px 8px", borderRadius:999, background:bg, color:col, whiteSpace:"nowrap" }}>
-              {r.band}
+          <td style={{ ...css.td, textAlign:"center" }}>
+            <span style={{ fontSize:11, padding:"2px 8px", borderRadius:999, background:"#F0F0F0", color:"#666", whiteSpace:"nowrap" }}>
+              {r.benchmark}
             </span>
           </td>
-          <td style={{ ...css.td, textAlign:"right", fontWeight:"bold", color:col }}>{r.score}</td>
-          <td style={{ ...css.td, textAlign:"right", color:"#888" }}>{r.max}</td>
+          <td style={{ ...css.td, textAlign:"center" }}>
+            <span style={{ fontSize:11, padding:"2px 8px", borderRadius:999, background:bg, color:col, whiteSpace:"nowrap" }}>
+              {r.displayValue}
+            </span>
+          </td>
+          <td style={{ ...css.td, textAlign:"center", fontWeight:"bold", color:col }}>{r.score}</td>
+          <td style={{ ...css.td, textAlign:"center", color:"#888" }}>{r.max}</td>
         </tr>
       </>
     );
@@ -177,10 +181,10 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
           <thead>
             <tr>
               <th style={css.th}>Ratio</th>
-              <th style={css.th}>Result</th>
-              <th style={css.th}>Band</th>
-              <th style={{ ...css.th, textAlign:"right" }}>Score</th>
-              <th style={{ ...css.th, textAlign:"right" }}>Max</th>
+              <th style={{ ...css.th, textAlign:"center" }}>Benchmark</th>
+              <th style={{ ...css.th, textAlign:"center" }}>Result</th>
+              <th style={{ ...css.th, textAlign:"center" }}>Score</th>
+              <th style={{ ...css.th, textAlign:"center" }}>Max</th>
             </tr>
           </thead>
           <tbody>

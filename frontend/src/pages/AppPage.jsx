@@ -608,6 +608,34 @@ function FaqContent() {
   const faqs = [
     ["What does SmartRisk Credit actually do?", "SmartRisk Credit is an AI-assisted credit risk scoring tool for Nigerian capital markets professionals. You upload a company's audited financial statements, the AI extracts the key figures, and the tool computes 10 standardised ratios to produce a total score out of 56. A score of 34 or above (60%) indicates the issuer is eligible for a investing in Commercial Papers (CPs)."],
     ["Is the score a formal credit rating?", "No. The SmartRisk Credit score is a quantitative decision-support tool for internal use only. It is not a regulated credit rating and does not replace the opinion of a licensed credit rating agency such as Agusto & Co., GCR Ratings, or DataPro."],
+    ["Does 'Not Eligible' mean the issuer will default on their existing paper?", (
+      <div>
+        <p style={{ marginBottom:8 }}>No — and this is an important distinction. "Not Eligible" means the issuer does not meet the minimum credit quality threshold of the 10-ratio scoring model at the time of assessment. It is a <strong>new investment caution signal</strong>, not a default prediction.</p>
+        <p style={{ marginBottom:8 }}>An issuer can have Commercial Paper or Promissory Notes in the market and continue servicing them while not meeting this model's entry criteria. The scoring model assesses whether a company's current financial profile is strong enough to warrant <em>new</em> investment — it does not predict whether an issuer will honour <em>existing</em> obligations.</p>
+        <p style={{ marginBottom:8 }}>If you or your fund hold existing paper from a "Not Eligible" issuer, the result should be treated as a prompt to monitor more closely — specifically reviewing:</p>
+        <ul style={{ margin:"0 0 8px 18px", lineHeight:1.8 }}>
+          <li>Liquidity headroom (cash vs short-term debt obligations)</li>
+          <li>Leverage trajectory (is debt growing faster than EBITDA?)</li>
+          <li>Upcoming maturities and refinancing capacity</li>
+          <li>Any changes to the external credit rating</li>
+        </ul>
+        <p style={{ margin:0, color:"#888", fontSize:12 }}>The score is a quantitative decision-support tool only. It does not constitute a credit rating or financial advice.</p>
+      </div>
+    )],
+    ["What is the difference between 'Eligible' and an investment being approved?", (
+      <div>
+        <p style={{ marginBottom:8 }}>"Eligible" means the issuer passes the quantitative screening threshold — it is the first gate, not the final decision. An Eligible result means the financial metrics are strong enough to warrant further consideration, but it does not automatically mean the investment is approved.</p>
+        <p style={{ marginBottom:8 }}>Before a final investment decision, the analyst and investment committee should also review:</p>
+        <ul style={{ margin:"0 0 8px 18px", lineHeight:1.8 }}>
+          <li>The AI-generated risk narrative and qualitative factors</li>
+          <li>The external credit rating and agency commentary</li>
+          <li>The issuer's sector outlook and macroeconomic exposure</li>
+          <li>The specific CP terms — tenor, discount rate, use of proceeds</li>
+          <li>Concentration limits and portfolio-level risk considerations</li>
+        </ul>
+        <p style={{ margin:0 }}>The quantitative score is one input into the investment decision — it should always be read alongside the full risk narrative and the analyst's qualitative assessment.</p>
+      </div>
+    )],
     ["What financial statements should I upload?", "Upload the most recent audited annual financial statements for the issuing entity — not the group. The document should include the Statement of Comprehensive Income, Statement of Financial Position, Statement of Cash Flows, and Notes to the Accounts."],
     ["Why standalone figures and not group figures?", "The obligor on the CP is the legal entity itself, not the group. Group consolidated figures include subsidiary revenues and assets not available to service the CP. The AI is specifically instructed to extract standalone figures."],
     ["What if the AI extracts the wrong figures?", "Every extracted figure is shown on the Review Data screen before scores are computed. You can edit any field manually. Blue fields were populated by AI; amber fields require manual entry."],
@@ -628,7 +656,11 @@ function FaqContent() {
             {q}
             <span style={{ fontSize:16, color:"#888", marginLeft:12, flexShrink:0, transform: open === i ? "rotate(180deg)" : "none", transition:"transform 0.2s" }}>⌄</span>
           </div>
-          {open === i && <p style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.7, marginTop:8 }}>{a}</p>}
+          {open === i && (
+            typeof a === "string"
+              ? <p style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.7, marginTop:8 }}>{a}</p>
+              : <div style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.7, marginTop:8 }}>{a}</div>
+          )}
         </div>
       ))}
     </div>
@@ -747,6 +779,86 @@ function UserGuidePage({ onBack }) {
           </div>
           <p style={{ fontSize:11, color:"#888", marginTop:10, lineHeight:1.6 }}>
             * DSCR scoring is inverted by design: a very low DSCR (e.g. &lt;0.5x) means the company has minimal debt relative to EBITDA, which is favourable. A very high DSCR means the company is heavily leveraged, which attracts a penalty score.
+          </p>
+        </div>
+
+        {/* Eligible vs Not Eligible */}
+        <div style={card}>
+          <div style={sectionTitle}>Understanding Eligible vs Not Eligible</div>
+          <p style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.8, marginTop:12, marginBottom:4 }}>
+            The tool produces one of two verdicts after computing the 10-ratio score.
+            Understanding what each verdict means — and what it does <em>not</em> mean — is essential for using the output correctly.
+          </p>
+          {/* Eligible */}
+          <div style={{ background:"#EAF3DE", border:"1px solid #97C459", borderRadius:8, padding:"14px 18px", margin:"14px 0" }}>
+            <div style={{ fontSize:14, fontWeight:"bold", color:"#27500A", marginBottom:6 }}>✓ &nbsp;Eligible</div>
+            <p style={{ margin:0, color:"#2C2C2C", fontSize:13, lineHeight:1.75 }}>
+              The issuer's financial profile meets the minimum credit quality threshold of the 10-ratio scoring model, achieving <strong>34 or more out of 56 points (60%)</strong>.
+              This indicates adequate financial strength, manageable leverage, and sufficient liquidity to warrant investment consideration in the Commercial Paper or Promissory Note.
+            </p>
+            <p style={{ margin:"8px 0 0", color:"#2C2C2C", fontSize:13, lineHeight:1.75 }}>
+              An Eligible result should proceed to qualitative review and investment committee consideration. It is not an automatic approval — qualitative factors, sector risks, and the external credit rating context must also be reviewed.
+            </p>
+          </div>
+          {/* Not Eligible */}
+          <div style={{ background:"#FCEBEB", border:"1px solid #F09595", borderRadius:8, padding:"14px 18px", margin:"14px 0" }}>
+            <div style={{ fontSize:14, fontWeight:"bold", color:"#791F1F", marginBottom:6 }}>✗ &nbsp;Not Eligible</div>
+            <p style={{ margin:0, color:"#2C2C2C", fontSize:13, lineHeight:1.75 }}>
+              The issuer scores below <strong>34 points</strong> across one or more critical dimensions — liquidity, profitability, leverage, or debt serviceability.
+              This means the <strong>risk-adjusted case for new investment does not meet the model's minimum standard</strong> at the time of assessment.
+            </p>
+            <p style={{ margin:"8px 0 0", color:"#2C2C2C", fontSize:13, lineHeight:1.75 }}>
+              A Not Eligible result does <strong>not</strong> mean the issuer is at imminent risk of default. An issuer can have paper in the market and continue servicing it while not meeting this model's entry criteria for new investment.
+              The result is a <strong>forward-looking investment quality signal</strong>, not a credit rating and not a default forecast.
+            </p>
+          </div>
+          {/* Important Distinction */}
+          <div style={{ background:"#FFF8E1", border:"1px solid #FFD54F", borderRadius:8, padding:"14px 18px", margin:"14px 0" }}>
+            <div style={{ fontSize:13, fontWeight:"bold", color:"#7B4F00", marginBottom:6 }}>⚠ &nbsp;Important Distinction</div>
+            <p style={{ margin:0, color:"#2C2C2C", fontSize:13, lineHeight:1.75 }}>
+              If you or your fund hold <strong>existing paper</strong> from an issuer that scores Not Eligible, treat the result as a prompt for closer monitoring — not as a signal to panic or assume loss.
+              Review the issuer's liquidity headroom, leverage trajectory, and upcoming debt maturities more carefully.
+            </p>
+          </div>
+          {/* Reference table */}
+          <div style={{ overflowX:"auto", marginTop:16 }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
+              <thead>
+                <tr style={{ background:"var(--primary)" }}>
+                  {["Result","Score","What it means","Recommended Action"].map(h => (
+                    <th key={h} style={{ color:"#fff", padding:"7px 10px", textAlign:"left", fontSize:11 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style={{ padding:"8px 10px", borderBottom:"1px solid #F0F0F0", verticalAlign:"top" }}>
+                    <span style={{ display:"inline-flex", alignItems:"center", gap:6 }}>
+                      <span style={{ width:10, height:10, borderRadius:"50%", background:"#1E7E34", display:"inline-block" }}></span>
+                      <strong>Eligible</strong>
+                    </span>
+                  </td>
+                  <td style={{ padding:"8px 10px", borderBottom:"1px solid #F0F0F0", whiteSpace:"nowrap" }}>≥ 34 / 56</td>
+                  <td style={{ padding:"8px 10px", borderBottom:"1px solid #F0F0F0", color:"#5A5A5A" }}>Financial profile meets the 10-ratio model threshold (60%)</td>
+                  <td style={{ padding:"8px 10px", borderBottom:"1px solid #F0F0F0", color:"#5A5A5A" }}>Proceed to qualitative review and investment committee</td>
+                </tr>
+                <tr style={{ background:"#F9F9F7" }}>
+                  <td style={{ padding:"8px 10px", verticalAlign:"top" }}>
+                    <span style={{ display:"inline-flex", alignItems:"center", gap:6 }}>
+                      <span style={{ width:10, height:10, borderRadius:"50%", background:"#E24B4A", display:"inline-block" }}></span>
+                      <strong>Not Eligible</strong>
+                    </span>
+                  </td>
+                  <td style={{ padding:"8px 10px", whiteSpace:"nowrap" }}>&lt; 34 / 56</td>
+                  <td style={{ padding:"8px 10px", color:"#5A5A5A" }}>Financial profile does not meet the model threshold</td>
+                  <td style={{ padding:"8px 10px", color:"#5A5A5A" }}>Decline new investment; monitor existing exposure if held</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p style={{ marginTop:16, fontSize:11, color:"#888", lineHeight:1.6 }}>
+            Scores are computed using a standardised 10-ratio credit quality model (maximum 56 points) benchmarked against institutional investment frameworks used by Nigerian rating agencies and capital markets professionals.
+            This model does not constitute a credit rating, financial advice, or a prediction of default. Always supplement quantitative scores with qualitative analysis and external credit rating context.
           </p>
         </div>
 
