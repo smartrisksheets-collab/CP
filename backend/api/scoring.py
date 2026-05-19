@@ -39,7 +39,7 @@ def _acid_test(f: dict) -> RatioResult:
     return RatioResult(
         id="quick_ratio", name="Acid-Test Ratio", category="Liquidity",
         formula="(Cash + Inventory - Prepaid) / Current Liabilities",
-        benchmark=">= 1", max_score=2,
+        benchmark="≥ 1x", max_score=2,
         value=value, display_value=f"{value:.2f}x",
         band=band, score=score, passed=score > 0,
     )
@@ -56,7 +56,7 @@ def _net_income_margin(f: dict) -> RatioResult:
     return RatioResult(
         id="net_income_margin", name="Net Income Margin", category="Profitability",
         formula="Net Income / Total Revenue x 100",
-        benchmark=">= 20%", max_score=4,
+        benchmark="≥ 20%", max_score=4,
         value=value, display_value=f"{value:.1f}%",
         band=band, score=score, passed=score > 0,
     )
@@ -69,7 +69,7 @@ def _revenue_growth(f: dict) -> RatioResult:
         return RatioResult(
             id="revenue_growth", name="Revenue Growth Rate", category="Profitability",
             formula="(Current Revenue - Prior Year Revenue) / Prior Year Revenue x 100",
-            benchmark="> 15%", max_score=5,
+            benchmark="> 30%", max_score=5,
             value=0, display_value="N/A",
             band="N/A", score=0, passed=False,
         )
@@ -85,7 +85,7 @@ def _revenue_growth(f: dict) -> RatioResult:
     return RatioResult(
         id="revenue_growth", name="Revenue Growth Rate", category="Profitability",
         formula="(Current Revenue - Prior Year Revenue) / Prior Year Revenue x 100",
-        benchmark="> 15%", max_score=5,
+        benchmark="> 30%", max_score=5,
         value=value, display_value=f"{value:.1f}%",
         band=band, score=score, passed=score > 0,
     )
@@ -103,7 +103,7 @@ def _return_on_assets(f: dict) -> RatioResult:
     return RatioResult(
         id="return_on_assets", name="Return on Assets", category="Returns",
         formula="Net Income / Total Assets x 100",
-        benchmark=">= 15%", max_score=5,
+        benchmark="≥ 30%", max_score=5,
         value=value, display_value=f"{value:.1f}%",
         band=band, score=score, passed=score > 0,
     )
@@ -158,7 +158,7 @@ def _interest_coverage(f: dict) -> RatioResult:
         return RatioResult(
             id="interest_coverage", name="Interest Coverage Ratio", category="Coverage",
             formula="EBIT / Interest Expense",
-            benchmark=">= 3.0x", max_score=6,
+            benchmark="> 5.0x", max_score=6,
             value=999, display_value="N/A",
             band="No debt", score=6, passed=True,
         )
@@ -174,7 +174,7 @@ def _interest_coverage(f: dict) -> RatioResult:
     return RatioResult(
         id="interest_coverage", name="Interest Coverage Ratio", category="Coverage",
         formula="EBIT / Interest Expense",
-        benchmark=">= 3.0x", max_score=6,
+        benchmark="> 5.0x", max_score=6,
         value=value, display_value=f"{value:.2f}x",
         band=band, score=score, passed=score > 0,
     )
@@ -193,7 +193,7 @@ def _dscr(f: dict) -> RatioResult:
     return RatioResult(
         id="dscr", name="Debt Service Coverage Ratio", category="Coverage",
         formula="EBITDA / Total Debt",
-        benchmark=">= 1.5x", max_score=7,
+        benchmark="< 0.5x", max_score=7,
         value=value, display_value=f"{value:.2f}x",
         band=band, score=score, passed=score > 0,
     )
@@ -214,7 +214,7 @@ def _debt_to_ebitda(f: dict) -> RatioResult:
     return RatioResult(
         id="debt_to_ebitda", name="Debt to EBITDA", category="Coverage",
         formula="Net Debt (Total Debt - Cash) / EBITDA",
-        benchmark="Lower is better", max_score=7,
+        benchmark="< 2x", max_score=7,
         value=value, display_value=f"{value:.2f}x",
         band=band, score=score, passed=score > 0,
     )
@@ -237,7 +237,7 @@ def _altman_z(f: dict) -> RatioResult:
     return RatioResult(
         id="altman_z", name="Altman Z-Score", category="Bankruptcy",
         formula="1.2A + 1.4B + 3.3C + 0.6D + 1.0E",
-        benchmark=">= 3", max_score=10,
+        benchmark="≥ 3", max_score=10,
         value=value, display_value=f"{value:.2f}",
         band=band, score=score, passed=score > 0,
     )

@@ -83,7 +83,7 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
           <td style={css.td}>{r.name}</td>
           <td style={{ ...css.td, textAlign:"center" }}>
             <span style={{ fontSize:11, padding:"2px 8px", borderRadius:999, background:"#F0F0F0", color:"#666", whiteSpace:"nowrap" }}>
-              {r.benchmark}
+              {r.benchmark || "—"}
             </span>
           </td>
           <td style={{ ...css.td, textAlign:"center" }}>
