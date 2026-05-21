@@ -128,7 +128,7 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
         border: `1px solid ${eligible ? "#97C459" : "#F09595"}`,
       }}>
         <div style={{ fontSize:22, fontWeight:"bold", color: eligible ? "#27500A" : "#791F1F" }}>
-          {eligible ? "ELIGIBLE" : "NOT ELIGIBLE"}
+          {eligible ? "MEETS THRESHOLD" : "BELOW THRESHOLD"}
         </div>
         <div style={{ fontSize:13, marginTop:6, color:"#5A5A5A" }}>
           Score: {score} / 56 — {eligible ? "Meets" : "Below"} the 34-point (60%) threshold

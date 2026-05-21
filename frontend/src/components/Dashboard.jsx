@@ -147,7 +147,7 @@ export default function Dashboard() {
                     color:      eligible ? "#27500A" : "#791F1F",
                     border:     `1px solid ${eligible ? "#97C459" : "#F09595"}`,
                   }}>
-                    {eligible ? "Eligible" : "Not Eligible"}
+                    {eligible ? "Meets Threshold" : "Below Threshold"}
                   </span>
                 </td>
                 <td style={{ ...td, textAlign:"center" }}>

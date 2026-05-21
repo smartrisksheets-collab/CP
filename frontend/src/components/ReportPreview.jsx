@@ -73,7 +73,7 @@ export default function ReportPreview({ assessmentId, narrative, clientInfo, sco
             <div style={{ fontSize:12, color:"#888", marginTop:2 }}>
               {clientInfo.clientName} &nbsp;·&nbsp; Score: {score}/56 &nbsp;·&nbsp;
               <span style={{ color: eligible ? "#1E7E34" : "#A32D2D", fontWeight:"bold" }}>
-                {eligible ? "Eligible" : "Not Eligible"}
+                {eligible ? "Meets Threshold" : "Below Threshold"}
               </span>
             </div>
           </div>

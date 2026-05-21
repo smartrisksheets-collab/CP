@@ -277,7 +277,7 @@ def _build_elements(assessment: Assessment):
     score_pct  = round(score / max_score * 100) if max_score else 0
     eligible   = assessment.eligible
     margin_pts = abs(score - cutoff)
-    verdict    = "ELIGIBLE" if eligible else "NOT ELIGIBLE"
+    verdict    = "MEETS THRESHOLD" if eligible else "BELOW THRESHOLD"
     vd_color   = C_EMERALD  if eligible else C_RED
     vd_margin  = "Meets"    if eligible else "Below"
 
