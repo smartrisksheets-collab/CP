@@ -184,11 +184,12 @@ def _dscr(f: dict) -> RatioResult:
     total_debt = _n(f.get("shortTermDebt")) + _n(f.get("longTermDebt"))
     value      = (_n(f.get("ebitda")) / total_debt) if total_debt > 0 else 0
 
-    if value < 0.5:      band, score = "< 0.5x",      -5
-    elif value <= 1:     band, score = "0.6 - 1.0x",   2
-    elif value <= 3.5:   band, score = "1.1 - 3.5x",   3
-    elif value <= 4:     band, score = "3.6 - 4.0x",   4
-    else:                band, score = "> 4.1x",        7
+    if value < 0.5:      band, score = "< 0.5x",       7
+    elif value <= 1:     band, score = "0.5 - 1.0x",   4
+    elif value <= 2:     band, score = "1.1 - 2.0x",   3
+    elif value <= 3.5:   band, score = "2.1 - 3.5x",   1
+    elif value <= 5:     band, score = "3.6 - 5.0x",   0
+    else:                band, score = "> 5.0x",        0
 
     return RatioResult(
         id="dscr", name="Debt Service Coverage Ratio", category="Coverage",
@@ -209,7 +210,7 @@ def _debt_to_ebitda(f: dict) -> RatioResult:
     elif value <= 3:     band, score = "2.1 - 3.0x",  3
     elif value <= 3.5:   band, score = "3.1 - 3.5x",  2
     elif value <= 4:     band, score = "3.6 - 4.0x",  0
-    else:                band, score = "> 4.1x",      -5
+    else:                band, score = "> 4.1x",       0
 
     return RatioResult(
         id="debt_to_ebitda", name="Debt to EBITDA", category="Coverage",
