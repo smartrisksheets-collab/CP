@@ -606,13 +606,13 @@ function Modal({ onClose, title, children, maxWidth = 760 }) {
 
 function FaqContent() {
   const faqs = [
-    ["What does SmartRisk Credit actually do?", "SmartRisk Credit is an AI-assisted credit risk scoring tool for Nigerian capital markets professionals. You upload a company's audited financial statements, the AI extracts the key figures, and the tool computes 10 standardised ratios to produce a total score out of 56. A score of 34 or above (60%) indicates the issuer is eligible for a investing in Commercial Papers (CPs)."],
+    ["What does SmartRisk Credit actually do?", "SmartRisk Credit is an AI-assisted credit risk scoring tool for Nigerian capital markets professionals. You upload a company's audited financial statements, the AI extracts the key figures, and the tool computes 10 standardised ratios to produce a total score out of 56. A score of 34 or above (60%) indicates the issuer meets the threshold for investing in Commercial Papers (CPs)."],
     ["Is the score a formal credit rating?", "No. The SmartRisk Credit score is a quantitative decision-support tool for internal use only. It is not a regulated credit rating and does not replace the opinion of a licensed credit rating agency such as Agusto & Co., GCR Ratings, or DataPro."],
-    ["Does 'Not Eligible' mean the issuer will default on their existing paper?", (
+    ["Does 'Below Threshold' mean the issuer will default on their existing paper?", (
       <div>
-        <p style={{ marginBottom:8 }}>No — and this is an important distinction. "Not Eligible" means the issuer does not meet the minimum credit quality threshold of the 10-ratio scoring model at the time of assessment. It is a <strong>new investment caution signal</strong>, not a default prediction.</p>
+        <p style={{ marginBottom:8 }}>No — and this is an important distinction. "Below Threshold" means the issuer does not meet the minimum credit quality threshold of the 10-ratio scoring model at the time of assessment. It is a <strong>new investment caution signal</strong>, not a default prediction.</p>
         <p style={{ marginBottom:8 }}>An issuer can have Commercial Paper or Promissory Notes in the market and continue servicing them while not meeting this model's entry criteria. The scoring model assesses whether a company's current financial profile is strong enough to warrant <em>new</em> investment — it does not predict whether an issuer will honour <em>existing</em> obligations.</p>
-        <p style={{ marginBottom:8 }}>If you or your fund hold existing paper from a "Not Eligible" issuer, the result should be treated as a prompt to monitor more closely — specifically reviewing:</p>
+        <p style={{ marginBottom:8 }}>If you or your fund hold existing paper from a "Below Threshold" issuer, the result should be treated as a prompt to monitor more closely — specifically reviewing:</p>
         <ul style={{ margin:"0 0 8px 18px", lineHeight:1.8 }}>
           <li>Liquidity headroom (cash vs short-term debt obligations)</li>
           <li>Leverage trajectory (is debt growing faster than EBITDA?)</li>
@@ -622,9 +622,9 @@ function FaqContent() {
         <p style={{ margin:0, color:"#888", fontSize:12 }}>The score is a quantitative decision-support tool only. It does not constitute a credit rating or financial advice.</p>
       </div>
     )],
-    ["What is the difference between 'Eligible' and an investment being approved?", (
+    ["What is the difference between 'Meets Threshold' and an investment being approved?", (
       <div>
-        <p style={{ marginBottom:8 }}>"Eligible" means the issuer passes the quantitative screening threshold — it is the first gate, not the final decision. An Eligible result means the financial metrics are strong enough to warrant further consideration, but it does not automatically mean the investment is approved.</p>
+        <p style={{ marginBottom:8 }}>"Meets Threshold" means the issuer passes the quantitative screening threshold — it is the first gate, not the final decision. A Meets Threshold result means the financial metrics are strong enough to warrant further consideration, but it does not automatically mean the investment is approved.</p>
         <p style={{ marginBottom:8 }}>Before a final investment decision, the analyst and investment committee should also review:</p>
         <ul style={{ margin:"0 0 8px 18px", lineHeight:1.8 }}>
           <li>The AI-generated risk narrative and qualitative factors</li>
@@ -686,7 +686,7 @@ function UserGuidePage({ onBack }) {
     ["Extraction",      "The financial statement is sent for review and extraction, which reads the primary financial statements and extract figures. This takes 20–60 seconds. All extracted figures are shown on the Review Data screen for you to verify and correct."],
     ["Review Data",     "Check every field carefully. Blue fields were extracted by AI. Amber fields require manual entry (e.g. Prior Year Revenue for the growth rate). Always verify revenue, EBIT, and debt figures against the face of the financial statements."],
     ["Compute Scores",  "Click \"Compute Scores\" to calculate all 10 ratios client-side. Review the ratio table and scores before proceeding. You can go back and edit any figure."],
-    ["View Result",     "Click \"View Result\" to run the final server-side assessment and generate the narrative. The result screen shows the verdict (Eligible / Not Eligible), score breakdown, and report export options."],
+    ["View Result",     "Click \"View Result\" to run the final server-side assessment and generate the narrative. The result screen shows the verdict (Meets Threshold / Below Threshold), score breakdown, and report export options."],
     ["Export Report",   "Starter and above can preview and edit the generated narrative before exporting. Free users can export directly. The report is a PDF containing the CP terms, risk narrative, financial figures, and quantitative score table."],
   ];
 
@@ -721,7 +721,7 @@ function UserGuidePage({ onBack }) {
           </p>
           <p style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.8 }}>
             The tool processes audited financial statements, extracts key financial figures using artificial intelligence (AI), computes 10 standardised financial ratios,
-            and produces a total score out of <strong>56 points</strong>. A score of <strong>34 or above (60%)</strong> indicates the issuer is eligible for investment consideration.
+            and produces a total score out of <strong>56 points</strong>. A score of <strong>34 or above (60%)</strong> indicates the issuer meets the threshold for investment consideration.
           </p>
         </div>
 
@@ -782,33 +782,33 @@ function UserGuidePage({ onBack }) {
           </p>
         </div>
 
-        {/* Eligible vs Not Eligible */}
+        {/* Meets Threshold vs Below Threshold */}
         <div style={card}>
-          <div style={sectionTitle}>Understanding Eligible vs Not Eligible</div>
+          <div style={sectionTitle}>Understanding Meets Threshold vs Below Threshold</div>
           <p style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.8, marginTop:12, marginBottom:4 }}>
-            The tool produces one of two verdicts after computing the 10-ratio score.
-            Understanding what each verdict means — and what it does <em>not</em> mean — is essential for using the output correctly.
+            The tool produces one of two results after computing the 10-ratio score.
+            Understanding what each result means — and what it does <em>not</em> mean — is essential for using the output correctly.
           </p>
-          {/* Eligible */}
+          {/* Meets Threshold */}
           <div style={{ background:"#EAF3DE", border:"1px solid #97C459", borderRadius:8, padding:"14px 18px", margin:"14px 0" }}>
-            <div style={{ fontSize:14, fontWeight:"bold", color:"#27500A", marginBottom:6 }}>✓ &nbsp;Eligible</div>
+            <div style={{ fontSize:14, fontWeight:"bold", color:"#27500A", marginBottom:6 }}>✓ &nbsp;Meets Threshold</div>
             <p style={{ margin:0, color:"#2C2C2C", fontSize:13, lineHeight:1.75 }}>
               The issuer's financial profile meets the minimum credit quality threshold of the 10-ratio scoring model, achieving <strong>34 or more out of 56 points (60%)</strong>.
               This indicates adequate financial strength, manageable leverage, and sufficient liquidity to warrant investment consideration in the Commercial Paper or Promissory Note.
             </p>
             <p style={{ margin:"8px 0 0", color:"#2C2C2C", fontSize:13, lineHeight:1.75 }}>
-              An Eligible result should proceed to qualitative review and investment committee consideration. It is not an automatic approval — qualitative factors, sector risks, and the external credit rating context must also be reviewed.
+              A Meets Threshold result should proceed to qualitative review and investment committee consideration. It is not an automatic approval — qualitative factors, sector risks, and the external credit rating context must also be reviewed.
             </p>
           </div>
-          {/* Not Eligible */}
+          {/* Below Threshold */}
           <div style={{ background:"#FCEBEB", border:"1px solid #F09595", borderRadius:8, padding:"14px 18px", margin:"14px 0" }}>
-            <div style={{ fontSize:14, fontWeight:"bold", color:"#791F1F", marginBottom:6 }}>✗ &nbsp;Not Eligible</div>
+            <div style={{ fontSize:14, fontWeight:"bold", color:"#791F1F", marginBottom:6 }}>✗ &nbsp;Below Threshold</div>
             <p style={{ margin:0, color:"#2C2C2C", fontSize:13, lineHeight:1.75 }}>
               The issuer scores below <strong>34 points</strong> across one or more critical dimensions — liquidity, profitability, leverage, or debt serviceability.
               This means the <strong>risk-adjusted case for new investment does not meet the model's minimum standard</strong> at the time of assessment.
             </p>
             <p style={{ margin:"8px 0 0", color:"#2C2C2C", fontSize:13, lineHeight:1.75 }}>
-              A Not Eligible result does <strong>not</strong> mean the issuer is at imminent risk of default. An issuer can have paper in the market and continue servicing it while not meeting this model's entry criteria for new investment.
+              A Below Threshold result does <strong>not</strong> mean the issuer is at imminent risk of default. An issuer can have paper in the market and continue servicing it while not meeting this model's entry criteria for new investment.
               The result is a <strong>forward-looking investment quality signal</strong>, not a credit rating and not a default forecast.
             </p>
           </div>
@@ -816,7 +816,7 @@ function UserGuidePage({ onBack }) {
           <div style={{ background:"#FFF8E1", border:"1px solid #FFD54F", borderRadius:8, padding:"14px 18px", margin:"14px 0" }}>
             <div style={{ fontSize:13, fontWeight:"bold", color:"#7B4F00", marginBottom:6 }}>⚠ &nbsp;Important Distinction</div>
             <p style={{ margin:0, color:"#2C2C2C", fontSize:13, lineHeight:1.75 }}>
-              If you or your fund hold <strong>existing paper</strong> from an issuer that scores Not Eligible, treat the result as a prompt for closer monitoring — not as a signal to panic or assume loss.
+              If you or your fund hold <strong>existing paper</strong> from an issuer that scores Below Threshold, treat the result as a prompt for closer monitoring — not as a signal to panic or assume loss.
               Review the issuer's liquidity headroom, leverage trajectory, and upcoming debt maturities more carefully.
             </p>
           </div>
@@ -835,7 +835,7 @@ function UserGuidePage({ onBack }) {
                   <td style={{ padding:"8px 10px", borderBottom:"1px solid #F0F0F0", verticalAlign:"top" }}>
                     <span style={{ display:"inline-flex", alignItems:"center", gap:6 }}>
                       <span style={{ width:10, height:10, borderRadius:"50%", background:"#1E7E34", display:"inline-block" }}></span>
-                      <strong>Eligible</strong>
+                      <strong>Meets Threshold</strong>
                     </span>
                   </td>
                   <td style={{ padding:"8px 10px", borderBottom:"1px solid #F0F0F0", whiteSpace:"nowrap" }}>≥ 34 / 56</td>
@@ -846,7 +846,7 @@ function UserGuidePage({ onBack }) {
                   <td style={{ padding:"8px 10px", verticalAlign:"top" }}>
                     <span style={{ display:"inline-flex", alignItems:"center", gap:6 }}>
                       <span style={{ width:10, height:10, borderRadius:"50%", background:"#E24B4A", display:"inline-block" }}></span>
-                      <strong>Not Eligible</strong>
+                      <strong>Below Threshold</strong>
                     </span>
                   </td>
                   <td style={{ padding:"8px 10px", whiteSpace:"nowrap" }}>&lt; 34 / 56</td>
