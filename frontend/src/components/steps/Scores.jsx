@@ -191,8 +191,8 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
             {rows}
             <tr style={{ background:"#F5F5F2" }}>
               <td colSpan={3} style={{ ...css.td, fontWeight:"bold" }}>TOTAL (preview)</td>
-              <td style={{ ...css.td, textAlign:"right", fontWeight:"bold", color: local.eligible ? "#1E7E34" : "#A32D2D" }}>{local.total}</td>
-              <td style={{ ...css.td, textAlign:"right", color:"#888" }}>56</td>
+              <td style={{ ...css.td, textAlign:"center", fontWeight:"bold", color: local.eligible ? "#1E7E34" : "#A32D2D" }}>{local.total}</td>
+              <td style={{ ...css.td, textAlign:"center", color:"#888" }}>56</td>
             </tr>
           </tbody>
         </table>
