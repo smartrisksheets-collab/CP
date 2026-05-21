@@ -94,16 +94,16 @@ def _revenue_growth(f: dict) -> RatioResult:
 def _return_on_assets(f: dict) -> RatioResult:
     value = (_n(f.get("netIncome")) / max(_n(f.get("totalAssets")), 1)) * 100
 
-    if value < 10:       band, score = "< 10%",      1
-    elif value <= 15:    band, score = "10.1 - 15%",  2
-    elif value <= 20:    band, score = "15.1 - 20%",  3
-    elif value <= 30:    band, score = "20.1 - 30%",  4
-    else:                band, score = "> 30%",        5
+    if value < 3:        band, score = "< 3%",        0
+    elif value <= 6:     band, score = "3 - 6%",       1
+    elif value <= 10:    band, score = "6.1 - 10%",    2
+    elif value <= 15:    band, score = "10.1 - 15%",   4
+    else:                band, score = "> 15%",         5
 
     return RatioResult(
         id="return_on_assets", name="Return on Assets", category="Returns",
         formula="Net Income / Total Assets x 100",
-        benchmark="≥ 30%", max_score=5,
+        benchmark="≥ 15%", max_score=5,
         value=value, display_value=f"{value:.1f}%",
         band=band, score=score, passed=score > 0,
     )
@@ -117,7 +117,7 @@ def _debt_to_assets(f: dict) -> RatioResult:
     elif value <= 50:    band, score = "30.1 - 50%",   3
     elif value <= 75:    band, score = "50.1 - 75%",   2
     elif value <= 100:   band, score = "75.1 - 100%",  0
-    else:                band, score = "> 100%",       -5
+    else:                band, score = "> 100%",        0
 
     return RatioResult(
         id="debt_to_assets", name="Debt to Asset Ratio", category="Leverage",
@@ -137,7 +137,7 @@ def _debt_to_capital(f: dict) -> RatioResult:
     elif value <= 50:    band, score = "30.1 - 50%",   2
     elif value <= 75:    band, score = "50.1 - 75%",   1
     elif value <= 100:   band, score = "75.1 - 100%",  0
-    else:                band, score = "> 100%",       -5
+    else:                band, score = "> 100%",        0
 
     return RatioResult(
         id="debt_to_capital", name="Debt to Capital Ratio", category="Leverage",
@@ -159,8 +159,8 @@ def _interest_coverage(f: dict) -> RatioResult:
             id="interest_coverage", name="Interest Coverage Ratio", category="Coverage",
             formula="EBIT / Interest Expense",
             benchmark="> 5.0x", max_score=6,
-            value=999, display_value="N/A",
-            band="No debt", score=6, passed=True,
+            value=0, display_value="N/A",
+            band="Not available", score=0, passed=False,
         )
 
     value = _n(f.get("ebit")) / interest

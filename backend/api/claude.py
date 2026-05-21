@@ -361,6 +361,7 @@ COMPUTED SCORING RATIOS:
 SCORING RESULT:
   Total Score: {client_info.get('totalScore')} / 56
   Eligible: {'YES — meets the 34-point cut-off' if client_info.get('eligible') else 'NO — below the 34-point cut-off'}
+  Score Tier: {'STRONG (≥ 42 pts)' if (client_info.get('totalScore') or 0) >= 42 else 'MARGINAL (34–41 pts)' if client_info.get('eligible') else 'BELOW THRESHOLD (< 34 pts)'} 
 
 INSTRUCTIONS:
 - Each narrative section: 2–3 sentences MAXIMUM.
@@ -385,7 +386,7 @@ Return ONLY valid JSON with no markdown and no backticks:
   "futureRiskLevel": "Low|Moderate|High",
   "futureRisksReview": "2-3 sentences: most material forward risk grounded in current trend",
   "creditRatingReview": "1-2 sentences: what the external rating implies for this specific issuance",
-  "recommendation": "2 sentences: clear verdict with the single most important supporting figure",
+  "recommendation": "2–3 sentences. Opening MUST match the score tier exactly — no exceptions: STRONG (≥ 42 pts): start with 'The quantitative profile supports investment consideration —' then state key strengths. MARGINAL (34–41 pts): start with 'Analysts are advised to proceed with caution —' then state the specific concern and which ratio drives it. BELOW THRESHOLD (< 34 pts): start with 'Analysts are advised to apply caution and supplement this quantitative assessment with thorough qualitative review —' then state the primary quantitative concern with its computed value. Final sentence: name the single ratio most decisive to the outcome and what qualitative evidence could strengthen the credit case. NEVER use the words: NOT RECOMMENDED, RECOMMENDED for investment, APPROVED FOR INVESTMENT, APPROVED WITH CAUTION, or DECLINED.",
   "strengths": ["one sentence: metric + exact figure + WHY it is a credit strength", "..."],
   "weaknesses": ["one sentence: metric + exact figure + WHY it elevates credit risk", "..."]
 }}"""

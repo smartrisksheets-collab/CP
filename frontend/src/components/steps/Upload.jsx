@@ -754,8 +754,8 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
         )}
         <div style={{ display:"flex", flexDirection:"column", alignItems:"stretch" }}>
           <button
-            style={canExtract ? { ...css.btn, display:"flex", alignItems:"center", gap:8, borderRadius: loading ? "6px 6px 0 0" : 6 } : { ...css.btnDis, display:"flex", alignItems:"center", gap:8 }}
-            disabled={!canExtract}
+            style={canExtract || loading ? { ...css.btn, display:"flex", alignItems:"center", gap:8, borderRadius: loading ? "6px 6px 0 0" : 6 } : { ...css.btnDis, display:"flex", alignItems:"center", gap:8 }}
+            disabled={!canExtract && !loading}
             onClick={handleExtract}
           >
             {loading

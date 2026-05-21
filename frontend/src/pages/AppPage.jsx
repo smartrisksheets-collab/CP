@@ -672,7 +672,7 @@ function UserGuidePage({ onBack }) {
     ["Acid-Test Ratio",         2,  "Can the company meet short-term obligations from liquid assets alone? Excludes inventory and prepayments — a stricter test than the current ratio.",        "> 1.5x"],
     ["Net Income Margin",       4,  "How much of each naira of revenue becomes profit after all costs and tax. A proxy for pricing power and cost discipline.",                               "> 20%"],
     ["Revenue Growth Rate",     5,  "Year-on-year top-line growth. Signals whether the business is expanding or contracting — critical for short-tenor debt repayment confidence.",           "> 30%"],
-    ["Return on Assets",        5,  "How efficiently the company generates profit from its asset base. Higher ROA signals better capital deployment and earning quality.",                    "> 30%"],
+    ["Return on Assets",        5,  "How efficiently the company generates profit from its asset base. Higher ROA signals better capital deployment and earning quality.",                    "> 15%"],
     ["Debt to Asset Ratio",     5,  "What proportion of total assets is funded by debt. A low ratio means creditors have a large cushion if assets need to be liquidated.",                  "< 30%"],
     ["Debt to Capital Ratio",   5,  "The share of total capital (debt + equity) that is debt-funded. Measures structural leverage and the buffer available to absorb losses.",               "< 30%"],
     ["Interest Coverage Ratio", 6,  "How many times operating profit covers interest charges. A ratio below 1.5x means most of operating profit is consumed by interest — a major red flag.", "> 5.0x"],
