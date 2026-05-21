@@ -72,7 +72,7 @@ function SplashScreen({ onContinue }) {
           <strong style={{ color:"#fff" }}>Important Notice</strong><br /><br />
           This tool generates quantitative credit risk scores based on financial data you provide.
           All outputs — including scores, ratio analyses, narratives, and reports — are{" "}
-          <strong style={{ color:"#fff" }}>for internal reference and decision support only</strong>.<br /><br />
+          <strong style={{ color:"#fff" }}>for decision-support purposes only</strong>.<br /><br />
           They do not constitute a credit rating, financial advice, or an investment recommendation,
           and should not be relied upon as the sole basis for any investment, lending, or credit decision.<br /><br />
           SmartRisk Sheets Technologies Limited accepts no liability for any loss or damage arising
@@ -87,7 +87,7 @@ function SplashScreen({ onContinue }) {
             onChange={e => setAgreed(e.target.checked)}
             style={{ marginTop:3, flexShrink:0, accentColor:"var(--accent)", width:15, height:15 }}
           />
-          I have read and understood this notice and agree to use this tool for internal reference purposes only.
+          I have read and understood this notice, including the AI processing disclosure, and agree that "Meets Threshold" and "Below Threshold" results are decision-support signals only and do not constitute financial advice, a credit rating, or an investment recommendation.
         </label>
         <button
           onClick={onContinue}
