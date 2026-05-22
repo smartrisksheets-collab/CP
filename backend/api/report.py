@@ -585,11 +585,11 @@ def _build_elements(assessment: Assessment):
 
     # ── 9. FOOTER ─────────────────────────────────────────────
     DISCLAIMER = (
-        'IMPORTANT NOTICE: An "Eligible" result indicates the issuer meets the minimum credit quality threshold of a '
+        'IMPORTANT NOTICE: A "Meets threshold" result indicates the issuer meets the minimum credit quality threshold of a '
         "standardised 10-ratio scoring model (maximum 56 points; cut-off 34 points), benchmarked against institutional "
-        'investment frameworks. A "Not Eligible" result indicates the issuer does not meet the model\'s minimum standard '
+        'investment frameworks. A "Below threshold" result indicates the issuer does not meet the model\'s minimum standard '
         "for new investment consideration; it is not a credit rating and does not constitute a prediction of default. "
-        "Investors holding existing paper from a Not Eligible issuer should treat this as a monitoring signal, not a loss "
+        "Investors holding existing paper from a Below threshold issuer should treat this as a monitoring signal, not a loss "
         "forecast. This report is prepared for decision-support purposes only and does not constitute financial advice. "
         "Confidential — for authorised personnel only."
     )

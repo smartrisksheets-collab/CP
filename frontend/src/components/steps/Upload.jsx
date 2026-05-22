@@ -4,7 +4,7 @@ import { useIsMobile } from "../../hooks/useBreakpoint.js";
 import { extractFigures } from "../../api/client.js";
 import CPTerms from "./CPTerms.jsx";
 
-const RATINGS = ["","AAA","AA+","AA","AA-","A+","A","A-", "A3", "BBB+","BBB","BBB-","BB+","BB","BB-","B+","B","B-","CCC","CC","C","D"];
+const RATINGS = ["","AAA","AA+","AA","AA-","A+","A","A-", "A1+", "A1", "A2", "A3", "BBB+","BBB","BBB-","BB+","BB","BB-","B+","B","B-","CCC","CC","C","D"];
 
 const EXTRACT_MESSAGES = [
   "Sending to extraction engine…",
