@@ -488,9 +488,10 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
   const [confirm,   setConfirm]   = useState(null);
   const [showModal, setShowModal] = useState(false);
   const nameGuard = () => { if (!info.clientName?.trim()) { setShowModal(true); return true; } return false; };
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState("");
-  const [msgIdx,   setMsgIdx]   = useState(0);
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState("");
+  const [msgIdx,     setMsgIdx]     = useState(0);
+  const [uploadPct,  setUploadPct]  = useState(0);
   const [subStep,  setSubStep]  = useState(() => {
     try { return parseInt(sessionStorage.getItem("sr_uploadSubStep") || "0"); } catch { return 0; }
   });
@@ -500,8 +501,9 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
   const [extractedFileKey, setExtractedFileKey] = useState(() => {
     try { return sessionStorage.getItem("sr_extractedFileKey") || ""; } catch { return ""; }
   });
-  const [reExtractModal, setReExtractModal] = useState(null); // null | "warning" | "deduction"
-  const [newAssessModal,  setNewAssessModal]  = useState(null);
+  const [reExtractModal,    setReExtractModal]    = useState(null); // null | "warning" | "deduction"
+  const [newAssessModal,    setNewAssessModal]     = useState(null);
+  const [showExtractConfirm, setShowExtractConfirm] = useState(false);
 
   const isMobile = useIsMobile();
   const info = clientInfo;
@@ -594,13 +596,16 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
     setError("");
     setLoading(true);
     setMsgIdx(0);
+    setUploadPct(0);
     const fd = new FormData();
     fd.append("financial_pdf", finFile);
     if (ratFile)         fd.append("rating_pdf",  ratFile);
     if (info.clientName) fd.append("client_name", info.clientName);
     if (draftId)         fd.append("draft_id",    String(draftId));
     try {
-      const res  = await extractFigures(fd);
+      const res  = await extractFigures(fd, (e) => {
+        if (e.lengthComputable) setUploadPct(Math.round((e.loaded / e.total) * 100));
+      });
       const data = res.data;
       const updatedInfo = {
         ...info,
@@ -631,6 +636,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
       }
     } finally {
       setLoading(false);
+      setUploadPct(0);
     }
   }
 
@@ -643,14 +649,18 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
     }
     if (extractionCount === 1)     { setReExtractModal("warning");   return; }
     if (extractionCount >= 2)      { setReExtractModal("deduction"); return; }
-    doExtract();
+    setShowExtractConfirm(true);
   }
 
   const anyValidating = finV.validating || ratV.validating;
   const hasExtracted  = extractionCount > 0;
   const canGoNext     = hasExtracted && !fileChanged;
   const canExtract    = !!finFile && !!info.clientName?.trim() && !loading && !anyValidating && (!hasExtracted || fileChanged);
-  const progressPct   = loading ? Math.min(88, (msgIdx / (EXTRACT_MESSAGES.length - 1)) * 88) : 0;
+  const progressPct   = loading
+    ? uploadPct < 100
+      ? uploadPct                                                          // real upload progress
+      : Math.min(99, 100 + (msgIdx / (EXTRACT_MESSAGES.length - 1)) * 0) // hold at 99 while Claude works
+    : 0;
 
   if (subStep === 1) {
     return (
@@ -759,7 +769,9 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
             onClick={handleExtract}
           >
             {loading
-              ? <><Loader size={14} style={{ animation:"spin 0.8s linear infinite", flexShrink:0 }} />{EXTRACT_MESSAGES[msgIdx]}</>
+              ? uploadPct < 100 && uploadPct > 0
+                ? <><Loader size={14} style={{ animation:"spin 0.8s linear infinite", flexShrink:0 }} />Uploading… {uploadPct}%</>
+                : <><Loader size={14} style={{ animation:"spin 0.8s linear infinite", flexShrink:0 }} />{EXTRACT_MESSAGES[msgIdx]}</>
               : anyValidating ? "Validating…"
               : fileChanged && hasExtracted ? "Re-extract with AI"
               : "Extract"}
@@ -785,6 +797,32 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
           onConfirm={handleConfirm}
           onCancel={handleCancelConfirm}
         />
+      )}
+      {showExtractConfirm && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:99999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+          <div className="sr-modal-inner" style={{ background:"#fff", borderRadius:10, padding:"28px 32px", maxWidth:420, width:"100%", boxShadow:"0 16px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+              <AlertTriangle size={22} color="#d4820a" />
+              <div style={{ fontSize:15, fontWeight:"bold", color:"#1F2854" }}>Before you extract</div>
+            </div>
+            <p style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.75, marginBottom:20 }}>
+              This will use <strong>1 credit</strong>. Please confirm:<br /><br />
+              ✓ &nbsp;You have uploaded the correct financial statement<br />
+              ✓ &nbsp;The client name matches the document<br />
+              ✓ &nbsp;All details above are correctly filled
+            </p>
+            <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+              <button onClick={() => setShowExtractConfirm(false)}
+                style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#5A5A5A", fontFamily:"Arial,sans-serif" }}>
+                Cancel
+              </button>
+              <button onClick={() => { setShowExtractConfirm(false); doExtract(); }}
+                style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"none", background:"var(--accent)", color:"#fff", fontFamily:"Arial,sans-serif", fontWeight:600, display:"flex", alignItems:"center", gap:6 }}>
+                <CheckCircle size={13} /> Proceed
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {reExtractModal && (
         <ReExtractModal

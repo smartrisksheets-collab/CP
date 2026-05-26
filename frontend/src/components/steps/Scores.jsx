@@ -211,11 +211,11 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
 
         {!canProceed && (
           <div style={{ display:"flex", flexDirection:"column", alignItems:"stretch" }}>
-            <button onClick={handleViewResult} disabled={loading}
+             <button onClick={handleViewResult} disabled={loading}
               style={{ padding:"9px 20px", fontSize:13, borderRadius: loading ? "6px 6px 0 0" : 6, cursor: loading ? "not-allowed" : "pointer", border:"1px solid #1F2854", background: loading ? "#2a3870" : "#1F2854", color:"#fff", fontFamily:"Arial,sans-serif", display:"flex", alignItems:"center", gap:8 }}>
               {loading
                 ? <><Loader size={14} style={{ animation:"spin 0.8s linear infinite", flexShrink:0 }} />{RUN_MESSAGES[msgIdx]}</>
-                : <><Zap size={14} /> View Result <span style={{ fontSize:10, padding:"1px 6px", borderRadius:999, background:"rgba(255,255,255,0.15)", marginLeft:2 }}>1 credit</span></>
+                : <><Zap size={14} /> View Result</>
               }
             </button>
             {loading && (

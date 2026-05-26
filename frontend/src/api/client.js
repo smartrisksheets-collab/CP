@@ -28,6 +28,22 @@ api.interceptors.response.use(
 );
 
 
+async function withRetry(fn, maxAttempts = 2) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const isNetworkError = !err.response && err.code !== "ECONNABORTED";
+      if (isNetworkError && attempt < maxAttempts) {
+        await new Promise(r => setTimeout(r, 2000 * attempt)); // 2s, 4s backoff
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
+
 // ── Auth ──────────────────────────────────────────────────────
 export const requestOTP = (email, hostname, code) =>
   api.post("/auth/request-otp", { email, hostname, code });
@@ -55,16 +71,25 @@ export const getQuotaStatus = () =>
 
 
 // ── Assessment ────────────────────────────────────────────────
-export const extractFigures = (formData) =>
-  api.post("/assessment/extract", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+export const extractFigures = (formData, onUploadProgress) =>
+  withRetry(() =>
+    api.post("/assessment/extract", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 120000,
+      onUploadProgress,
+    })
+  );
 
 export const extractCpTerms = (formData) =>
-  api.post("/assessment/extract-cp", formData, { headers: { "Content-Type": "multipart/form-data" } });
+  api.post("/assessment/extract-cp", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 90000,
+  });
 
 export const runAssessment = (figures, clientInfo, extractedFigures = null, draftId = null) =>
-  api.post("/assessment/run", { figures, clientInfo, extractedFigures, draftId }, { timeout: 180000 });
+  withRetry(() =>
+    api.post("/assessment/run", { figures, clientInfo, extractedFigures, draftId }, { timeout: 180000 })
+  );
 
 export const getDraft = () =>
   api.get("/assessment/draft");
@@ -77,7 +102,7 @@ export const generateReport = (assessmentId, narrativeOverrides = {}) =>
   api.post(
     "/assessment/report",
     { assessment_id: assessmentId, narrative_overrides: narrativeOverrides },
-    { responseType: "blob" }
+    { responseType: "blob", timeout: 60000 }
   );
 
 export const getHistory = (page = 1, pageSize = 20) =>

@@ -6,11 +6,10 @@ from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-import random
-import string
+import secrets
 import os
 import resend
-
+import hmac
 from fastapi import Request
 from api.db import SessionLocal
 from api.models import Tenant, User, OTP
@@ -24,7 +23,7 @@ def _hash_otp(otp: str) -> str:
     return hashlib.sha256(otp.encode()).hexdigest()
 
 def _verify_otp_hash(plain: str, hashed: str) -> bool:
-    return hashlib.sha256(plain.encode()).hexdigest() == hashed
+    return hmac.compare_digest(hashlib.sha256(plain.encode()).hexdigest(), hashed)
 
 resend.api_key = os.getenv("RESEND_API_KEY")
 OTP_EXPIRY_MINUTES = 10
@@ -45,7 +44,7 @@ class OTPVerifyBody(BaseModel):
 
 # ── Helpers ───────────────────────────────────────────────────
 def _generate_otp() -> str:
-    return "".join(random.choices(string.digits, k=6))
+    return "".join(secrets.choice("0123456789") for _ in range(6))
 
 
 
@@ -115,7 +114,7 @@ async def request_otp(request: Request, body: OTPRequestBody, db: AsyncSession =
 
     # 2. Validate access code if tenant requires it
     if tenant.access_code:
-        if not body.code or body.code.strip().upper() != tenant.access_code.upper():
+        if not body.code or not hmac.compare_digest(body.code.strip().upper(), tenant.access_code.upper()):
             raise HTTPException(status_code=403, detail="Invalid access code.")
 
     # 3. Check user exists and is verified

@@ -18,7 +18,15 @@ SUPERADMIN_KEY = os.getenv("SUPERADMIN_KEY")
 bearer_scheme = HTTPBearer(auto_error=False)
 
 # ── Rate limiter (shared across all routes) ───────────────────
-limiter = Limiter(key_func=get_remote_address)
+from slowapi.util import get_remote_address
+
+def _get_real_ip(request):
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return get_remote_address(request)
+
+limiter = Limiter(key_func=_get_real_ip)
 
 
 # ── DB session ────────────────────────────────────────────────

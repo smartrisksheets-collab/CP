@@ -135,10 +135,12 @@ class CreditTransaction(Base):
     id                   : Mapped[int]           = mapped_column(Integer, primary_key=True)
     user_email           : Mapped[str]           = mapped_column(Text, nullable=False, index=True)
     tenant_id            : Mapped[int]           = mapped_column(ForeignKey("tenants.id"), nullable=False)
-    pack                 : Mapped[str]           = mapped_column(Text, nullable=False)     # starter | standard | professional | team | free
-    credits_added        : Mapped[int]           = mapped_column(Integer, nullable=False)
-    amount_kobo          : Mapped[int]           = mapped_column(BigInteger, default=0)    # 0 for free credits
-    paystack_reference   : Mapped[Optional[str]] = mapped_column(Text, nullable=True)     # null for free credits
+    pack                 : Mapped[str]           = mapped_column(Text, nullable=False)
+    credits_added        : Mapped[int]           = mapped_column(Integer, nullable=False)  # positive = credit, negative = debit
+    amount_kobo          : Mapped[int]           = mapped_column(BigInteger, default=0)
+    paystack_reference   : Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    transaction_type     : Mapped[str]           = mapped_column(Text, default="purchase") # purchase | usage | refund | free
+    assessment_id        : Mapped[Optional[int]] = mapped_column(ForeignKey("assessments.id"), nullable=True)
     status               : Mapped[str]           = mapped_column(Text, default="success") # success | failed | refunded
     expires_at           : Mapped[datetime]      = mapped_column(DateTime(timezone=True), nullable=False)
     created_at           : Mapped[datetime]      = mapped_column(DateTime(timezone=True), server_default=func.now())

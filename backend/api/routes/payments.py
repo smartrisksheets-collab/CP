@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, update
 from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel
 from datetime import datetime, timedelta, timezone
@@ -74,17 +74,11 @@ async def _add_credits(
     )
     db.add(transaction)
 
-    # Update user credits and plan
-    result = await db.execute(
-        select(User).where(and_(
-            User.email     == email,
-            User.tenant_id == tenant_id,
-        ))
+    await db.execute(
+        update(User)
+        .where(and_(User.email == email, User.tenant_id == tenant_id))
+        .values(credits=User.credits + credits, plan=pack)
     )
-    user = result.scalar_one_or_none()
-    if user:
-        user.credits += credits
-        user.plan     = pack
 
 
 # ── POST /payments/initialize ─────────────────────────────────

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, update
@@ -7,8 +7,8 @@ from typing import Optional
 from datetime import datetime, timezone, timedelta
 import base64
 
-from api.deps import get_db, get_current_user
-from api.models import User, Assessment
+from api.deps import get_db, get_current_user, limiter
+from api.models import CreditTransaction, User, Assessment
 from api.scoring import compute_all_ratios
 from api.claude import extract_figures, extract_rating, extract_cp_terms, generate_narrative
 from api.report import build_pdf
@@ -77,7 +77,8 @@ async def _check_quota(user: User, db: AsyncSession = None) -> None:
         )
 
 
-async def _decrement_credits(user: User, db: AsyncSession) -> None:
+async def _decrement_credits(user: User, db: AsyncSession, assessment_id: int = None) -> None:
+
     result = await db.execute(
         update(User)
         .where(and_(User.id == user.id, User.credits > 0))
@@ -85,9 +86,9 @@ async def _decrement_credits(user: User, db: AsyncSession) -> None:
         .returning(User.credits)
     )
     updated = result.fetchone()
-    await db.commit()
 
     if not updated:
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail={
@@ -95,6 +96,19 @@ async def _decrement_credits(user: User, db: AsyncSession) -> None:
                 "message"      : "You have 0 credits remaining. Please purchase a credit pack to continue.",
             },
         )
+
+    # Log the debit — completes the ledger
+    db.add(CreditTransaction(
+        user_email       = user.email,
+        tenant_id        = user.tenant_id,
+        pack             = user.plan,
+        credits_added    = -1,
+        amount_kobo      = 0,
+        transaction_type = "usage",
+        assessment_id    = assessment_id,
+        expires_at       = datetime.now(timezone.utc),  # not meaningful for debits but non-null
+    ))
+    await db.commit()
 
 
 def _validate_pdf(file: UploadFile, content: bytes) -> None:
@@ -119,7 +133,9 @@ async def _get_draft(assessment_id: int, email: str, tenant_id: int, db: AsyncSe
 
 # ── POST /assessment/extract ──────────────────────────────────
 @router.post("/extract")
+@limiter.limit("10/minute")
 async def extract(
+    request       : Request,
     financial_pdf : UploadFile           = File(...),
     rating_pdf    : Optional[UploadFile] = File(None),
     cp_terms_pdf  : Optional[UploadFile] = File(None),
@@ -130,6 +146,7 @@ async def extract(
 ):
     user = await _get_user(current_user["email"], current_user["tenant_id"], db)
     await _check_quota(user, db)
+    await _decrement_credits(user, db)
 
     fin_bytes = await financial_pdf.read()
     _validate_pdf(financial_pdf, fin_bytes)
@@ -138,6 +155,12 @@ async def extract(
     try:
         figures = await extract_figures(fin_b64)
     except RuntimeError as e:
+        await db.execute(
+            update(User)
+            .where(User.id == user.id)
+            .values(credits=User.credits + 1)
+        )
+        await db.commit()
         raise HTTPException(status_code=502, detail=str(e))
 
     result = {"figures": figures}
@@ -188,7 +211,9 @@ async def extract(
 
 # ── POST /assessment/extract-cp ───────────────────────────────
 @router.post("/extract-cp")
+@limiter.limit("10/minute")
 async def extract_cp(
+    request      : Request,
     cp_terms_pdf : UploadFile   = File(...),
     current_user : dict         = Depends(get_current_user),
     db           : AsyncSession = Depends(get_db),
@@ -204,7 +229,9 @@ async def extract_cp(
 
 # ── POST /assessment/run ──────────────────────────────────────
 @router.post("/run")
+@limiter.limit("10/minute")
 async def run_assessment(
+    request      : Request,
     body         : RunAssessmentBody,
     current_user : dict          = Depends(get_current_user),
     db           : AsyncSession  = Depends(get_db),
@@ -238,6 +265,8 @@ async def run_assessment(
 
     score_result = compute_all_ratios(body.figures)
 
+    score_result = compute_all_ratios(body.figures)
+
     client_info = {
         **body.clientInfo,
         "totalScore": score_result["total_score"],
@@ -252,8 +281,6 @@ async def run_assessment(
         )
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e))
-
-    await _decrement_credits(user, db)
 
     # Update existing draft or create new assessment
     assessment = None
@@ -294,6 +321,19 @@ async def run_assessment(
     await db.commit()
     await db.refresh(assessment)
 
+    # Back-fill assessment_id on the ledger debit row
+    await db.execute(
+        update(CreditTransaction)
+        .where(and_(
+            CreditTransaction.user_email        == current_user["email"],
+            CreditTransaction.tenant_id         == current_user["tenant_id"],
+            CreditTransaction.transaction_type  == "usage",
+            CreditTransaction.assessment_id     == None,
+        ))
+        .values(assessment_id=assessment.id)
+    )
+    await db.commit()
+
     return {
         "assessmentId": assessment.id,
         "totalScore"  : score_result["total_score"],
@@ -318,6 +358,7 @@ async def generate_report(
             Assessment.id         == body.assessment_id,
             Assessment.user_email == current_user["email"],
             Assessment.tenant_id  == current_user["tenant_id"],
+            Assessment.deleted_at == None,
         ))
     )
     assessment = result.scalar_one_or_none()

@@ -6,7 +6,7 @@ import ReviewData from "../components/steps/ReviewData.jsx";
 import Scores from "../components/steps/Scores.jsx";
 import Result from "../components/steps/Result.jsx";
 import Dashboard from "../components/Dashboard.jsx";
-import { LogOut, BookOpen, LayoutDashboard, X, Zap, Shield, MessageCircle, ChevronDown, User, Mail } from "lucide-react";
+import { LogOut, BookOpen, LayoutDashboard, X, Zap, Shield, MessageCircle, ChevronDown, User, Mail, Plus, AlertTriangle } from "lucide-react";
 import LegalModal from "../components/LegalModal.jsx";
 import { getQuotaStatus } from "../api/client.js";
 import Onboarding, { useOnboardingDone } from "../components/Onboarding.jsx";
@@ -60,10 +60,11 @@ export default function AppPage() {
   const [showContact,     setShowContact]     = useState(false);
   const [quota, setQuota]             = useState(null);
   const [showOnboarding, setShowOnboarding] = useState(() => !useOnboardingDone());
+  const [confirmNewTop,  setConfirmNewTop]  = useState(false);
 
   useEffect(() => {
     getQuotaStatus().then((res) => setQuota(res.data)).catch(() => {});
-  }, [scoreResult]);
+  }, []);
 
   useEffect(() => {
     if (draftId || Object.keys(figures).length > 0) return;
@@ -182,7 +183,7 @@ export default function AppPage() {
           <div style={{ color:"#999", fontSize:12 }}>Commercial Paper Risk Assessment</div>
         </div>
       </div>
-      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+       <div style={{ display:"flex", alignItems:"center", gap:8 }}>
         {quota && (
           <div className="sr-hdr-credits" style={{
             fontSize:11, padding:"4px 10px", borderRadius:5,
@@ -193,6 +194,14 @@ export default function AppPage() {
           }}>
             {quota.credits} credit{quota.credits !== 1 ? "s" : ""} remaining · {quota.plan}
           </div>
+        )}
+        <span className="sr-hdr-btn">
+          <HdrBtn icon={<Zap size={13}/>} label="Buy Credits" onClick={() => navigate("/pricing")} />
+        </span>
+        {step > 0 && (
+          <span className="sr-hdr-btn">
+            <HdrBtn icon={<Plus size={13}/>} label="New Assessment" onClick={() => setConfirmNewTop(true)} />
+          </span>
         )}
         <span className="sr-hdr-btn"><HdrBtn icon={<LayoutDashboard size={13}/>} label="Past Assessments" onClick={() => setShowDash(true)} /></span>
         <button onClick={() => setMobileMenu(v => !v)}
@@ -237,7 +246,6 @@ export default function AppPage() {
                 <DropItem icon={<BookOpen size={13}/>}      label="User Guide" onClick={() => { setShowUserMenu(false); setShowGuide(true); }} />
                 <DropItem icon={<MessageCircle size={13}/>} label="FAQ"        onClick={() => { setShowUserMenu(false); setShowFaq(true); }} />
                 <div style={{ borderTop:"1px solid #2e3f6e", margin:"4px 0" }} />
-                <DropItem icon={<Zap size={13}/>}           label="Buy Credits" onClick={() => { setShowUserMenu(false); navigate("/pricing"); }} />
                 {["admin","superadmin"].includes(user?.role) && (
                   <DropItem icon={<Shield size={13}/>}  label="Admin Panel" onClick={() => { setShowUserMenu(false); navigate("/admin"); }} />
                 )}
@@ -333,7 +341,7 @@ export default function AppPage() {
         figures={figures}
         onFiguresChange={setFigures}
         onContinue={() => setStep(1)}
-        onExtracted={(figs, updatedInfo, newDraftId) => {
+         onExtracted={(figs, updatedInfo, newDraftId) => {
           setFigures(figs);
           setExtractedFigures(figs);
           if (updatedInfo) setClientInfo(updatedInfo);
@@ -341,6 +349,7 @@ export default function AppPage() {
             setDraftId(newDraftId);
             try { sessionStorage.setItem("sr_draftId", String(newDraftId)); } catch {}
           }
+          getQuotaStatus().then((res) => setQuota(res.data)).catch(() => {});
         }}
         draftId={draftId}
         onQuotaError={(msg) => setQuotaMsg(msg)}
@@ -423,6 +432,21 @@ export default function AppPage() {
       {mobileMenuEl}
       <div className="sr-stepper sr-stepper-scroll">{stepper}</div>
       <div style={{ maxWidth:960, margin:"0 auto", width:"100%", padding:"16px 12px 0" }} className="sr-content-pad">
+        {quota && quota.credits < 2 && (
+          <div style={{ marginBottom:12, padding:"10px 16px", borderRadius:8, background:"#FFF8E1", border:"1px solid #FFD54F", display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, flexWrap:"wrap" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+              <Zap size={15} color="#d4820a" />
+              <span style={{ fontSize:13, color:"#7B4F00", fontWeight:600 }}>
+                {quota.credits === 0 ? "You have no credits remaining." : "You have 1 credit remaining."}
+              </span>
+              <span style={{ fontSize:12, color:"#7B4F00" }}>Top up to continue running assessments.</span>
+            </div>
+            <button onClick={() => navigate("/pricing")}
+              style={{ padding:"6px 16px", fontSize:12, borderRadius:6, cursor:"pointer", border:"none", background:"#d4820a", color:"#fff", fontFamily:"Arial,sans-serif", fontWeight:600, whiteSpace:"nowrap" }}>
+              Buy Credits
+            </button>
+          </div>
+        )}
         {draftOffer && (
           <div style={{ marginBottom:16, padding:"14px 18px", borderRadius:8, background:"#FEF6E7", border:"1px solid #F0C060", display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, flexWrap:"wrap" }}>
             <div>
@@ -502,6 +526,25 @@ export default function AppPage() {
         <Modal onClose={() => setShowDash(false)} title="Past Assessments" maxWidth={1100}>
           <Dashboard />
         </Modal>
+      )}
+
+      {/* Header New Assessment confirm */}
+      {confirmNewTop && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:99999, display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+          <div style={{ background:"#fff", borderRadius:10, padding:"28px 32px", maxWidth:420, width:"100%", boxShadow:"0 16px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+              <AlertTriangle size={22} color="#d4820a" />
+              <div style={{ fontSize:15, fontWeight:"bold", color:"#1F2854" }}>Start New Assessment?</div>
+            </div>
+            <p style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.75, marginBottom:20 }}>
+              This will clear all current data. Make sure you have downloaded your report before proceeding.
+            </p>
+            <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+              <button onClick={() => setConfirmNewTop(false)} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#5A5A5A", fontFamily:"Arial,sans-serif" }}>Cancel</button>
+              <button onClick={() => { setConfirmNewTop(false); startNew(); }} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"none", background:"#1F2854", color:"#fff", fontFamily:"Arial,sans-serif", fontWeight:600 }}>Yes, start new</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Contact modal */}

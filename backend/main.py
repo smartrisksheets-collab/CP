@@ -16,7 +16,6 @@ ENVIRONMENT     = os.getenv("ENVIRONMENT", "development")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Create all tables on startup if they don't exist
-    # In production this is handled by Alembic migrations
     if ENVIRONMENT == "development":
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
