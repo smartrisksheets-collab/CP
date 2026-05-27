@@ -60,7 +60,8 @@ export default function AppPage() {
   const [showContact,     setShowContact]     = useState(false);
   const [quota, setQuota]             = useState(null);
   const [showOnboarding, setShowOnboarding] = useState(() => !useOnboardingDone());
-  const [confirmNewTop,  setConfirmNewTop]  = useState(false);
+  const [confirmNewTop,   setConfirmNewTop]   = useState(false);
+  const [showAssessMenu,  setShowAssessMenu]  = useState(false);
 
   useEffect(() => {
     getQuotaStatus().then((res) => setQuota(res.data)).catch(() => {});
@@ -198,12 +199,35 @@ export default function AppPage() {
         <span className="sr-hdr-btn">
           <HdrBtn icon={<Zap size={13}/>} label="Buy Credits" onClick={() => navigate("/pricing")} />
         </span>
-        {step > 0 && (
-          <span className="sr-hdr-btn">
-            <HdrBtn icon={<Plus size={13}/>} label="New Assessment" onClick={() => setConfirmNewTop(true)} />
-          </span>
-        )}
-        <span className="sr-hdr-btn"><HdrBtn icon={<LayoutDashboard size={13}/>} label="Past Assessments" onClick={() => setShowDash(true)} /></span>
+        <span className="sr-hdr-btn" style={{ position:"relative" }}>
+          <button
+            onClick={() => setShowAssessMenu(v => !v)}
+            style={{ background:"none", border:"1px solid #3a4a7a", color:"#ccc", fontSize:11, padding:"5px 10px", borderRadius:5, cursor:"pointer", display:"flex", alignItems:"center", gap:5, fontFamily:"Arial,sans-serif" }}
+          >
+            <LayoutDashboard size={13}/> Assessment <ChevronDown size={11} style={{ opacity:0.6 }} />
+          </button>
+          {showAssessMenu && (
+            <>
+              <div onClick={() => setShowAssessMenu(false)} style={{ position:"fixed", inset:0, zIndex:199 }} />
+              <div style={{ position:"absolute", top:"calc(100% + 6px)", right:0, background:"#1a2347", border:"1px solid #2e3f6e", borderRadius:8, minWidth:170, zIndex:200, boxShadow:"0 8px 24px rgba(0,0,0,0.4)", overflow:"hidden" }}>
+                <button onClick={() => { setShowAssessMenu(false); setShowDash(true); }}
+                  style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"10px 14px", background:"none", border:"none", color:"#ccc", fontSize:12, cursor:"pointer", fontFamily:"Arial,sans-serif" }}
+                  onMouseEnter={e => e.currentTarget.style.background="rgba(255,255,255,0.06)"}
+                  onMouseLeave={e => e.currentTarget.style.background="none"}>
+                  <LayoutDashboard size={13}/> Past Assessments
+                </button>
+                {step > 0 && (
+                  <button onClick={() => { setShowAssessMenu(false); setConfirmNewTop(true); }}
+                    style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"10px 14px", background:"none", border:"none", color:"#ccc", fontSize:12, cursor:"pointer", fontFamily:"Arial,sans-serif" }}
+                    onMouseEnter={e => e.currentTarget.style.background="rgba(255,255,255,0.06)"}
+                    onMouseLeave={e => e.currentTarget.style.background="none"}>
+                    <Plus size={13}/> New Assessment
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </span>
         <button onClick={() => setMobileMenu(v => !v)}
           className="sr-hamburger"
           aria-label="Menu"
