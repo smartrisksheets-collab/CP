@@ -1,6 +1,6 @@
 import asyncio
-from sqlalchemy import select
-from api.db import SessionLocal, engine, Base
+from sqlalchemy import inspect, select
+from api.db import SessionLocal, engine
 from api.models import Tenant
 from dotenv import load_dotenv
 
@@ -71,8 +71,11 @@ TENANTS = [
 
 
 async def seed():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # Tables come from Alembic; stop early with a clear message if they are missing
+    async with engine.connect() as conn:
+        has_schema = await conn.run_sync(lambda c: inspect(c).has_table("alembic_version"))
+    if not has_schema:
+        raise SystemExit("Schema missing. Run: alembic upgrade head")
 
     async with SessionLocal() as db:
         for data in TENANTS:

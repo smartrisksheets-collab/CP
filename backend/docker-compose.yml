@@ -1,3 +1,4 @@
+name: smartrisk-cp
 services:
   db:
     image: postgres:16

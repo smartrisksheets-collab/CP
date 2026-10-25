@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 import os
 
-from api.db import engine, Base
+from api.db import engine
 from api.routes import auth, assessment, quota, tenant, register, payments, admin
 
 load_dotenv()
@@ -15,10 +15,7 @@ ENVIRONMENT     = os.getenv("ENVIRONMENT", "development")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create all tables on startup if they don't exist
-    if ENVIRONMENT == "development":
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+    # Schema is managed by Alembic (alembic upgrade head), not created here
     yield
     await engine.dispose()
 
