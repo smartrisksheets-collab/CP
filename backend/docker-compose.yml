@@ -1,0 +1,13 @@
+services:
+  db:
+    image: postgres:16
+    container_name: smartrisk-db
+    environment:
+      POSTGRES_PASSWORD: localpass
+      POSTGRES_DB: smartrisk
+    ports:
+      - "5433:5432"
+    volumes:
+      - smartrisk-pg:/var/lib/postgresql/data
+volumes:
+  smartrisk-pg:
