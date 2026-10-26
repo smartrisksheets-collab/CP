@@ -57,7 +57,8 @@ export default function Register() {
       }
     } catch (e) {
       const detail = e.response?.data?.detail;
-      setGlobalErr(typeof detail === "string" ? detail : "Registration failed. Please try again.");
+      if (e.response?.status === 429) setGlobalErr("Too many sign-up attempts. Please wait an hour and try again.");
+      else setGlobalErr(typeof detail === "string" ? detail : "Registration failed. Please try again.");
     } finally {
       setLoading(false);
     }
