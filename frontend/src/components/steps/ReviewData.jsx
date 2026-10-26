@@ -134,12 +134,13 @@ export default function ReviewData({ figures, onChange, onBack, onNext, draftId 
       </div>
 
       <div style={css.card}>
-        <div style={css.title}>Interest Rates</div>
+        <div style={css.title}>Finance Cost &amp; Interest Rates</div>
         <div style={css.grid}>
+          <Field label="Finance Cost (₦'000)" id="financeCost" figures={figures} onChange={set} />
           <Field label="Short-term debt rate (%)" id="shortTermInterestRate" figures={figures} onChange={set} step="0.1" placeholder="e.g. 13.5" manual />
           <Field label="Long-term debt rate (%)" id="longTermInterestRate" figures={figures} onChange={set} step="0.1" placeholder="e.g. 17.5" manual />
         </div>
-        <div style={{ fontSize:11, color:"#888", marginTop:8 }}>Enter as percentage e.g. 13.5 for 13.5%. The scoring engine converts to decimal automatically.</div>
+        <div style={{ fontSize:11, color:"#888", marginTop:8 }}>Interest coverage uses the reported finance cost. Rates are only used when finance cost is empty; enter them as a percentage, e.g. 13.5 for 13.5%.</div>
       </div>
 
       <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:20 }}>

@@ -743,7 +743,7 @@ function UserGuidePage({ onBack }) {
     ["Debt to Asset Ratio",     5,  "What proportion of total assets is funded by debt. A low ratio means creditors have a large cushion if assets need to be liquidated.",                  "< 30%"],
     ["Debt to Capital Ratio",   5,  "The share of total capital (debt + equity) that is debt-funded. Measures structural leverage and the buffer available to absorb losses.",               "< 30%"],
     ["Interest Coverage Ratio", 6,  "How many times operating profit covers interest charges. A ratio below 1.5x means most of operating profit is consumed by interest — a major red flag.", "> 5.0x"],
-    ["Debt Service Coverage",   7,  "EBITDA relative to total debt stock. A low ratio means the company generates strong cash flow relative to its debt — favourable for a CP investor.",   "< 0.5x*"],
+    ["Debt Service Coverage",   7,  "EBITDA against the debt service due within 12 months (finance cost plus short-term debt, including commercial papers). Below 1.0x means earnings do not cover what falls due this year.",   ">= 1.5x"],
     ["Net Debt / EBITDA",       7,  "How many years of operating cash flow would be needed to repay all net debt. The most widely used leverage metric by Nigerian rating agencies.",        "< 2.0x"],
     ["Altman Z-Score",         10,  "A multi-factor bankruptcy predictor combining working capital, retained earnings, profitability, leverage, and asset turnover. Score above 3 indicates low distress risk.", "> 3.0"],
   ];
@@ -844,9 +844,6 @@ function UserGuidePage({ onBack }) {
               </tbody>
             </table>
           </div>
-          <p style={{ fontSize:11, color:"#888", marginTop:10, lineHeight:1.6 }}>
-            * DSCR scoring is inverted by design: a very low DSCR (e.g. &lt;0.5x) means the company has minimal debt relative to EBITDA, which is favourable. A very high DSCR means the company is heavily leveraged, which attracts a penalty score.
-          </p>
         </div>
 
         {/* Meets Threshold vs Below Threshold */}

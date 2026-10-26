@@ -23,3 +23,13 @@
 - New Render web service on dev with Supabase session pooler; env PYTHON_VERSION=3.11.9, exact ALLOWED_ORIGINS
 - No code changes
 - Decisions: D011, D012
+
+## 2026-10-26 AI model upgrade and cleanups
+- Changed: backend/api/claude.py, backend/requirements.txt (anthropic==0.125.0), backend/main.py
+- Removed: backend/render.yaml
+- Decisions: D013 to D015
+
+## 2026-10-26 Scoring fixes
+- Changed: backend/api/scoring.py, backend/api/report.py, backend/api/claude.py (prompt, narrative DSCR), frontend/src/components/steps/Scores.jsx, ReviewData.jsx, frontend/src/pages/AppPage.jsx
+- Checks: Veritasi figures give ICR 1.89x (4 pts), DSCR 0.44x (0 pts); edge cases (no debt, negative cost, missing cost, negative EBITDA, string values) pass; npm run build passes; no new lint issues (18 pre-existing); app starts
+- Decisions: D016 to D018

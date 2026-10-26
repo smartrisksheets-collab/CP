@@ -268,7 +268,7 @@ def _build_elements(assessment: Assessment):
     net_debt_ebitda = _fmt_x(net_debt / ebitda) if ebitda > 0 else "N/A"
     st_int          = _n(f.get("shortTermDebt")) * _n(f.get("shortTermInterestRate"))
     lt_int          = _n(f.get("longTermDebt"))  * _n(f.get("longTermInterestRate"))
-    total_int       = st_int + lt_int
+    total_int       = abs(_n(f.get("financeCost"))) or (st_int + lt_int)
     icr             = _fmt_x(_n(f.get("ebit")) / total_int) if total_int > 0 else "N/A"
 
     score      = assessment.total_score or 0

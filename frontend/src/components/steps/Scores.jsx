@@ -33,6 +33,8 @@ function computeLocal(f) {
   const ltRate = n(f.longTermInterestRate)  > 1 ? n(f.longTermInterestRate)  / 100 : n(f.longTermInterestRate);
 
   const td = n(f.shortTermDebt) + n(f.longTermDebt);
+  // Reported finance cost first; debt x rates only as a fallback (mirrors backend)
+  const interest = Math.abs(n(f.financeCost)) || ((n(f.shortTermDebt)*stRate)+(n(f.longTermDebt)*ltRate));
 
   const checks = [
     { name:"Acid-Test Ratio",           benchmark:"≥ 1x",    max:2,  val:(n(f.cash)+n(f.inventory)-n(f.prepaidExpenses))/Math.max(n(f.currentLiabilities),1), fmt:(v)=>v.toFixed(2)+"x", band:(v)=>v<1?"< 1x":v<=1.5?"1 - 1.5x":"> 1.5x", score:(v)=>v<1?-2:v<=1.5?1:2 },
@@ -41,8 +43,8 @@ function computeLocal(f) {
     { name:"Return on Assets",          benchmark:"≥ 15%",   max:5,  val:(n(f.netIncome)/Math.max(n(f.totalAssets),1))*100, fmt:(v)=>v.toFixed(1)+"%", band:(v)=>v<3?"< 3%":v<=6?"3-6%":v<=10?"6.1-10%":v<=15?"10.1-15%":"> 15%", score:(v)=>v<3?0:v<=6?1:v<=10?2:v<=15?4:5 },
     { name:"Debt to Asset Ratio",       benchmark:"< 30%",   max:5,  val:(td/Math.max(n(f.totalAssets),1))*100,   fmt:(v)=>v.toFixed(1)+"%", band:(v)=>v<30?"< 30%":v<=50?"30.1-50%":v<=75?"50.1-75%":v<=100?"75.1-100%":"> 100%", score:(v)=>v<30?5:v<=50?3:v<=75?2:v<=100?0:0 },
     { name:"Debt to Capital Ratio",     benchmark:"< 30%",   max:5,  val:(td/Math.max(td+n(f.shareholdersEquity),1))*100, fmt:(v)=>v.toFixed(1)+"%", band:(v)=>v<30?"< 30%":v<=50?"30.1-50%":v<=75?"50.1-75%":v<=100?"75.1-100%":"> 100%", score:(v)=>v<30?5:v<=50?2:v<=75?1:v<=100?0:0 },
-    { name:"Interest Coverage Ratio",   benchmark:"> 5.0x",  max:6,  val:(()=>{ const int=(n(f.shortTermDebt)*stRate)+(n(f.longTermDebt)*ltRate); return int>0?n(f.ebit)/int:null; })(), fmt:(v)=>v===null?"N/A":v.toFixed(2)+"x", band:(v)=>v===null?"Not available":v<1?"< 1.0x":v<=1.5?"1.0-1.5x":v<=3?"1.6-3.0x":v<=5?"3.1-5.0x":"> 5.0x", score:(v)=>v===null?0:v<1?-5:v<=1.5?2:v<=3?4:v<=5?5:6 },
-    { name:"Debt Service Coverage",     benchmark:"< 0.5x",  max:7,  val:td>0?n(f.ebitda)/td:0, fmt:(v)=>v.toFixed(2)+"x", band:(v)=>v<0.5?"< 0.5x":v<=1?"0.5-1.0x":v<=2?"1.1-2.0x":v<=3.5?"2.1-3.5x":v<=5?"3.6-5.0x":"> 5.0x", score:(v)=>v<0.5?7:v<=1?4:v<=2?3:v<=3.5?1:v<=5?0:0 },
+    { name:"Interest Coverage Ratio",   benchmark:"> 5.0x",  max:6,  val:interest>0?n(f.ebit)/interest:null, fmt:(v)=>v===null?"N/A":v.toFixed(2)+"x", band:(v)=>v===null?"Not available":v<1?"< 1.0x":v<=1.5?"1.0-1.5x":v<=3?"1.6-3.0x":v<=5?"3.1-5.0x":"> 5.0x", score:(v)=>v===null?0:v<1?-5:v<=1.5?2:v<=3?4:v<=5?5:6 },
+    { name:"Debt Service Coverage",     benchmark:">= 1.5x", max:7,  val:(()=>{ const ds=interest+n(f.shortTermDebt); return ds>0?n(f.ebitda)/ds:(td>0?null:Infinity); })(), fmt:(v)=>v===null?"N/A":v===Infinity?"No debt":v.toFixed(2)+"x", band:(v)=>v===null?"Not available":v===Infinity?"No debt service":v>=1.5?">= 1.5x":v>=1.25?"1.25-1.49x":v>=1?"1.0-1.24x":"< 1.0x", score:(v)=>v===null?0:v>=1.5?7:v>=1.25?5:v>=1?3:0 },
     { name:"Debt to EBITDA",            benchmark:"< 2x",    max:7,  val:n(f.ebitda)>0?(td-n(f.cash))/n(f.ebitda):0, fmt:(v)=>v.toFixed(2)+"x", band:(v)=>v<2?"< 2x":v<=3?"2.1-3.0x":v<=3.5?"3.1-3.5x":v<=4?"3.6-4.0x":"> 4.1x", score:(v)=>v<2?7:v<=3?3:v<=3.5?2:v<=4?0:-5 },
     { name:"Altman Z-Score",            benchmark:"≥ 3",     max:10, val:(()=>{ const ta=Math.max(n(f.totalAssets),1); const wc=n(f.currentAssets)-n(f.currentLiabilities); return 1.2*(wc/ta)+1.4*(n(f.retainedEarnings)/ta)+3.3*(n(f.ebit)/ta)+0.6*(n(f.shareholdersEquity)/Math.max(n(f.totalLiabilities),1))+1.0*(n(f.revenue)/ta); })(), fmt:(v)=>v.toFixed(2), band:(v)=>v<1.8?"< 1.8":v<=2.9?"1.8-2.9":"> 3", score:(v)=>v<1.8?-10:v<=2.9?5:10 },
   ];
