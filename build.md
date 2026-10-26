@@ -7,5 +7,10 @@
 
 ## 2026-10-25 P2 Cutover
 - Changed: backend/main.py, backend/seed.py (create_all removed), backend/docker-compose.yml (project name)
-- New: build.md, decision.md, migration_state.md, session_archive.md (root files skipped from P1 because the patch was applied from backend/)
+- New: build.md, decision.md, migration_state.md, session_archive.md (P1 copies were created but not committed)
 - Decisions: D005, D006
+
+## 2026-10-26 P3 Supabase
+- Changed: backend/api/db.py (DB_POOL_SIZE, DB_MAX_OVERFLOW)
+- Removed: p2-cutover.patch (committed to repo root by mistake)
+- Decisions: D007, D008

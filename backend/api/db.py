@@ -9,10 +9,14 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL not set in .env")
 
+# Kept small so all workers fit under the Supabase session pooler limit.
+POOL_SIZE    = int(os.getenv("DB_POOL_SIZE", "5"))
+MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "5"))
+
 engine = create_async_engine(
     DATABASE_URL,
-    pool_size=10,
-    max_overflow=20,
+    pool_size=POOL_SIZE,
+    max_overflow=MAX_OVERFLOW,
     pool_pre_ping=True,   # drops stale connections before use
     echo=False,
 )

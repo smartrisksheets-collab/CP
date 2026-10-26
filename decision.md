@@ -7,6 +7,8 @@
 - D004 2026-10-25 Pin greenlet in requirements.txt
 - D005 2026-10-25 Local database is Docker Postgres 16 on port 5433, never SQLite
 - D006 2026-10-25 Alembic is the only schema source; app and seed never create tables
+- D007 2026-10-26 App and Alembic both use the Supabase session pooler, not the transaction pooler
+- D008 2026-10-26 DB pool size set by DB_POOL_SIZE and DB_MAX_OVERFLOW, default 5 and 5
 
 ## D001 Start Supabase empty
 Render database is suspended for non-payment and unreachable. User confirmed the app stores no data worth keeping. Tenants are recreated by backend/seed.py. Edge cases: no stamping of an existing schema needed; tenant rows must exist before any login, so seed runs after upgrade head.
@@ -25,3 +27,9 @@ Models use JSONB and ARRAY and the engine is asyncpg, so SQLite cannot run the a
 
 ## D006 Alembic is the only schema source
 create_all removed from backend/main.py lifespan and backend/seed.py. Migrations run explicitly with alembic upgrade head; they are not run on app startup, so several workers never race on DDL. Edge cases: seed.py on an unmigrated database exits with "Schema missing. Run: alembic upgrade head"; seed stays idempotent (update by hostname); production startup unchanged apart from no DDL.
+
+## D007 Session pooler for app and Alembic
+Render runs a persistent FastAPI server, which matches Supabase's session pooler (port 5432 on aws-1-eu-central-1.pooler.supabase.com, IPv4). The transaction pooler (6543) was tested in the sandbox through PgBouncer in transaction mode: 130 of 200 concurrent queries failed with "prepared statement does not exist", even with asyncpg statement_cache_size=0 and unique statement names. Session mode: 0 of 200 failed. Edge cases: Supabase direct connection not used (IPv6); MIGRATION_DATABASE_URL may equal DATABASE_URL; Supavisor itself could not be tested in the sandbox.
+
+## D008 Pool size from environment
+backend/api/db.py had pool_size 10 plus max_overflow 20 (30 connections per worker), too many for a free tier session pool. Now DB_POOL_SIZE (default 5) and DB_MAX_OVERFLOW (default 5). Edge case: total across workers must stay under the pool size shown in Supabase Database settings.
