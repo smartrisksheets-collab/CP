@@ -14,3 +14,7 @@
 - Changed: backend/api/db.py (DB_POOL_SIZE, DB_MAX_OVERFLOW)
 - Removed: p2-cutover.patch (committed to repo root by mistake)
 - Decisions: D007, D008
+
+## 2026-10-26 P3 RLS
+- New: backend/alembic/versions/0002_enable_rls.py, backend/alembic/sql/0002_enable_rls.sql
+- Decisions: D009, D010

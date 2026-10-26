@@ -9,6 +9,8 @@
 - D006 2026-10-25 Alembic is the only schema source; app and seed never create tables
 - D007 2026-10-26 App and Alembic both use the Supabase session pooler, not the transaction pooler
 - D008 2026-10-26 DB pool size set by DB_POOL_SIZE and DB_MAX_OVERFLOW, default 5 and 5
+- D009 2026-10-26 RLS enabled on every table with no policies (0002_enable_rls)
+- D010 2026-10-26 Supabase schema changes are run by the user as SQL in the editor
 
 ## D001 Start Supabase empty
 Render database is suspended for non-payment and unreachable. User confirmed the app stores no data worth keeping. Tenants are recreated by backend/seed.py. Edge cases: no stamping of an existing schema needed; tenant rows must exist before any login, so seed runs after upgrade head.
@@ -33,3 +35,10 @@ Render runs a persistent FastAPI server, which matches Supabase's session pooler
 
 ## D008 Pool size from environment
 backend/api/db.py had pool_size 10 plus max_overflow 20 (30 connections per worker), too many for a free tier session pool. Now DB_POOL_SIZE (default 5) and DB_MAX_OVERFLOW (default 5). Edge case: total across workers must stay under the pool size shown in Supabase Database settings.
+Pool math (Supabase Nano, pool size 15): one uvicorn worker uses at most 10, Alembic 1. With 2 workers set DB_POOL_SIZE=3 and DB_MAX_OVERFLOW=3.
+
+## D009 RLS on, no policies
+Supabase exposes the public schema through its Data API to the anon and authenticated roles. RLS with no policies denies them every row. The app connects as the owner role, which RLS does not apply to, so app behaviour is unchanged. Sandbox: as a non-superuser owner, seed and app worked and 200 concurrent queries passed; a separate role with table grants saw 0 tenants and its insert was rejected by RLS. Edge case: FORCE ROW LEVEL SECURITY must never be added, or the app would be blocked too. alembic_version also gets RLS.
+
+## D010 SQL editor workflow
+Each migration still gets an Alembic revision (keeps local Docker and alembic_version consistent) plus backend/alembic/sql/<revision>.sql produced with alembic upgrade --sql, which includes the alembic_version update. The user runs that SQL in the Supabase SQL editor. The revision file must be pushed in the same change, otherwise alembic upgrade head on Render fails with "Can't locate revision".
