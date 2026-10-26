@@ -1,8 +1,8 @@
 # Migration State
 
 ## Current
-- Phase: P3 Supabase (schema and seed on Supabase confirmed by user; 0002_enable_rls delivered)
-- Gates: P1 VERIFIED | P2 VERIFIED | P3 PENDING (until 0002 is on dev and run in the SQL editor) | P4 LOCKED
+- Phase: P4 Switch done on dev; merging dev to main
+- Gates: P1 VERIFIED | P2 VERIFIED | P3 VERIFIED | P4 PENDING (until main deploys on Render and both tenants pass)
 - Supabase: Frankfurt (eu-central-1), session pooler aws-1-eu-central-1.pooler.supabase.com:5432
 - Render: new web service in workspace Smarkrisk Pulse_v2, Frankfurt
 - Head revision: 0002_enable_rls
@@ -15,7 +15,7 @@
 3. backend/api/db.py
 
 ## Next task
-P4 Switch: create Render web service (Python 3, root backend, start alembic upgrade head && uvicorn), set env vars incl. DATABASE_URL (session pooler) and DB_POOL_SIZE, merge dev to main, smoke test both tenants.
+After merge: switch Render branch to main, smoke test /tenant on both hostnames, OTP login, one assessment and PDF. Then the migration project is complete. Optional cleanup: update or delete stale backend/render.yaml; trim spaces in ALLOWED_ORIGINS parsing in backend/main.py.
 
 ## Last 3 sessions
 ### 2026-10-25
@@ -24,3 +24,5 @@ P4 Switch: create Render web service (Python 3, root backend, start alembic upgr
 ### 2026-10-26
 - P3: session pooler chosen over transaction pooler after sandbox test (D007); pool size from env (D008).
 - P3: Supabase schema and seed done (user confirmed tables visible). Added 0002_enable_rls (D009); SQL editor workflow (D010).
+### 2026-10-26 (P4)
+- Render web service (Pulse_v2 workspace, Frankfurt) on dev: build failed on greenlet until PYTHON_VERSION=3.11.9 was set (D011). /tenant smoke test passed. CORS 400 on OPTIONS fixed by exact ALLOWED_ORIGINS (D012). Login works.

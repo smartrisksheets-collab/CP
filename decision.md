@@ -11,6 +11,8 @@
 - D008 2026-10-26 DB pool size set by DB_POOL_SIZE and DB_MAX_OVERFLOW, default 5 and 5
 - D009 2026-10-26 RLS enabled on every table with no policies (0002_enable_rls)
 - D010 2026-10-26 Supabase schema changes are run by the user as SQL in the editor
+- D011 2026-10-26 Render pins Python with PYTHON_VERSION=3.11.9
+- D012 2026-10-26 ALLOWED_ORIGINS must match browser origins exactly
 
 ## D001 Start Supabase empty
 Render database is suspended for non-payment and unreachable. User confirmed the app stores no data worth keeping. Tenants are recreated by backend/seed.py. Edge cases: no stamping of an existing schema needed; tenant rows must exist before any login, so seed runs after upgrade head.
@@ -42,3 +44,9 @@ Supabase exposes the public schema through its Data API to the anon and authenti
 
 ## D010 SQL editor workflow
 Each migration still gets an Alembic revision (keeps local Docker and alembic_version consistent) plus backend/alembic/sql/<revision>.sql produced with alembic upgrade --sql, which includes the alembic_version update. The user runs that SQL in the Supabase SQL editor. The revision file must be pushed in the same change, otherwise alembic upgrade head on Render fails with "Can't locate revision".
+
+## D011 PYTHON_VERSION on Render
+Render's default Python had no prebuilt greenlet 3.1.1 wheel, so the build failed. PYTHON_VERSION=3.11.9 (matches backend/runtime.txt and the previous production runtime) fixed it. Pinning Python is safer than bumping greenlet alone, since asyncpg and weasyprint pins also target 3.11.
+
+## D012 Exact CORS origins
+backend/main.py splits ALLOWED_ORIGINS on commas with no trimming, so a space, trailing slash or wrong scheme makes the browser preflight (OPTIONS) return 400. Value used: https://assess.smartrisksheets.com,https://credit.smartrisksheets.com.

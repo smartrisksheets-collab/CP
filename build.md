@@ -18,3 +18,8 @@
 ## 2026-10-26 P3 RLS
 - New: backend/alembic/versions/0002_enable_rls.py, backend/alembic/sql/0002_enable_rls.sql
 - Decisions: D009, D010
+
+## 2026-10-26 P4 Switch
+- New Render web service on dev with Supabase session pooler; env PYTHON_VERSION=3.11.9, exact ALLOWED_ORIGINS
+- No code changes
+- Decisions: D011, D012
