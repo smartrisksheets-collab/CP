@@ -9,7 +9,7 @@ from api.routes import auth, assessment, quota, tenant, register, payments, admi
 
 load_dotenv()
 
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+ALLOWED_ORIGINS = [o.strip().rstrip("/") for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",") if o.strip()]
 ENVIRONMENT     = os.getenv("ENVIRONMENT", "development")
 
 

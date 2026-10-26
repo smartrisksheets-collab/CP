@@ -148,11 +148,16 @@ def _debt_to_capital(f: dict) -> RatioResult:
     )
 
 
-def _interest_coverage(f: dict) -> RatioResult:
-    interest = (
+def _interest(f: dict) -> float:
+    # Reported finance cost is audited and repeatable; debt x rates is only a fallback
+    return abs(_n(f.get("financeCost"))) or (
         _n(f.get("shortTermDebt")) * _n(f.get("shortTermInterestRate")) +
         _n(f.get("longTermDebt"))  * _n(f.get("longTermInterestRate"))
     )
+
+
+def _interest_coverage(f: dict) -> RatioResult:
+    interest = _interest(f)
 
     if interest <= 0:
         return RatioResult(
@@ -181,20 +186,32 @@ def _interest_coverage(f: dict) -> RatioResult:
 
 
 def _dscr(f: dict) -> RatioResult:
-    total_debt = _n(f.get("shortTermDebt")) + _n(f.get("longTermDebt"))
-    value      = (_n(f.get("ebitda")) / total_debt) if total_debt > 0 else 0
+    # Debt service due within 12 months: interest for the year plus short-term debt
+    debt_service = _interest(f) + _n(f.get("shortTermDebt"))
+    total_debt   = _n(f.get("shortTermDebt")) + _n(f.get("longTermDebt"))
 
-    if value < 0.5:      band, score = "< 0.5x",       7
-    elif value <= 1:     band, score = "0.5 - 1.0x",   4
-    elif value <= 2:     band, score = "1.1 - 2.0x",   3
-    elif value <= 3.5:   band, score = "2.1 - 3.5x",   1
-    elif value <= 5:     band, score = "3.6 - 5.0x",   0
-    else:                band, score = "> 5.0x",        0
+    if debt_service <= 0:
+        no_debt = total_debt <= 0
+        return RatioResult(
+            id="dscr", name="Debt Service Coverage Ratio", category="Coverage",
+            formula="EBITDA / (Finance Cost + Short-term Debt)",
+            benchmark=">= 1.5x", max_score=7,
+            value=0, display_value="No debt" if no_debt else "N/A",
+            band="No debt service" if no_debt else "Not available",
+            score=7 if no_debt else 0, passed=no_debt,
+        )
+
+    value = _n(f.get("ebitda")) / debt_service
+
+    if value >= 1.5:     band, score = ">= 1.5x",       7
+    elif value >= 1.25:  band, score = "1.25 - 1.49x",  5
+    elif value >= 1.0:   band, score = "1.0 - 1.24x",   3
+    else:                band, score = "< 1.0x",        0
 
     return RatioResult(
         id="dscr", name="Debt Service Coverage Ratio", category="Coverage",
-        formula="EBITDA / Total Debt",
-        benchmark="< 0.5x", max_score=7,
+        formula="EBITDA / (Finance Cost + Short-term Debt)",
+        benchmark=">= 1.5x", max_score=7,
         value=value, display_value=f"{value:.2f}x",
         band=band, score=score, passed=score > 0,
     )

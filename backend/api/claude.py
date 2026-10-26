@@ -5,9 +5,11 @@ import re
 import os
 from typing import Optional
 
-CLAUDE_MODEL   = "claude-sonnet-4-5"
-CLAUDE_TIMEOUT = 150  # seconds — narrative generation needs more headroom
-MAX_RETRIES    = 3
+CLAUDE_MODEL      = "claude-opus-5-5"
+CLAUDE_EFFORT     = "medium" # thinking is always on; effort sets its depth (raise to "high" if extraction misses figures)
+CLAUDE_MAX_TOKENS = 16000    # covers thinking plus the JSON reply
+CLAUDE_TIMEOUT    = 300      # seconds; thinking on long PDFs needs headroom
+MAX_RETRIES       = 3
 
 client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
@@ -27,33 +29,50 @@ def _parse_json(raw: str) -> dict:
         raise ValueError(f"Could not parse JSON from Claude response: {raw[:200]}")
 
 
+async def _create(content):
+    """One Messages call. fallbacks="default" re-runs a safety-declined request on a fallback model."""
+    return await client.beta.messages.create(
+        model=CLAUDE_MODEL,
+        max_tokens=CLAUDE_MAX_TOKENS,
+        output_config={"effort": CLAUDE_EFFORT},
+        betas=["server-side-fallback-2026-07-01"],
+        fallbacks="default",
+        messages=[{"role": "user", "content": content}],
+    )
+
+
+def _response_text(response) -> str:
+    """Join the text blocks; thinking blocks come first and carry no answer text."""
+    if response.stop_reason == "refusal":
+        raise RuntimeError("Claude declined to process this document. Please check the file and try again.")
+    if response.stop_reason == "max_tokens":
+        raise RuntimeError("Claude's response was cut off. Please try again.")
+    text = "".join(block.text for block in response.content if block.type == "text")
+    if not text.strip():
+        raise RuntimeError("Claude returned an empty response. Please try again.")
+    return text
+
+
 async def _call_with_pdf(base64_pdf: str, prompt: str) -> str:
     """Call Claude with a PDF document and a text prompt. Retries on 429."""
     delay = 8
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             response = await asyncio.wait_for(
-                client.messages.create(
-                    model=CLAUDE_MODEL,
-                    max_tokens=2000,
-                    messages=[{
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "document",
-                                "source": {
-                                    "type"      : "base64",
-                                    "media_type": "application/pdf",
-                                    "data"      : base64_pdf,
-                                },
-                            },
-                            {"type": "text", "text": prompt},
-                        ],
-                    }],
-                ),
+                _create([
+                    {
+                        "type": "document",
+                        "source": {
+                            "type"      : "base64",
+                            "media_type": "application/pdf",
+                            "data"      : base64_pdf,
+                        },
+                    },
+                    {"type": "text", "text": prompt},
+                ]),
                 timeout=CLAUDE_TIMEOUT,
             )
-            return response.content[0].text
+            return _response_text(response)
 
         except anthropic.RateLimitError:
             if attempt < MAX_RETRIES:
@@ -84,14 +103,10 @@ async def _call_text_only(prompt: str) -> str:
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             response = await asyncio.wait_for(
-                client.messages.create(
-                    model=CLAUDE_MODEL,
-                    max_tokens=2000,
-                    messages=[{"role": "user", "content": prompt}],
-                ),
+                _create(prompt),
                 timeout=CLAUDE_TIMEOUT,
             )
-            return response.content[0].text
+            return _response_text(response)
 
         except anthropic.RateLimitError:
             if attempt < MAX_RETRIES:
@@ -137,14 +152,14 @@ How to identify standalone figures:
 - Look for columns or sections labelled: Company, Parent Company, The Company, Standalone, or Entity.
 - Standalone statements are often presented FIRST, before or alongside consolidated statements.
 - If statements are on separate pages, the page heading will say "Company" or "Standalone".
-- In a multi-column layout, the Company column is typically the THIRD column (after Group 2024 and Group 2023).
-- The column order in Nigerian IFRS accounts is typically: Group 2024 | Group 2023 | Company 2024 | Company 2023.
+- In a multi-column layout, the Company column is typically the THIRD column (after the two Group columns).
+- The column order in Nigerian IFRS accounts is typically: Group current year | Group prior year | Company current year | Company prior year.
 - You MUST read the column headers carefully before extracting any figure.
 
 How to verify you have the right figures:
 - After extracting revenue, confirm it appears on the FACE of the Statement of Comprehensive Income
   as the top-line figure for the Company — not in a note, not in a segment table, not in consolidation workings.
-- If you see multiple revenue figures on the same page, use ONLY the one under the Company/Standalone 2024 column.
+- If you see multiple revenue figures on the same page, use ONLY the one under the Company/Standalone current year column.
 - Do NOT use figures from: elimination columns, intercompany schedules, subsidiary breakdowns,
   segment analyses, or consolidation adjustment tables.
 - If unsure which column is standalone, the Company revenue will ALWAYS be LOWER than Group revenue.
@@ -152,10 +167,10 @@ How to verify you have the right figures:
   For example: if you see 483,842,269 and 230,625,974 — the Company figure is 230,625,974.
 
 === FROM STATEMENT OF COMPREHENSIVE INCOME (P&L) ===
-- revenue: The TOP LINE figure labelled Revenue, Turnover, or Investment Income under the COMPANY 2024 column. NOT gross profit.
-- priorYearRevenue: Same revenue line, COMPANY 2023 (prior year) column.
-- netIncome: Bottom line — Profit for the year / Profit after taxation, COMPANY 2024 column.
-- ebit: Operating profit / Profit from operations / Profit before finance costs and tax, COMPANY 2024 column.
+- revenue: The TOP LINE figure labelled Revenue, Turnover, or Investment Income under the COMPANY current year column. NOT gross profit.
+- priorYearRevenue: Same revenue line, COMPANY prior year column.
+- netIncome: Bottom line — Profit for the year / Profit after taxation, COMPANY current year column.
+- ebit: Operating profit / Profit from operations / Profit before finance costs and tax, COMPANY current year column.
   If not separately labelled: derive as Profit before tax + Finance costs - Finance income.
   IMPORTANT: Do NOT use Profit before tax as EBIT if there are finance cost line items.
 
@@ -168,7 +183,7 @@ How to verify you have the right figures:
   This field is critical — do not return null without checking all three locations.
 
 === FROM STATEMENT OF FINANCIAL POSITION (BALANCE SHEET) ===
-Use ONLY the COMPANY 2024 column for all balance sheet figures.
+Use ONLY the COMPANY current year column for all balance sheet figures.
 - totalAssets: Total assets grand total.
 - currentAssets: Total current assets subtotal.
 - cash: Cash and cash equivalents from current assets.
@@ -180,27 +195,36 @@ Use ONLY the COMPANY 2024 column for all balance sheet figures.
 - retainedEarnings: Retained earnings or Accumulated surplus from equity section.
 
 === DEBT — MOST COMMON EXTRACTION ERROR ===
-In Nigerian audited accounts, debt is labelled Borrowings, Loans and borrowings, or Bank loans.
-It appears in TWO sections of the balance sheet. You MUST check BOTH:
-- shortTermDebt: Borrowings within the CURRENT LIABILITIES section, COMPANY 2024 column.
-- longTermDebt: Borrowings within the NON-CURRENT LIABILITIES section, COMPANY 2024 column.
-  Never return 0 for longTermDebt without explicitly checking non-current liabilities.
+Debt means every interest-bearing obligation: borrowings, loans, bank loans, overdrafts,
+commercial papers, bonds, notes, debentures and finance leases.
+It appears in TWO sections of the balance sheet. You MUST check BOTH, and you MUST open the notes
+behind lines such as "Other liabilities" or "Other long-term liabilities", because commercial papers,
+bonds and overdrafts are often disclosed only inside those notes.
+- shortTermDebt: Interest-bearing obligations within CURRENT LIABILITIES (including commercial papers
+  and bank overdrafts), COMPANY current year column.
+- longTermDebt: Interest-bearing obligations within NON-CURRENT LIABILITIES (including bonds), COMPANY current year column.
+  Never return 0 for longTermDebt without explicitly checking non-current liabilities and their notes.
 - totalDebt: shortTermDebt + longTermDebt.
+- Do NOT count trade payables, accruals, tax payable, customer deposits or joint venture funding as debt.
+
+=== FINANCE COST ===
+- financeCost: Total finance costs / interest expense for the year from the income statement
+  (or its note), COMPANY current year column, as a positive number. Exclude finance income.
 
 === INTEREST RATES — FROM NOTES TO THE ACCOUNTS ===
 - shortTermInterestRate: Rate on short-term borrowings as decimal (e.g. 0.215 for 21.5%). Midpoint if range.
 - longTermInterestRate: Rate on long-term borrowings as decimal.
 
 === METADATA ===
-- reportingPeriod: Financial year end date from the face of the statements (e.g. 31 December 2024).
+- reportingPeriod: Financial year end date from the face of the statements (e.g. 31 December 2025).
 - auditorName: Name of the audit firm from the independent auditors report.
 - auditOpinion: Clean / Qualified / Emphasis of matter.
 
 === PRIOR YEAR FIGURES (COMPANY prior year column — for year-on-year analysis) ===
-Extract from the COMPANY prior year column only (typically labelled 2023):
+Extract from the COMPANY prior year column only (the column next to the current year):
 - priorYearNetIncome: Profit for the year / Profit after taxation, prior year COMPANY column.
 - priorYearEBIT: Operating profit / Profit from operations, prior year COMPANY column.
-- priorYearTotalDebt: Sum of short-term and long-term borrowings, prior year COMPANY column.
+- priorYearTotalDebt: Sum of short-term and long-term debt (same definition as above), prior year COMPANY column.
 - priorYearTotalAssets: Total assets, prior year COMPANY column.
 - priorYearShareholdersEquity: Total equity attributable to shareholders, prior year COMPANY column.
 
@@ -210,7 +234,7 @@ Return ONLY this JSON — no other text:
 "currentAssets":number,"totalAssets":number,"currentLiabilities":number,"totalLiabilities":number,
 "shortTermDebt":number,"longTermDebt":number,"totalDebt":number,
 "shareholdersEquity":number,"retainedEarnings":number,
-"shortTermInterestRate":number,"longTermInterestRate":number,
+"financeCost":number,"shortTermInterestRate":number,"longTermInterestRate":number,
 "reportingPeriod":string,"auditorName":string,"auditOpinion":string,
 "priorYearNetIncome":number,"priorYearEBIT":number,"priorYearTotalDebt":number,
 "priorYearTotalAssets":number,"priorYearShareholdersEquity":number}"""
@@ -307,7 +331,8 @@ async def generate_narrative(figures: dict, ratios: list, client_info: dict) -> 
     f       = figures
     td      = n(f.get("shortTermDebt")) + n(f.get("longTermDebt"))
     net_debt = td - n(f.get("cash"))
-    dscr    = f"{n(f.get('ebitda')) / td:.2f}" if td > 0 and n(f.get("ebitda")) else "N/A"
+    debt_service = (abs(n(f.get("financeCost"))) or (n(f.get("shortTermDebt")) * n(f.get("shortTermInterestRate")) + n(f.get("longTermDebt")) * n(f.get("longTermInterestRate")))) + n(f.get("shortTermDebt"))
+    dscr    = f"{n(f.get('ebitda')) / debt_service:.2f}" if debt_service > 0 else "N/A"
     net_dte = f"{net_debt / n(f.get('ebitda')):.2f}" if n(f.get("ebitda")) > 0 else "N/A"
     de      = f"{td / n(f.get('shareholdersEquity')) * 100:.1f}" if n(f.get("shareholdersEquity")) > 0 else "N/A"
 
@@ -353,7 +378,7 @@ DERIVED METRICS:
   Return on Equity:    {pct(f.get('netIncome'), f.get('shareholdersEquity'))}%
   Debt to Equity:      {de}%
   Net Debt / EBITDA:   {net_dte}x
-  DSCR (EBITDA/Debt):  {dscr}x
+  DSCR (EBITDA / (Finance Cost + Short-term Debt)):  {dscr}x
 
 COMPUTED SCORING RATIOS:
 {ratio_lines}
