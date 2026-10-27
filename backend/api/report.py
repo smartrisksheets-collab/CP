@@ -13,6 +13,7 @@ except ImportError:
     REPORTLAB_AVAILABLE = False
 
 from api.models import Assessment
+from api.scoring import CUTOFF_SCORE, MAX_SCORE, compute_all_ratios
 
 # ── Unicode font (for ₦ and other non-Latin-1 chars) ──────────
 import os as _os
@@ -82,7 +83,7 @@ _VD_R   = 135
 _VD_M   = CW - _VD_L - _VD_R
 
 DIMS = [
-    ("Quick Ratios",         "Liquidity"),
+    ("Liquidity Ratios",     "Liquidity"),
     ("Profitability Ratios", "Profitability"),
     ("Return Ratios",        "Returns"),
     ("Leverage Ratios",      "Leverage"),
@@ -102,15 +103,6 @@ def _fmt_bn(val):
         return f"\u20a6{amount}" if _HAS_UNIFONT else f"NGN {amount}"
     except:
         return "N/A"
-
-def _pct(num, den):
-    try:    return f"{float(num)/float(den)*100:.1f}%"
-    except: return "N/A"
-
-def _fmt_x(val, dp=2):
-    try:    return f"{float(val):.{dp}f}x"
-    except: return "N/A"
-
 
 # ── Style factory ──────────────────────────────────────────────
 def _ST():
@@ -259,21 +251,28 @@ def _build_elements(assessment: Assessment):
     cp     = f.get("cpTerms")    or {}
     ratios = assessment.ratios   or []
 
-    # Metrics
+    # Header metrics come from the saved ratios. Assessments saved before a ratio
+    # existed fall back to the engine on the saved figures, never to a local formula.
+    saved_by_id  = {r.get("id"): r for r in ratios}
+    engine_by_id = None
+    def metric(ratio_id):
+        nonlocal engine_by_id
+        r = saved_by_id.get(ratio_id)
+        if r is None:
+            if engine_by_id is None:
+                engine_by_id = {e["id"]: e for e in compute_all_ratios(f)["ratios"]}
+            r = engine_by_id.get(ratio_id, {})
+        return r.get("display_value") or "N/A"
+
     revenue         = _fmt_bn(f.get("revenue"))
-    net_margin      = _pct(f.get("netIncome"), f.get("revenue"))
-    td              = _n(f.get("shortTermDebt")) + _n(f.get("longTermDebt"))
-    net_debt        = td - _n(f.get("cash"))
-    ebitda          = _n(f.get("ebitda"))
-    net_debt_ebitda = _fmt_x(net_debt / ebitda) if ebitda > 0 else "N/A"
-    st_int          = _n(f.get("shortTermDebt")) * _n(f.get("shortTermInterestRate"))
-    lt_int          = _n(f.get("longTermDebt"))  * _n(f.get("longTermInterestRate"))
-    total_int       = abs(_n(f.get("financeCost"))) or (st_int + lt_int)
-    icr             = _fmt_x(_n(f.get("ebit")) / total_int) if total_int > 0 else "N/A"
+    net_margin      = metric("net_income_margin")
+    net_debt_ebitda = metric("debt_to_ebitda")
+    icr             = metric("interest_coverage")
+    current_ratio   = metric("current_ratio")
 
     score      = assessment.total_score or 0
-    max_score  = assessment.max_score   or 56
-    cutoff     = 34
+    max_score  = assessment.max_score   or MAX_SCORE
+    cutoff     = CUTOFF_SCORE
     score_pct  = round(score / max_score * 100) if max_score else 0
     eligible   = assessment.eligible
     margin_pts = abs(score - cutoff)
@@ -296,10 +295,10 @@ def _build_elements(assessment: Assessment):
     if altman:
         z_sc   = altman.get("score", 0)
         z_mx   = altman.get("max_score", 10)
-        zone   = ("safe zone (> 3.0)" if z_sc == z_mx
-                  else "distress zone (< 1.8)" if z_sc <= 0
-                  else "grey zone (1.8\u20132.9)")
-        distress = (f"Altman Z-Score of {altman.get('display_value','N/A')} places the company "
+        zone   = (f"safe zone ({altman.get('band')})" if z_sc == z_mx
+                  else f"distress zone ({altman.get('band')})" if z_sc <= 0
+                  else f"grey zone ({altman.get('band')})")
+        distress = (f"{altman.get('name', 'Altman Z-Score')} of {altman.get('display_value','N/A')} places the company "
                     f"in the {zone}, earning {z_sc} out of {z_mx} points. Ongoing monitoring "
                     f"is warranted throughout the tenor of the instrument.")
     else:
@@ -310,6 +309,8 @@ def _build_elements(assessment: Assessment):
     weaknesses = list(n.get("weaknesses") or [])
     if not strengths or not weaknesses:
         for r in ratios:
+            if r.get("display_only"):
+                continue
             sc = r.get("score", 0); mx = r.get("max_score", 0)
             nm = r.get("name","");   dv = r.get("display_value",""); bd = r.get("band","")
             if sc == mx and mx > 0 and len(strengths) < 4:
@@ -352,15 +353,16 @@ def _build_elements(assessment: Assessment):
         return [Paragraph(lbl, ST["met_lbl"]), Spacer(1, 2), Paragraph(val, ST["met_val"])]
 
     metrics = Table([[mcell("REVENUE", revenue), mcell("NET MARGIN", net_margin),
-                      mcell("NET DEBT / EBITDA", net_debt_ebitda), mcell("INTEREST COVER", icr)]],
-                    colWidths=[QUAR] * 4)
+                      mcell("NET DEBT / EBITDA", net_debt_ebitda), mcell("INTEREST COVER", icr),
+                      mcell("CURRENT RATIO", current_ratio)]],
+                    colWidths=[CW / 5] * 5)
     metrics.setStyle(TableStyle([
         ("BACKGROUND",    (0,0), (-1,-1), C_CREAM),
         ("LEFTPADDING",   (0,0), (-1,-1), 12),
         ("RIGHTPADDING",  (0,0), (-1,-1), 6),
         ("TOPPADDING",    (0,0), (-1,-1), 8),
         ("BOTTOMPADDING", (0,0), (-1,-1), 8),
-        ("LINEAFTER",     (0,0), (2, 0),  0.5, C_BORDER),
+        ("LINEAFTER",     (0,0), (3, 0),  0.5, C_BORDER),
         ("LINEBELOW",     (0,0), (-1,-1), 0.5, C_BORDER),
         ("VALIGN",        (0,0), (-1,-1), "TOP"),
     ]))
@@ -460,7 +462,7 @@ def _build_elements(assessment: Assessment):
         textColor=C_GREY, leading=9, alignment=align))
     col_hdr = Table([[
         _ch("RATIO"), _ch("RESULT"), _ch("BENCHMARK", TA_CENTER),
-        _ch(""), _ch("WEIGHT", TA_RIGHT),
+        _ch(""), _ch("SCORE", TA_RIGHT),
     ]], colWidths=[_SC_NAME, _SC_VAL, _SC_BAND, _SC_BAR, _SC_SCR])
     col_hdr.setStyle(TableStyle([
         ("BACKGROUND",    (0,0), (-1,-1), C_CREAM),
@@ -477,8 +479,9 @@ def _build_elements(assessment: Assessment):
         dim_ratios = [r for r in ratios if r.get("category") == cat]
         if not dim_ratios:
             continue
-        dim_tot = sum(r.get("score", 0) for r in dim_ratios)
-        dim_mx  = sum(r.get("max_score", 0) for r in dim_ratios)
+        scored  = [r for r in dim_ratios if not r.get("display_only")]
+        dim_tot = sum(r.get("score", 0) for r in scored)
+        dim_mx  = sum(r.get("max_score", 0) for r in scored)
 
         dim_hdr = Table([[Paragraph(dim_name, ST["dim_name"]),
                           Paragraph(f"{dim_tot} / {dim_mx}", ST["dim_tot"])]],
@@ -511,14 +514,16 @@ def _build_elements(assessment: Assessment):
                 ("BOTTOMPADDING", (0,0), (-1,-1), 2),
             ]))
 
+            info_only = bool(r.get("display_only"))
             scr_p = ParagraphStyle("scr2", fontName="Helvetica-Bold", fontSize=8,
-                                   textColor=_score_fg(sc, mx), leading=10, alignment=TA_RIGHT)
+                                   textColor=C_GREY if info_only else _score_fg(sc, mx),
+                                   leading=10, alignment=TA_RIGHT)
             row = Table([[
                 Paragraph(r.get("name",""),            ST["r_name"]),
                 Paragraph(r.get("display_value","N/A"),ST["r_val"]),
                 band_tbl,
-                _bar(_SC_BAR - 8, max(0, min(100, sc / mx * 100)), bc),
-                Paragraph(f"{sc} / {mx}", scr_p),
+                "" if info_only else _bar(_SC_BAR - 8, max(0, min(100, sc / mx * 100)), bc),
+                Paragraph("Info only" if info_only else f"{sc} / {mx}", scr_p),
             ]], colWidths=[_SC_NAME, _SC_VAL, _SC_BAND, _SC_BAR, _SC_SCR])
             row.setStyle(TableStyle([
                 ("LEFTPADDING",   (0,0), (-1,-1), 10),
@@ -531,6 +536,12 @@ def _build_elements(assessment: Assessment):
             ]))
             E.append(row)
 
+        if len(scored) < len(dim_ratios):
+            E.append(Spacer(1, 3))
+            E.append(Paragraph(
+                f"{' and '.join(r.get('name','') for r in dim_ratios if r.get('display_only'))} "
+                f"are shown for information and are not part of the {max_score}-point score.",
+                ST["r_val"]))
         E.append(Spacer(1, 6))
 
     # ── 7. VERDICT BAR ────────────────────────────────────────
@@ -586,7 +597,7 @@ def _build_elements(assessment: Assessment):
     # ── 9. FOOTER ─────────────────────────────────────────────
     DISCLAIMER = (
         'IMPORTANT NOTICE: A "Meets Threshold" result indicates the issuer meets the minimum credit quality threshold of a '
-        "standardised 10-ratio scoring model (maximum 56 points; cut-off 34 points), benchmarked against institutional "
+        "standardised 12-ratio scoring model (maximum 56 points; cut-off 34 points), benchmarked against institutional "
         'investment frameworks. A "Below Threshold" result indicates the issuer does not meet the model\'s minimum standard '
         "for new investment consideration; it is not a credit rating and does not constitute a prediction of default. "
         "Investors holding existing paper from a Below Threshold issuer should treat this as a monitoring signal, not a loss "
@@ -599,7 +610,7 @@ def _build_elements(assessment: Assessment):
 
     ft = Table([[
         Paragraph(
-            "Generated by SmartRisk Credit \u00b7 "
+            f"Generated by SmartRisk Credit \u00b7 Scoring model {assessment.model_version or 'v1.0'} \u00b7 "
             "SmartRisk Sheets Technologies Limited (RC: 9170218) \u00b7 "
             "Confidential \u2014 for authorised personnel only",
             ST["footer"],

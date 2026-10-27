@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useIsMobile } from "../../hooks/useBreakpoint.js";
-import { runAssessment } from "../../api/client.js";
+import { runAssessment, previewScores } from "../../api/client.js";
+import RatioTable from "../RatioTable.jsx";
 import { Loader, Zap, ChevronRight } from "lucide-react";
 
 const RUN_MESSAGES = [
@@ -11,76 +12,19 @@ const RUN_MESSAGES = [
   "Finalising assessment…",
 ];
 
-function scoreColor(score, max) {
-  if (score === max) return "#1E7E34";
-  if (score <= 0)    return "#A32D2D";
-  return "#065f46";
+// Rates are always typed as a percentage (13.5 = 13.5%, 0.8 = 0.8%); the engine divides by 100
+function toEngineFigures(figures) {
+  return { ...figures, rateUnit:"percent" };
 }
-function scoreBg(score, max) {
-  if (score === max) return "#EAF3DE";
-  if (score <= 0)    return "#FCEBEB";
-  return "#d1fae5";
-}
-
-// Client-side scoring — mirrors backend exactly, used for preview only
-function computeLocal(f) {
-  function n(v) { return parseFloat(v) || 0; }
-
-  const ratios = [];
-
-  // Convert interest rates: if > 1 assume percentage, convert to decimal
-  const stRate = n(f.shortTermInterestRate) > 1 ? n(f.shortTermInterestRate) / 100 : n(f.shortTermInterestRate);
-  const ltRate = n(f.longTermInterestRate)  > 1 ? n(f.longTermInterestRate)  / 100 : n(f.longTermInterestRate);
-
-  const td = n(f.shortTermDebt) + n(f.longTermDebt);
-  // Reported finance cost first; debt x rates only as a fallback (mirrors backend)
-  const interest = Math.abs(n(f.financeCost)) || ((n(f.shortTermDebt)*stRate)+(n(f.longTermDebt)*ltRate));
-
-  const checks = [
-    { name:"Acid-Test Ratio",           benchmark:"≥ 1x",    max:2,  val:(n(f.cash)+n(f.inventory)-n(f.prepaidExpenses))/Math.max(n(f.currentLiabilities),1), fmt:(v)=>v.toFixed(2)+"x", band:(v)=>v<1?"< 1x":v<=1.5?"1 - 1.5x":"> 1.5x", score:(v)=>v<1?-2:v<=1.5?1:2 },
-    { name:"Net Income Margin",         benchmark:"≥ 20%",   max:4,  val:(n(f.netIncome)/Math.max(n(f.revenue),1))*100,   fmt:(v)=>v.toFixed(1)+"%", band:(v)=>v<10?"< 10%":v<=15?"10.1-15%":v<=20?"15.1-20%":"> 20%",      score:(v)=>v<10?0:v<=15?2:v<=20?3:4 },
-    { name:"Revenue Growth Rate",       benchmark:"> 30%",   max:5,  val:n(f.priorYearRevenue)>0?((n(f.revenue)-n(f.priorYearRevenue))/n(f.priorYearRevenue))*100:null, fmt:(v)=>v===null?"N/A":v.toFixed(1)+"%", band:(v)=>v===null?"N/A":v<0?"Negative":v<=5?"0-5%":v<=15?"6-15%":v<=30?"16-30%":"> 30%", score:(v)=>v===null?0:v<0?-3:v<=5?1:v<=15?2:v<=30?3:5 },
-    { name:"Return on Assets",          benchmark:"≥ 15%",   max:5,  val:(n(f.netIncome)/Math.max(n(f.totalAssets),1))*100, fmt:(v)=>v.toFixed(1)+"%", band:(v)=>v<3?"< 3%":v<=6?"3-6%":v<=10?"6.1-10%":v<=15?"10.1-15%":"> 15%", score:(v)=>v<3?0:v<=6?1:v<=10?2:v<=15?4:5 },
-    { name:"Debt to Asset Ratio",       benchmark:"< 30%",   max:5,  val:(td/Math.max(n(f.totalAssets),1))*100,   fmt:(v)=>v.toFixed(1)+"%", band:(v)=>v<30?"< 30%":v<=50?"30.1-50%":v<=75?"50.1-75%":v<=100?"75.1-100%":"> 100%", score:(v)=>v<30?5:v<=50?3:v<=75?2:v<=100?0:0 },
-    { name:"Debt to Capital Ratio",     benchmark:"< 30%",   max:5,  val:(td/Math.max(td+n(f.shareholdersEquity),1))*100, fmt:(v)=>v.toFixed(1)+"%", band:(v)=>v<30?"< 30%":v<=50?"30.1-50%":v<=75?"50.1-75%":v<=100?"75.1-100%":"> 100%", score:(v)=>v<30?5:v<=50?2:v<=75?1:v<=100?0:0 },
-    { name:"Interest Coverage Ratio",   benchmark:"> 5.0x",  max:6,  val:interest>0?n(f.ebit)/interest:null, fmt:(v)=>v===null?"N/A":v.toFixed(2)+"x", band:(v)=>v===null?"Not available":v<1?"< 1.0x":v<=1.5?"1.0-1.5x":v<=3?"1.6-3.0x":v<=5?"3.1-5.0x":"> 5.0x", score:(v)=>v===null?0:v<1?-5:v<=1.5?2:v<=3?4:v<=5?5:6 },
-    { name:"Debt Service Coverage",     benchmark:">= 1.5x", max:7,  val:(()=>{ const ds=interest+n(f.shortTermDebt); return ds>0?n(f.ebitda)/ds:(td>0?null:Infinity); })(), fmt:(v)=>v===null?"N/A":v===Infinity?"No debt":v.toFixed(2)+"x", band:(v)=>v===null?"Not available":v===Infinity?"No debt service":v>=1.5?">= 1.5x":v>=1.25?"1.25-1.49x":v>=1?"1.0-1.24x":"< 1.0x", score:(v)=>v===null?0:v>=1.5?7:v>=1.25?5:v>=1?3:0 },
-    { name:"Debt to EBITDA",            benchmark:"< 2x",    max:7,  val:n(f.ebitda)>0?(td-n(f.cash))/n(f.ebitda):0, fmt:(v)=>v.toFixed(2)+"x", band:(v)=>v<2?"< 2x":v<=3?"2.1-3.0x":v<=3.5?"3.1-3.5x":v<=4?"3.6-4.0x":"> 4.1x", score:(v)=>v<2?7:v<=3?3:v<=3.5?2:v<=4?0:-5 },
-    { name:"Altman Z-Score",            benchmark:"≥ 3",     max:10, val:(()=>{ const ta=Math.max(n(f.totalAssets),1); const wc=n(f.currentAssets)-n(f.currentLiabilities); return 1.2*(wc/ta)+1.4*(n(f.retainedEarnings)/ta)+3.3*(n(f.ebit)/ta)+0.6*(n(f.shareholdersEquity)/Math.max(n(f.totalLiabilities),1))+1.0*(n(f.revenue)/ta); })(), fmt:(v)=>v.toFixed(2), band:(v)=>v<1.8?"< 1.8":v<=2.9?"1.8-2.9":"> 3", score:(v)=>v<1.8?-10:v<=2.9?5:10 },
-  ];
-
-  let total = 0;
-  for (const c of checks) {
-    const v  = c.val;
-    const sc = c.score(v);
-    total += sc;
-    ratios.push({ name:c.name, max:c.max, benchmark:c.benchmark, displayValue:c.fmt(v), band:c.band(v), score:sc });
-  }
-
-  return { ratios, total, max:56, eligible: total >= 34 };
-}
-
-const CATEGORIES = {
-  "Acid-Test Ratio"        : "Quick Ratios",
-  "Net Income Margin"      : "Profitability Ratios",
-  "Revenue Growth Rate"    : "Profitability Ratios",
-  "Return on Assets"       : "Return Ratios",
-  "Debt to Asset Ratio"    : "Leverage Ratios",
-  "Debt to Capital Ratio"  : "Leverage Ratios",
-  "Interest Coverage Ratio": "Coverage Ratios",
-  "Debt Service Coverage"  : "Coverage Ratios",
-  "Debt to EBITDA"         : "Coverage Ratios",
-  "Altman Z-Score"         : "Corporate Bankruptcy",
-};
 
 function makeFiguresKey(figures) {
   return JSON.stringify(Object.entries(figures).sort());
 }
 
-export default function Scores({ figures, extractedFigures, scoreResult, scoredFiguresKey, onScored, onBack, onNext, onQuotaExceeded, clientInfo, draftId }) {
+export default function Scores({ figures, extractedFigures, scoreResult, scoredFiguresKey, onBack, onNext, onQuotaExceeded, clientInfo, draftId }) {
   const isMobile  = useIsMobile(640);
-  const isTablet  = useIsMobile(960);
-  const [local]    = useState(() => computeLocal(figures));
+  const [preview, setPreview]     = useState(null);
+  const [previewErr, setPreviewErr] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
   const [msgIdx, setMsgIdx]   = useState(0);
@@ -90,8 +34,17 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
   const figuresMatch = scoredFiguresKey === currentKey;
   const canProceed   = hasResult && figuresMatch;
 
+  // Preview comes from the server engine, so it always matches the saved result
   useEffect(() => {
-    if (!loading) { setMsgIdx(0); return; }
+    let active = true;
+    previewScores(toEngineFigures(figures))
+      .then(res => { if (active) setPreview(res.data); })
+      .catch(() => { if (active) setPreviewErr("Could not load the score preview. You can still run the assessment."); });
+    return () => { active = false; };
+  }, [currentKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!loading) return; // handleViewResult resets msgIdx before each run
     const t = setInterval(() => setMsgIdx(i => Math.min(i + 1, RUN_MESSAGES.length - 1)), 7000);
     return () => clearInterval(t);
   }, [loading]);
@@ -101,16 +54,13 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
     setError("");
     setMsgIdx(0);
 
-    // Convert interest rates to decimal for backend if entered as percentage
-    const f = { ...figures };
-    if (f.shortTermInterestRate > 1) f.shortTermInterestRate = f.shortTermInterestRate / 100;
-    if (f.longTermInterestRate  > 1) f.longTermInterestRate  = f.longTermInterestRate  / 100;
+    const f = toEngineFigures(figures);
 
     try {
       const res = await runAssessment(f, clientInfo, extractedFigures, draftId);
       const d   = res.data;
       onNext(
-        { ratios: d.ratios, total_score: d.totalScore, eligible: d.eligible, max_score: d.maxScore },
+        { ratios: d.ratios, total_score: d.totalScore, eligible: d.eligible, max_score: d.maxScore, cutoff: d.cutoff, model_version: d.modelVersion },
         d.assessmentId,
         d.narrative,
         currentKey,
@@ -127,45 +77,6 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
     }
   }
 
-  const css = {
-    card : { background:"#fff", border:"1px solid #E0E0E0", borderRadius:8, padding:20, marginBottom:16 },
-    th   : { textAlign:"left", fontSize:11, fontWeight:"bold", color:"#888", padding:"8px 10px", borderBottom:"2px solid #E8E8E8", textTransform:"uppercase" },
-    td   : { padding:"10px", borderBottom:"1px solid #F0F0F0", verticalAlign:"middle" },
-    cat  : { background:"var(--primary)", color:"#fff", fontSize:11, fontWeight:"bold", padding:"5px 10px", textTransform:"uppercase", letterSpacing:"0.04em" },
-  };
-
-  let lastCat = "";
-  const rows = local.ratios.map((r, i) => {
-    const cat  = CATEGORIES[r.name] || "";
-    const newCat = cat !== lastCat;
-    lastCat = cat;
-    const col = scoreColor(r.score, r.max);
-    const bg  = scoreBg(r.score, r.max);
-
-    return (
-      <>
-        {newCat && (
-          <tr key={`cat-${i}`}><td colSpan={5} style={css.cat}>{cat}</td></tr>
-        )}
-        <tr key={i}>
-          <td style={css.td}>{r.name}</td>
-          <td style={{ ...css.td, textAlign:"center" }}>
-            <span style={{ fontSize:11, padding:"2px 8px", borderRadius:999, background:"#F0F0F0", color:"#666", whiteSpace:"nowrap" }}>
-              {r.benchmark}
-            </span>
-          </td>
-          <td style={{ ...css.td, textAlign:"center" }}>
-            <span style={{ fontSize:11, padding:"2px 8px", borderRadius:999, background:bg, color:col, whiteSpace:"nowrap" }}>
-              {r.displayValue}
-            </span>
-          </td>
-          <td style={{ ...css.td, textAlign:"center", fontWeight:"bold", color:col }}>{r.score}</td>
-          <td style={{ ...css.td, textAlign:"center", color:"#888" }}>{r.max}</td>
-        </tr>
-      </>
-    );
-  });
-
   return (
     <div>
       <div style={{ fontSize:13, color:"#5A5A5A", marginBottom:14 }}>
@@ -178,26 +89,18 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
         </div>
       )}
 
-      <div style={{ ...css.card, overflowX:"auto" }}>
-        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13, minWidth:480 }}>
-          <thead>
-            <tr>
-              <th style={css.th}>Ratio</th>
-              <th style={{ ...css.th, textAlign:"center" }}>Benchmark</th>
-              <th style={{ ...css.th, textAlign:"center" }}>Result</th>
-              <th style={{ ...css.th, textAlign:"center" }}>Score</th>
-              <th style={{ ...css.th, textAlign:"center" }}>Max</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows}
-            <tr style={{ background:"#F5F5F2" }}>
-              <td colSpan={3} style={{ ...css.td, fontWeight:"bold" }}>TOTAL (preview)</td>
-              <td style={{ ...css.td, textAlign:"center", fontWeight:"bold", color: local.eligible ? "#1E7E34" : "#A32D2D" }}>{local.total}</td>
-              <td style={{ ...css.td, textAlign:"center", color:"#888" }}>56</td>
-            </tr>
-          </tbody>
-        </table>
+      <div style={{ background:"var(--white)", border:"1px solid var(--border)", borderRadius:8, padding:20, marginBottom:16, overflowX:"auto" }}>
+        {previewErr && <div style={{ fontSize:13, color:"var(--muted)" }}>{previewErr}</div>}
+        {!preview && !previewErr && <div style={{ fontSize:13, color:"var(--muted)" }}>Loading preview…</div>}
+        {preview && (
+          <RatioTable
+            ratios={preview.ratios}
+            totalScore={preview.total_score}
+            maxScore={preview.max_score}
+            totalLabel="TOTAL (preview)"
+            totalColor={preview.eligible ? "var(--score-full)" : "var(--error)"}
+          />
+        )}
       </div>
 
       <div style={{ display:"flex", flexDirection: isMobile ? "column-reverse" : "row", gap:10, justifyContent:"flex-end", marginTop:20, alignItems: isMobile ? "stretch" : "center" }}>

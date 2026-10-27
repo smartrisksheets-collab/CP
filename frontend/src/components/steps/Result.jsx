@@ -3,30 +3,22 @@ import { useIsMobile } from "../../hooks/useBreakpoint.js";
 import { generateReport } from "../../api/client.js";
 import { Download, Loader, Plus, Eye, AlertTriangle } from "lucide-react";
 import ReportPreview from "../ReportPreview.jsx";
+import RatioTable from "../RatioTable.jsx";
 
-function scoreColor(score, max) {
-  if (score === max) return "#1E7E34";
-  if (score <= 0)    return "#A32D2D";
-  return "#065f46";
+// Declared at module scope so React keeps the same component between renders
+function NarrSection({ label, rating, review, ratingColor }) {
+  if (!review) return null;
+  const col = ratingColor || "#5A5A5A";
+  return (
+    <div style={{ marginBottom:16 }}>
+      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+        <span style={{ fontSize:11, fontWeight:"bold", color:"#888", textTransform:"uppercase", letterSpacing:"0.05em" }}>{label}</span>
+        {rating && <span style={{ fontSize:11, padding:"2px 8px", borderRadius:999, background:"#EEF4FF", color:col, border:"1px solid #9DBFEA" }}>{rating}</span>}
+      </div>
+      <p style={{ fontSize:13, lineHeight:1.7, color:"#333", wordBreak:"break-word", overflowWrap:"anywhere" }}>{review}</p>
+    </div>
+  );
 }
-function scoreBg(score, max) {
-  if (score === max) return "#EAF3DE";
-  if (score <= 0)    return "#FCEBEB";
-  return "#d1fae5";
-}
-
-const CATEGORIES = {
-  "quick_ratio"      : "Quick Ratios",
-  "net_income_margin": "Profitability Ratios",
-  "revenue_growth"   : "Profitability Ratios",
-  "return_on_assets" : "Return Ratios",
-  "debt_to_assets"   : "Leverage Ratios",
-  "debt_to_capital"  : "Leverage Ratios",
-  "interest_coverage": "Coverage Ratios",
-  "dscr"             : "Coverage Ratios",
-  "debt_to_ebitda"   : "Coverage Ratios",
-  "altman_z"         : "Corporate Bankruptcy",
-};
 
 export default function Result({ scoreResult, assessmentId, narrative: initialNarrative, clientInfo, onBack, onNew }) {
   const isMobile = useIsMobile();
@@ -38,6 +30,8 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
 
   const eligible = scoreResult?.eligible;
   const score    = scoreResult?.total_score ?? 0;
+  const maxScore = scoreResult?.max_score ?? 56;
+  const cutoff   = scoreResult?.cutoff ?? 34;
   const ratios   = scoreResult?.ratios ?? [];
   const n        = narrative || {};
 
@@ -52,7 +46,7 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
       a.download = `SmartRisk_${(clientInfo.clientName || "Report").replace(/\s+/g,"_")}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch (e) {
+    } catch {
       setDlError("Failed to generate PDF. Please try again.");
     } finally {
       setDownloading(false);
@@ -67,50 +61,6 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
     cat   : { background:"var(--primary)", color:"#fff", fontSize:11, fontWeight:"bold", padding:"5px 10px", textTransform:"uppercase", letterSpacing:"0.04em" },
     metric: { background:"#F5F5F2", borderRadius:6, padding:14, flex:1 },
   };
-
-  let lastCat = "";
-  const ratioRows = ratios.map((r, i) => {
-    const cat    = CATEGORIES[r.id] || r.category || "";
-    const newCat = cat !== lastCat;
-    lastCat = cat;
-    const col = scoreColor(r.score, r.max_score);
-    const bg  = scoreBg(r.score, r.max_score);
-
-    return (
-      <>
-        {newCat && <tr key={`cat-${i}`}><td colSpan={5} style={css.cat}>{cat}</td></tr>}
-        <tr key={i}>
-          <td style={css.td}>{r.name}</td>
-          <td style={{ ...css.td, textAlign:"center" }}>
-            <span style={{ fontSize:11, padding:"2px 8px", borderRadius:999, background:"#F0F0F0", color:"#666", whiteSpace:"nowrap" }}>
-              {r.benchmark || "—"}
-            </span>
-          </td>
-          <td style={{ ...css.td, textAlign:"center" }}>
-            <span style={{ fontSize:11, padding:"2px 8px", borderRadius:999, background:bg, color:col, whiteSpace:"nowrap" }}>
-              {r.display_value}
-            </span>
-          </td>
-          <td style={{ ...css.td, textAlign:"center", fontWeight:"bold", color:col }}>{r.score}</td>
-          <td style={{ ...css.td, textAlign:"center", color:"#888" }}>{r.max_score}</td>
-        </tr>
-      </>
-    );
-  });
-
-  function NarrSection({ label, rating, review, ratingColor }) {
-    if (!review) return null;
-    const col = ratingColor || "#5A5A5A";
-    return (
-      <div style={{ marginBottom:16 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
-          <span style={{ fontSize:11, fontWeight:"bold", color:"#888", textTransform:"uppercase", letterSpacing:"0.05em" }}>{label}</span>
-          {rating && <span style={{ fontSize:11, padding:"2px 8px", borderRadius:999, background:"#EEF4FF", color:col, border:"1px solid #9DBFEA" }}>{rating}</span>}
-        </div>
-        <p style={{ fontSize:13, lineHeight:1.7, color:"#333", wordBreak:"break-word", overflowWrap:"anywhere" }}>{review}</p>
-      </div>
-    );
-  }
 
   const ratingCol = (r) => {
     if (!r) return "#5A5A5A";
@@ -131,32 +81,22 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
           {eligible ? "MEETS THRESHOLD" : "BELOW THRESHOLD"}
         </div>
         <div style={{ fontSize:13, marginTop:6, color:"#5A5A5A" }}>
-          Score: {score} / 56 — {eligible ? "Meets" : "Below"} the 34-point (60%) threshold
+          Score: {score} / {maxScore} — {eligible ? "Meets" : "Below"} the {cutoff}-point (60%) threshold
+          {scoreResult?.model_version && <> · Scoring model {scoreResult.model_version}</>}
         </div>
       </div>
 
       {/* Metrics */}
       <div style={{ display:"flex", gap:10, marginBottom:16, flexWrap:"wrap" }}>
         <div style={css.metric}><div style={{ fontSize:11, color:"#888", marginBottom:6, textTransform:"uppercase" }}>Total Score</div><div style={{ fontSize:22, fontWeight:"bold", color:"var(--primary)" }}>{score}</div></div>
-        <div style={css.metric}><div style={{ fontSize:11, color:"#888", marginBottom:6, textTransform:"uppercase" }}>Max Score</div><div style={{ fontSize:22, fontWeight:"bold", color:"var(--primary)" }}>56</div></div>
-        <div style={css.metric}><div style={{ fontSize:11, color:"#888", marginBottom:6, textTransform:"uppercase" }}>Cut-off</div><div style={{ fontSize:22, fontWeight:"bold", color:"var(--primary)" }}>34</div></div>
+        <div style={css.metric}><div style={{ fontSize:11, color:"#888", marginBottom:6, textTransform:"uppercase" }}>Max Score</div><div style={{ fontSize:22, fontWeight:"bold", color:"var(--primary)" }}>{maxScore}</div></div>
+        <div style={css.metric}><div style={{ fontSize:11, color:"#888", marginBottom:6, textTransform:"uppercase" }}>Cut-off</div><div style={{ fontSize:22, fontWeight:"bold", color:"var(--primary)" }}>{cutoff}</div></div>
       </div>
 
       {/* Score breakdown */}
       <div style={{ ...css.card, overflowX:"auto" }}>
         <div style={css.title}>Score Breakdown</div>
-        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13, minWidth:480 }}>
-          <thead>
-            <tr>
-              <th style={css.th}>Ratio</th>
-              <th style={{ ...css.th, textAlign:"center" }}>Benchmark</th>
-              <th style={{ ...css.th, textAlign:"center" }}>Result</th>
-              <th style={{ ...css.th, textAlign:"center" }}>Score</th>
-              <th style={{ ...css.th, textAlign:"center" }}>Max</th>
-            </tr>
-          </thead>
-          <tbody>{ratioRows}</tbody>
-        </table>
+        <RatioTable ratios={ratios} maxScore={maxScore} />
       </div>
 
       {/* Narrative */}

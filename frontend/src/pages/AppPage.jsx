@@ -673,11 +673,11 @@ function Modal({ onClose, title, children, maxWidth = 760 }) {
 
 function FaqContent() {
   const faqs = [
-    ["What does SmartRisk Credit actually do?", "SmartRisk Credit is an AI-assisted credit risk scoring tool for Nigerian capital markets professionals. You upload a company's audited financial statements, the AI extracts the key figures, and the tool computes 10 standardised ratios to produce a total score out of 56. A score of 34 or above (60%) indicates the issuer meets the threshold for investing in Commercial Papers (CPs)."],
+    ["What does SmartRisk Credit actually do?", "SmartRisk Credit is an AI-assisted credit risk scoring tool for Nigerian capital markets professionals. You upload a company's audited financial statements, the AI extracts the key figures, and the tool computes 12 standardised ratios to produce a total score out of 56. A score of 34 or above (60%) indicates the issuer meets the threshold for investing in Commercial Papers (CPs)."],
     ["Is the score a formal credit rating?", "No. The SmartRisk Credit score is a quantitative decision-support tool for internal use only. It is not a regulated credit rating and does not replace the opinion of a licensed credit rating agency such as Agusto & Co., GCR Ratings, or DataPro."],
     ["Does 'Below Threshold' mean the issuer will default on their existing paper?", (
       <div>
-        <p style={{ marginBottom:8 }}>No — and this is an important distinction. "Below Threshold" means the issuer does not meet the minimum credit quality threshold of the 10-ratio scoring model at the time of assessment. It is a <strong>new investment caution signal</strong>, not a default prediction.</p>
+        <p style={{ marginBottom:8 }}>No — and this is an important distinction. "Below Threshold" means the issuer does not meet the minimum credit quality threshold of the 12-ratio scoring model at the time of assessment. It is a <strong>new investment caution signal</strong>, not a default prediction.</p>
         <p style={{ marginBottom:8 }}>An issuer can have Commercial Paper or Promissory Notes in the market and continue servicing them while not meeting this model's entry criteria. The scoring model assesses whether a company's current financial profile is strong enough to warrant <em>new</em> investment — it does not predict whether an issuer will honour <em>existing</em> obligations.</p>
         <p style={{ marginBottom:8 }}>If you or your fund hold existing paper from a "Below Threshold" issuer, the result should be treated as a prompt to monitor more closely — specifically reviewing:</p>
         <ul style={{ margin:"0 0 8px 18px", lineHeight:1.8 }}>
@@ -736,23 +736,25 @@ function FaqContent() {
 
 function UserGuidePage({ onBack }) {
   const RATIOS = [
-    ["Acid-Test Ratio",         2,  "Can the company meet short-term obligations from liquid assets alone? Excludes inventory and prepayments — a stricter test than the current ratio.",        "> 1.5x"],
+    ["Acid-Test Ratio",         2,  "(Current assets − inventory − prepayments) ÷ current liabilities. Can the company meet short-term obligations from liquid assets alone? A stricter test than the current ratio.",        "> 1.5x"],
+    ["Current Ratio",           3,  "Current assets ÷ current liabilities. How many times short-term assets cover short-term obligations.", "≥ 1.5x"],
+    ["Cash Ratio",              3,  "Cash and cash equivalents ÷ current liabilities. How much of short-term obligations cash alone could pay today.", "≥ 0.5x"],
     ["Net Income Margin",       4,  "How much of each naira of revenue becomes profit after all costs and tax. A proxy for pricing power and cost discipline.",                               "> 20%"],
     ["Revenue Growth Rate",     5,  "Year-on-year top-line growth. Signals whether the business is expanding or contracting — critical for short-tenor debt repayment confidence.",           "> 30%"],
     ["Return on Assets",        5,  "How efficiently the company generates profit from its asset base. Higher ROA signals better capital deployment and earning quality.",                    "> 15%"],
     ["Debt to Asset Ratio",     5,  "What proportion of total assets is funded by debt. A low ratio means creditors have a large cushion if assets need to be liquidated.",                  "< 30%"],
     ["Debt to Capital Ratio",   5,  "The share of total capital (debt + equity) that is debt-funded. Measures structural leverage and the buffer available to absorb losses.",               "< 30%"],
-    ["Interest Coverage Ratio", 6,  "How many times operating profit covers interest charges. A ratio below 1.5x means most of operating profit is consumed by interest — a major red flag.", "> 5.0x"],
-    ["Debt Service Coverage",   7,  "EBITDA against the debt service due within 12 months (finance cost plus short-term debt, including commercial papers). Below 1.0x means earnings do not cover what falls due this year.",   ">= 1.5x"],
-    ["Net Debt / EBITDA",       7,  "How many years of operating cash flow would be needed to repay all net debt. The most widely used leverage metric by Nigerian rating agencies.",        "< 2.0x"],
-    ["Altman Z-Score",         10,  "A multi-factor bankruptcy predictor combining working capital, retained earnings, profitability, leverage, and asset turnover. Score above 3 indicates low distress risk.", "> 3.0"],
+    ["Interest Coverage Ratio", 6,  "How many times operating profit covers the reported finance cost. A ratio below 1.5x means most of operating profit is consumed by interest — a major red flag. A company with no debt scores full points.", "> 5.0x"],
+    ["Debt Service Coverage",   5,  "EBITDA against the debt service due within 12 months (finance cost plus short-term debt, including commercial papers). Below 1.0x means earnings do not cover what falls due this year.",   ">= 1.5x"],
+    ["Net Debt / EBITDA",       5,  "How many years of operating cash flow would be needed to repay all net debt. The most widely used leverage metric by Nigerian rating agencies. Zero or negative EBITDA scores 0.",        "< 2.0x"],
+    ["Altman Z'-Score",         8,  "Altman's private-firm bankruptcy predictor (0.717A + 0.847B + 3.107C + 0.420D + 0.998E) combining working capital, retained earnings, profitability, book leverage and asset turnover. Above 2.90 indicates low distress risk; below 1.23 indicates distress.", "> 2.90"],
   ];
 
   const STEPS = [
     ["Upload",          "Enter the client name, select an external credit rating (optional), and upload the audited financial statements PDF. Optionally upload the credit rating report and a CP indicative terms email. The tool validates each document before proceeding."],
     ["Extraction",      "The financial statement is sent for review and extraction, which reads the primary financial statements and extract figures. This takes 20–60 seconds. All extracted figures are shown on the Review Data screen for you to verify and correct."],
     ["Review Data",     "Check every field carefully. Blue fields were extracted by AI. Amber fields require manual entry (e.g. Prior Year Revenue for the growth rate). Always verify revenue, EBIT, and debt figures against the face of the financial statements."],
-    ["Compute Scores",  "Click \"Compute Scores\" to calculate all 10 ratios client-side. Review the ratio table and scores before proceeding. You can go back and edit any figure."],
+    ["Compute Scores",  "Click \"Compute Scores\" to calculate all 12 ratios. Review the ratio table and scores before proceeding. You can go back and edit any figure."],
     ["View Result",     "Click \"View Result\" to run the final server-side assessment and generate the narrative. The result screen shows the verdict (Meets Threshold / Below Threshold), score breakdown, and report export options."],
     ["Export Report",   "Starter and above can preview and edit the generated narrative before exporting. Free users can export directly. The report is a PDF containing the CP terms, risk narrative, financial figures, and quantitative score table."],
   ];
@@ -787,7 +789,7 @@ function UserGuidePage({ onBack }) {
             It is designed to help analysts assess whether a corporate issuer meets the minimum credit quality threshold for investing in Commercial Papers (CPs) or Promissory Notes.
           </p>
           <p style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.8 }}>
-            The tool processes audited financial statements, extracts key financial figures using artificial intelligence (AI), computes 10 standardised financial ratios,
+            The tool processes audited financial statements, extracts key financial figures using artificial intelligence (AI), computes 12 standardised financial ratios,
             and produces a total score out of <strong>56 points</strong>. A score of <strong>34 or above (60%)</strong> indicates the issuer meets the threshold for investment consideration.
           </p>
         </div>
@@ -813,7 +815,7 @@ function UserGuidePage({ onBack }) {
 
         {/* Scoring table */}
         <div style={card}>
-          <div style={sectionTitle}>Scoring Model — 10 Ratios, 56 Points</div>
+          <div style={sectionTitle}>Scoring Model — 12 Ratios, 56 Points</div>
           <p style={{ fontSize:13, color:"#5A5A5A", marginTop:10, marginBottom:14 }}>
             Each ratio is scored against defined bands. The total score determines eligibility. The cut-off is 34 points (60% of 56).
           </p>
@@ -831,7 +833,7 @@ function UserGuidePage({ onBack }) {
                   <tr key={i} style={{ background: i % 2 === 0 ? "#fff" : "#F9F9F7" }}>
                     <td style={{ padding:"9px 12px", borderBottom:"1px solid #F0F0F0", fontWeight:600, color:"#1F2854", whiteSpace:"nowrap", verticalAlign:"top" }}>{name}</td>
                     <td style={{ padding:"9px 12px", borderBottom:"1px solid #F0F0F0", color:"#5A5A5A", lineHeight:1.65, verticalAlign:"top" }}>{desc}</td>
-                    <td style={{ padding:"9px 12px", borderBottom:"1px solid #F0F0F0", textAlign:"center", fontWeight:"bold", color:"var(--primary)", verticalAlign:"top" }}>{max}</td>
+                    <td style={{ padding:"9px 12px", borderBottom:"1px solid #F0F0F0", textAlign:"center", fontWeight:"bold", color:"var(--primary)", verticalAlign:"top" }}>{max || "Info only"}</td>
                     <td style={{ padding:"9px 12px", borderBottom:"1px solid #F0F0F0", textAlign:"center", color:"#5A5A5A", verticalAlign:"top", whiteSpace:"nowrap" }}>{best}</td>
                   </tr>
                 ))}
@@ -850,14 +852,14 @@ function UserGuidePage({ onBack }) {
         <div style={card}>
           <div style={sectionTitle}>Understanding Meets Threshold vs Below Threshold</div>
           <p style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.8, marginTop:12, marginBottom:4 }}>
-            The tool produces one of two results after computing the 10-ratio score.
+            The tool produces one of two results after computing the 12-ratio score.
             Understanding what each result means — and what it does <em>not</em> mean — is essential for using the output correctly.
           </p>
           {/* Meets Threshold */}
           <div style={{ background:"#EAF3DE", border:"1px solid #97C459", borderRadius:8, padding:"14px 18px", margin:"14px 0" }}>
             <div style={{ fontSize:14, fontWeight:"bold", color:"#27500A", marginBottom:6 }}>✓ &nbsp;Meets Threshold</div>
             <p style={{ margin:0, color:"#2C2C2C", fontSize:13, lineHeight:1.75 }}>
-              The issuer's financial profile meets the minimum credit quality threshold of the 10-ratio scoring model, achieving <strong>34 or more out of 56 points (60%)</strong>.
+              The issuer's financial profile meets the minimum credit quality threshold of the 12-ratio scoring model, achieving <strong>34 or more out of 56 points (60%)</strong>.
               This indicates adequate financial strength, manageable leverage, and sufficient liquidity to warrant investment consideration in the Commercial Paper or Promissory Note.
             </p>
             <p style={{ margin:"8px 0 0", color:"#2C2C2C", fontSize:13, lineHeight:1.75 }}>
@@ -903,7 +905,7 @@ function UserGuidePage({ onBack }) {
                     </span>
                   </td>
                   <td style={{ padding:"8px 10px", borderBottom:"1px solid #F0F0F0", whiteSpace:"nowrap" }}>≥ 34 / 56</td>
-                  <td style={{ padding:"8px 10px", borderBottom:"1px solid #F0F0F0", color:"#5A5A5A" }}>Financial profile meets the 10-ratio model threshold (60%)</td>
+                  <td style={{ padding:"8px 10px", borderBottom:"1px solid #F0F0F0", color:"#5A5A5A" }}>Financial profile meets the 12-ratio model threshold (60%)</td>
                   <td style={{ padding:"8px 10px", borderBottom:"1px solid #F0F0F0", color:"#5A5A5A" }}>Proceed to qualitative review and investment committee</td>
                 </tr>
                 <tr style={{ background:"#F9F9F7" }}>
@@ -921,7 +923,7 @@ function UserGuidePage({ onBack }) {
             </table>
           </div>
           <p style={{ marginTop:16, fontSize:11, color:"#888", lineHeight:1.6 }}>
-            Scores are computed using a standardised 10-ratio credit quality model (maximum 56 points) benchmarked against institutional investment frameworks used by Nigerian rating agencies and capital markets professionals.
+            Scores are computed using a standardised 12-ratio credit quality model (maximum 56 points) benchmarked against institutional investment frameworks used by Nigerian rating agencies and capital markets professionals.
             This model does not constitute a credit rating, financial advice, or a prediction of default. Always supplement quantitative scores with qualitative analysis and external credit rating context.
           </p>
         </div>
@@ -950,7 +952,7 @@ function UserGuidePage({ onBack }) {
           <div style={{ marginTop:12 }}>
             {[
               ["Standalone figures only.",              "For group companies, always use the standalone (Company) figures, not consolidated (Group) figures. The obligor on the CP is the legal entity, not the group. We extract standalone figures — verify this on the Review Data screen."],
-              ["Interest rates are required for the Interest Coverage Ratio.", "If the notes do not state a specific rate, use the CBN MPR plus the applicable spread, or the rate stated in the borrowing agreement. Enter as a percentage (e.g. 21.5 for 21.5%)."],
+              ["Interest rates are only a fallback for the Interest Coverage Ratio.", "Interest coverage uses the reported finance cost. Rates are used only when finance cost is missing. If the notes do not state a specific rate, use the CBN MPR plus the applicable spread, or the rate stated in the borrowing agreement. Always enter as a percentage (e.g. 21.5 for 21.5%, 0.8 for 0.8%)."],
               ["Prior Year Revenue is required for the Revenue Growth Rate.", "This is the only figure not extractable from a single year's statements. Enter it manually on the Review Data screen."],
               ["The score is not a credit rating.",     "It is a quantitative decision-support tool for internal use. Always supplement with qualitative analysis and consider the external credit rating in context."],
             ].map(([bold, text]) => (

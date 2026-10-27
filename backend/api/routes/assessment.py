@@ -9,7 +9,7 @@ import base64
 
 from api.deps import get_db, get_current_user, limiter
 from api.models import CreditTransaction, User, Assessment
-from api.scoring import compute_all_ratios
+from api.scoring import compute_all_ratios, normalise_rates, CUTOFF_SCORE
 from api.claude import extract_figures, extract_rating, extract_cp_terms, generate_narrative
 from api.report import build_pdf
 
@@ -227,6 +227,19 @@ async def extract_cp(
     return {"cpTerms": cp_terms}
 
 
+# ── POST /assessment/preview ──────────────────────────────────
+@router.post("/preview")
+@limiter.limit("30/minute")
+async def preview_scores(
+    request      : Request,
+    body         : FiguresBody,
+    current_user : dict = Depends(get_current_user),
+):
+    """Score figures without AI, quota or saving. The Scores step uses it so the
+    preview always comes from the same engine as the saved result."""
+    return compute_all_ratios(body.figures)
+
+
 # ── POST /assessment/run ──────────────────────────────────────
 @router.post("/run")
 @limiter.limit("10/minute")
@@ -256,16 +269,16 @@ async def run_assessment(
                 "assessmentId": completed.id,
                 "totalScore"  : completed.total_score,
                 "maxScore"    : completed.max_score,
-                "cutoff"      : 34,
+                "cutoff"      : CUTOFF_SCORE,
+                "modelVersion": completed.model_version,
                 "eligible"    : completed.eligible,
                 "ratios"      : completed.ratios,
                 "narrative"   : completed.narrative,
                 "clientInfo"  : {**body.clientInfo, "totalScore": completed.total_score, "eligible": completed.eligible},
             }
 
-    score_result = compute_all_ratios(body.figures)
-
-    score_result = compute_all_ratios(body.figures)
+    figures      = normalise_rates(body.figures)
+    score_result = compute_all_ratios(figures)
 
     client_info = {
         **body.clientInfo,
@@ -275,7 +288,7 @@ async def run_assessment(
 
     try:
         narrative = await generate_narrative(
-            body.figures,
+            figures,
             score_result["ratios"],
             client_info,
         )
@@ -294,8 +307,10 @@ async def run_assessment(
         assessment.credit_rating     = body.clientInfo.get("creditRating")
         assessment.review_date       = body.clientInfo.get("reviewDate")
         assessment.total_score       = score_result["total_score"]
+        assessment.max_score         = score_result["max_score"]
+        assessment.model_version     = score_result["model_version"]
         assessment.eligible          = score_result["eligible"]
-        assessment.figures           = body.figures
+        assessment.figures           = figures
         assessment.extracted_figures = body.extractedFigures
         assessment.ratios            = score_result["ratios"]
         assessment.narrative         = narrative
@@ -309,8 +324,10 @@ async def run_assessment(
             credit_rating     = body.clientInfo.get("creditRating"),
             review_date       = body.clientInfo.get("reviewDate"),
             total_score       = score_result["total_score"],
+            max_score         = score_result["max_score"],
+            model_version     = score_result["model_version"],
             eligible          = score_result["eligible"],
-            figures           = body.figures,
+            figures           = figures,
             extracted_figures = body.extractedFigures,
             ratios            = score_result["ratios"],
             narrative         = narrative,
@@ -339,6 +356,7 @@ async def run_assessment(
         "totalScore"  : score_result["total_score"],
         "maxScore"    : score_result["max_score"],
         "cutoff"      : score_result["cutoff"],
+        "modelVersion": score_result["model_version"],
         "eligible"    : score_result["eligible"],
         "ratios"      : score_result["ratios"],
         "narrative"   : narrative,
@@ -414,7 +432,7 @@ async def get_draft(
     return {
         "id"        : draft.id,
         "clientName": draft.client_name,
-        "figures"   : draft.figures,
+        "figures"   : normalise_rates(draft.figures) if draft.figures else draft.figures,
         "createdAt" : draft.created_at.isoformat(),
     }
 
@@ -485,6 +503,7 @@ async def get_assessment(
         "reviewDate"  : assessment.review_date,
         "totalScore"  : assessment.total_score,
         "maxScore"    : assessment.max_score,
+        "modelVersion": assessment.model_version,
         "eligible"    : assessment.eligible,
         "figures"     : assessment.figures,
         "ratios"      : assessment.ratios,

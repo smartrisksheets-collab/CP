@@ -16,6 +16,11 @@ input, select, textarea, button { max-width: 100%; box-sizing: border-box; }
   --error-bg     : #FCEBEB;
   --success      : #27500A;
   --success-bg   : #EAF3DE;
+  --score-full   : #1E7E34;
+  --score-part   : #065f46;
+  --score-part-bg: #d1fae5;
+  --warning      : #854F0B;
+  --chip-bg      : #F0F0F0;
 }
 
 body {

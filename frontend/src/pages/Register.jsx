@@ -57,7 +57,8 @@ export default function Register() {
       }
     } catch (e) {
       const detail = e.response?.data?.detail;
-      setGlobalErr(typeof detail === "string" ? detail : "Registration failed. Please try again.");
+      if (e.response?.status === 429) setGlobalErr("Too many sign-up attempts. Please wait an hour and try again.");
+      else setGlobalErr(typeof detail === "string" ? detail : "Registration failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -105,7 +106,7 @@ export default function Register() {
               </p>
               {[
                 "Lightening fast financial statement extraction",
-                "10-ratio quantitative scoring model",
+                "12-ratio quantitative scoring model",
                 "Professional PDF report generation",
                 "Nigerian capital markets calibrated",
               ].map((f, i) => (

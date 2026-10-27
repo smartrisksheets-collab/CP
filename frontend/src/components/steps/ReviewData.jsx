@@ -31,6 +31,19 @@ function Field({ label, id, figures, onChange, manual, readonly, step, placehold
   );
 }
 
+const fmtK = (v) => Math.round(v).toLocaleString("en-NG");
+
+// Current liabilities split into short-term debt, payables and the rest, so the analyst
+// can see what the figure includes. Null when there is nothing to split.
+function currentLiabilitiesBreakdown(f) {
+  const cl = parseFloat(f.currentLiabilities);
+  const tp = parseFloat(f.tradePayables);
+  if (isNaN(cl) || isNaN(tp)) return null;
+  const std   = parseFloat(f.shortTermDebt) || 0;
+  const other = cl - std - tp;
+  return { std, tp, other, short: other < 0 };
+}
+
 export default function ReviewData({ figures, onChange, onBack, onNext, draftId }) {
   const [error, setError]         = useState("");
   const [autoSaved, setAutoSaved] = useState(false);
@@ -67,10 +80,17 @@ export default function ReviewData({ figures, onChange, onBack, onNext, draftId 
   function handleNext() {
     if (!figures.revenue)          { setError("Revenue is required."); return; }
     if (!figures.totalAssets)      { setError("Total Assets is required."); return; }
+    if (!figures.currentAssets)    { setError("Current Assets is required."); return; }
     if (!figures.currentLiabilities){ setError("Current Liabilities is required."); return; }
+    for (const [id, label] of [["shortTermInterestRate","Short-term debt rate"],["longTermInterestRate","Long-term debt rate"]]) {
+      const r = figures[id];
+      if (r !== null && r !== undefined && (r < 0 || r > 100)) { setError(`${label} must be a percentage between 0 and 100.`); return; }
+    }
     setError("");
     onNext();
   }
+
+  const breakdown = currentLiabilitiesBreakdown(figures);
 
   const css = {
     card : { background:"#fff", border:"1px solid #E0E0E0", borderRadius:8, padding:20, marginBottom:16 },
@@ -121,9 +141,10 @@ export default function ReviewData({ figures, onChange, onBack, onNext, draftId 
           <Field label="Cash & Equivalents (₦'000)" id="cash" figures={figures} onChange={set} />
           <Field label="Inventory (₦'000)" id="inventory" figures={figures} onChange={set} />
           <Field label="Prepaid Expenses (₦'000)" id="prepaidExpenses" figures={figures} onChange={set} />
-          <Field label="Current Assets (₦'000)" id="currentAssets" figures={figures} onChange={set} />
+          <Field label="Current Assets (₦'000)" id="currentAssets" figures={figures} onChange={set} required />
           <Field label="Total Assets (₦'000)" id="totalAssets" figures={figures} onChange={set} required />
           <Field label="Current Liabilities (₦'000)" id="currentLiabilities" figures={figures} onChange={set} required />
+          <Field label="Trade & Other Payables (₦'000)" id="tradePayables" figures={figures} onChange={set} placeholder="Included in current liabilities" />
           <Field label="Total Liabilities (₦'000)" id="totalLiabilities" figures={figures} onChange={set} />
           <Field label="Short-term Debt (₦'000)" id="shortTermDebt" figures={figures} onChange={set} />
           <Field label="Long-term Debt (₦'000)" id="longTermDebt" figures={figures} onChange={set} />
@@ -131,16 +152,22 @@ export default function ReviewData({ figures, onChange, onBack, onNext, draftId 
           <Field label="Shareholders' Equity (₦'000)" id="shareholdersEquity" figures={figures} onChange={set} />
           <Field label="Retained Earnings (₦'000)" id="retainedEarnings" figures={figures} onChange={set} />
         </div>
+        {breakdown && (
+          <div style={{ fontSize:11, marginTop:8, color: breakdown.short ? "var(--warning)" : "var(--muted)" }}>
+            Current liabilities = short-term debt {fmtK(breakdown.std)} + payables {fmtK(breakdown.tp)} + other {fmtK(breakdown.other)}
+            {breakdown.short && <> &nbsp;⚠ Current liabilities are less than short-term debt plus payables. Check the figure includes every current liability line.</>}
+          </div>
+        )}
       </div>
 
       <div style={css.card}>
         <div style={css.title}>Finance Cost &amp; Interest Rates</div>
         <div style={css.grid}>
           <Field label="Finance Cost (₦'000)" id="financeCost" figures={figures} onChange={set} />
-          <Field label="Short-term debt rate (%)" id="shortTermInterestRate" figures={figures} onChange={set} step="0.1" placeholder="e.g. 13.5" manual />
-          <Field label="Long-term debt rate (%)" id="longTermInterestRate" figures={figures} onChange={set} step="0.1" placeholder="e.g. 17.5" manual />
+          <Field label="Short-term debt rate (%)" id="shortTermInterestRate" figures={figures} onChange={set} step="0.1" placeholder="e.g. 13.5 (%)" manual />
+          <Field label="Long-term debt rate (%)" id="longTermInterestRate" figures={figures} onChange={set} step="0.1" placeholder="e.g. 17.5 (%)" manual />
         </div>
-        <div style={{ fontSize:11, color:"#888", marginTop:8 }}>Interest coverage uses the reported finance cost. Rates are only used when finance cost is empty; enter them as a percentage, e.g. 13.5 for 13.5%.</div>
+        <div style={{ fontSize:11, color:"#888", marginTop:8 }}>Interest coverage uses the reported finance cost. Rates are only used when finance cost is empty; always enter them as a percentage, e.g. 13.5 for 13.5% or 0.8 for 0.8%.</div>
       </div>
 
       <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:20 }}>

@@ -91,6 +91,9 @@ export const runAssessment = (figures, clientInfo, extractedFigures = null, draf
     api.post("/assessment/run", { figures, clientInfo, extractedFigures, draftId }, { timeout: 180000 })
   );
 
+export const previewScores = (figures) =>
+  api.post("/assessment/preview", { figures });
+
 export const getDraft = () =>
   api.get("/assessment/draft");
 
