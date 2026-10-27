@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useIsMobile } from "../hooks/useBreakpoint.js";
 import { getHistory, generateReport, getAssessment, updateNarrative, deleteAssessment } from "../api/client.js";
 import { Loader, Download, Eye, X, Save, Trash2, Search } from "lucide-react";
+import RatioTable from "./RatioTable.jsx";
 
 async function parseAxiosError(e, fallback) {
   try {
@@ -213,19 +214,6 @@ const NARR_LABELS = [
   ["recommendation",          "Recommendation"],
 ];
 
-const CATEGORIES = {
-  "quick_ratio"      : "Quick Ratios",
-  "net_income_margin": "Profitability Ratios",
-  "revenue_growth"   : "Profitability Ratios",
-  "return_on_assets" : "Return Ratios",
-  "debt_to_assets"   : "Leverage Ratios",
-  "debt_to_capital"  : "Leverage Ratios",
-  "interest_coverage": "Coverage Ratios",
-  "dscr"             : "Coverage Ratios",
-  "debt_to_ebitda"   : "Coverage Ratios",
-  "altman_z"         : "Corporate Bankruptcy",
-};
-
 function AssessmentModal({ data, onClose, onSaved, onError }) {
   const isMobile = useIsMobile();
   const [narr, setNarr]         = useState(data.narrative || {});
@@ -266,31 +254,6 @@ function AssessmentModal({ data, onClose, onSaved, onError }) {
     }
   }
 
-  const th = { textAlign:"left", fontSize:11, fontWeight:"bold", color:"#888", padding:"7px 10px", borderBottom:"2px solid #E8E8E8", textTransform:"uppercase" };
-  const td = { padding:"9px 10px", borderBottom:"1px solid #F0F0F0", fontSize:13, verticalAlign:"middle" };
-
-  let lastCat = "";
-  const ratioRows = (data.ratios || []).map((r, i) => {
-    const cat    = CATEGORIES[r.id] || r.category || "";
-    const newCat = cat !== lastCat;
-    lastCat = cat;
-    const green = r.score === r.max_score;
-    const red   = r.score <= 0;
-    const col   = green ? "#1E7E34" : red ? "#A32D2D" : "#065f46";
-    const bg    = green ? "#EAF3DE" : red ? "#FCEBEB" : "#d1fae5";
-    return (
-      <>
-        {newCat && <tr key={`c${i}`}><td colSpan={5} style={{ background:"var(--primary)", color:"#fff", fontSize:11, fontWeight:"bold", padding:"5px 10px", textTransform:"uppercase", letterSpacing:"0.04em" }}>{cat}</td></tr>}
-        <tr key={i}>
-          <td style={td}>{r.name}</td>
-          <td style={td}>{r.display_value}</td>
-          <td style={td}><span style={{ fontSize:11, padding:"2px 8px", borderRadius:999, background:bg, color:col, whiteSpace:"nowrap" }}>{r.band}</span></td>
-          <td style={{ ...td, textAlign:"right", fontWeight:"bold", color:col }}>{r.score}</td>
-          <td style={{ ...td, textAlign:"right", color:"#888" }}>{r.max_score}</td>
-        </tr>
-      </>
-    );
-  });
 
   return (
     <div onClick={e => e.target === e.currentTarget && onClose()}
@@ -312,13 +275,7 @@ function AssessmentModal({ data, onClose, onSaved, onError }) {
           <div style={{ marginBottom:24 }}>
             <div style={{ fontSize:13, fontWeight:"bold", color:"#5A5A5A", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:10, paddingBottom:6, borderBottom:"1px solid #F0F0F0" }}>Score Breakdown</div>
             <div style={{ overflowX:"auto", width:"100%" }}>
-              <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13, minWidth:520 }}>
-                <thead><tr>
-                  <th style={th}>Ratio</th><th style={th}>Result</th><th style={th}>Band</th>
-                  <th style={{ ...th, textAlign:"right" }}>Score</th><th style={{ ...th, textAlign:"right" }}>Max</th>
-                </tr></thead>
-                <tbody>{ratioRows}</tbody>
-              </table>
+              <RatioTable ratios={data.ratios || []} maxScore={data.maxScore ?? 56} />
             </div>
           </div>
         )}
@@ -333,7 +290,7 @@ function AssessmentModal({ data, onClose, onSaved, onError }) {
             {showFigures && (
               <div style={{ marginTop:10, display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))", gap:8 }}>
                 {Object.entries(data.figures)
-                  .filter(([k, v]) => v !== null && v !== undefined && typeof v === "number")
+                  .filter(([, v]) => v !== null && v !== undefined && typeof v === "number")
                   .map(([k, v]) => (
                     <div key={k} style={{ padding:"8px 10px", borderRadius:6, background:"#F5F5F2", border:"1px solid #E8E8E8" }}>
                       <div style={{ fontSize:10, color:"#888", textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:2 }}>{k.replace(/([A-Z])/g," $1").trim()}</div>

@@ -106,6 +106,7 @@ class Assessment(Base):
     credit_rating : Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     total_score   : Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     max_score     : Mapped[int]           = mapped_column(Integer, default=56)
+    model_version : Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # scoring model used, e.g. "v1.2"
     eligible      : Mapped[Optional[bool]]= mapped_column(Boolean, nullable=True)
     figures            : Mapped[Optional[dict]]= mapped_column(JSONB, nullable=True)
     extracted_figures  : Mapped[Optional[dict]]= mapped_column(JSONB, nullable=True)  # AI-extracted, pre-edit

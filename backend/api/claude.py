@@ -5,6 +5,8 @@ import re
 import os
 from typing import Optional
 
+from api.scoring import CUTOFF_SCORE, MAX_SCORE, normalise_rates
+
 CLAUDE_MODEL      = "claude-opus-5-5"
 CLAUDE_EFFORT     = "medium" # thinking is always on; effort sets its depth (raise to "high" if extraction misses figures)
 CLAUDE_MAX_TOKENS = 16000    # covers thinking plus the JSON reply
@@ -53,25 +55,12 @@ def _response_text(response) -> str:
     return text
 
 
-async def _call_with_pdf(base64_pdf: str, prompt: str) -> str:
-    """Call Claude with a PDF document and a text prompt. Retries on 429."""
+async def _call(content) -> str:
+    """One Claude call with retries on rate limits, timeouts and overload."""
     delay = 8
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            response = await asyncio.wait_for(
-                _create([
-                    {
-                        "type": "document",
-                        "source": {
-                            "type"      : "base64",
-                            "media_type": "application/pdf",
-                            "data"      : base64_pdf,
-                        },
-                    },
-                    {"type": "text", "text": prompt},
-                ]),
-                timeout=CLAUDE_TIMEOUT,
-            )
+            response = await asyncio.wait_for(_create(content), timeout=CLAUDE_TIMEOUT)
             return _response_text(response)
 
         except anthropic.RateLimitError:
@@ -95,40 +84,26 @@ async def _call_with_pdf(base64_pdf: str, prompt: str) -> str:
             raise RuntimeError(f"Claude API error ({e.status_code}): {e.message}")
         except anthropic.APIError as e:
             raise RuntimeError(f"Claude API error: {e}")
+
+
+async def _call_with_pdf(base64_pdf: str, prompt: str) -> str:
+    """Call Claude with a PDF document and a text prompt."""
+    return await _call([
+        {
+            "type": "document",
+            "source": {
+                "type"      : "base64",
+                "media_type": "application/pdf",
+                "data"      : base64_pdf,
+            },
+        },
+        {"type": "text", "text": prompt},
+    ])
 
 
 async def _call_text_only(prompt: str) -> str:
-    """Call Claude with text only. Retries on 429."""
-    delay = 8
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            response = await asyncio.wait_for(
-                _create(prompt),
-                timeout=CLAUDE_TIMEOUT,
-            )
-            return _response_text(response)
-
-        except anthropic.RateLimitError:
-            if attempt < MAX_RETRIES:
-                await asyncio.sleep(delay)
-                delay *= 2
-                continue
-            raise RuntimeError("Claude rate limit reached. Please wait 30 seconds and try again.")
-
-        except asyncio.TimeoutError:
-            if attempt < MAX_RETRIES:
-                await asyncio.sleep(5)
-                continue
-            raise RuntimeError("Claude took too long to respond. Please try again in a moment.")
-
-        except anthropic.APIStatusError as e:
-            if e.status_code in (529, 500, 503) and attempt < MAX_RETRIES:
-                await asyncio.sleep(delay)
-                delay *= 2
-                continue
-            raise RuntimeError(f"Claude API error ({e.status_code}): {e.message}")
-        except anthropic.APIError as e:
-            raise RuntimeError(f"Claude API error: {e}")
+    """Call Claude with text only."""
+    return await _call(prompt)
 
 
 # ── 1. Financial figures extraction ──────────────────────────
@@ -190,7 +165,11 @@ Use ONLY the COMPANY current year column for all balance sheet figures.
 - inventory: Inventories or Stocks from current assets. Return 0 if not present.
 - prepaidExpenses: Prepayments or Prepaid expenses from current assets. Return 0 if not present.
 - totalLiabilities: Total liabilities grand total.
-- currentLiabilities: Total current liabilities subtotal.
+- currentLiabilities: Total current liabilities subtotal. It MUST include every current liability line:
+  trade and other payables, accruals, short-term borrowings, commercial papers, overdrafts, current portion
+  of long-term debt, tax payable and other current liabilities. If the statement shows no subtotal,
+  add those lines up. It is never just the short-term borrowings line.
+- tradePayables: Trade and other payables plus accruals from current liabilities. Return 0 if not present.
 - shareholdersEquity: Total equity / Total shareholders funds.
 - retainedEarnings: Retained earnings or Accumulated surplus from equity section.
 
@@ -212,8 +191,8 @@ bonds and overdrafts are often disclosed only inside those notes.
   (or its note), COMPANY current year column, as a positive number. Exclude finance income.
 
 === INTEREST RATES — FROM NOTES TO THE ACCOUNTS ===
-- shortTermInterestRate: Rate on short-term borrowings as decimal (e.g. 0.215 for 21.5%). Midpoint if range.
-- longTermInterestRate: Rate on long-term borrowings as decimal.
+- shortTermInterestRate: Rate on short-term borrowings as a percentage number (e.g. 21.5 for 21.5%). Midpoint if range.
+- longTermInterestRate: Rate on long-term borrowings as a percentage number (e.g. 17.5 for 17.5%).
 
 === METADATA ===
 - reportingPeriod: Financial year end date from the face of the statements (e.g. 31 December 2025).
@@ -231,7 +210,7 @@ Extract from the COMPANY prior year column only (the column next to the current 
 Return ONLY this JSON — no other text:
 {"revenue":number,"priorYearRevenue":number,"netIncome":number,"ebit":number,
 "depreciationAndAmortisation":number,"cash":number,"inventory":number,"prepaidExpenses":number,
-"currentAssets":number,"totalAssets":number,"currentLiabilities":number,"totalLiabilities":number,
+"currentAssets":number,"totalAssets":number,"currentLiabilities":number,"tradePayables":number,"totalLiabilities":number,
 "shortTermDebt":number,"longTermDebt":number,"totalDebt":number,
 "shareholdersEquity":number,"retainedEarnings":number,
 "financeCost":number,"shortTermInterestRate":number,"longTermInterestRate":number,
@@ -243,6 +222,9 @@ Return ONLY this JSON — no other text:
 async def extract_figures(base64_pdf: str) -> dict:
     raw     = await _call_with_pdf(base64_pdf, EXTRACTION_PROMPT)
     figures = _parse_json(raw)
+    # The prompt asks for percentages; if the model still returns a decimal (0.215),
+    # the legacy rule converts it, then rateUnit marks the figures as percentages
+    figures = normalise_rates({k: v for k, v in figures.items() if k != "rateUnit"})
 
     # Compute EBITDA server-side
     ebit = figures.get("ebit")
@@ -314,26 +296,22 @@ async def extract_cp_terms(base64_pdf: str) -> dict:
 async def generate_narrative(figures: dict, ratios: list, client_info: dict) -> dict:
     def n(v):
         try: return float(v) if v is not None else 0
-        except: return 0
+        except (TypeError, ValueError): return 0
 
     def fmt(val):
         if val is None: return "N/A"
-        try:
-            bn = n(val) / 1_000_000
-            return f"₦{bn:.1f}bn"
-        except: return "N/A"
+        return f"₦{n(val) / 1_000_000:.1f}bn"
 
     def pct(num, den):
-        try:
-            return f"{(n(num) / n(den)) * 100:.1f}" if n(den) else "N/A"
-        except: return "N/A"
+        return f"{(n(num) / n(den)) * 100:.1f}" if n(den) else "N/A"
+
+    # Scored ratios come from the engine's saved result, never recomputed here
+    by_id = {r.get("id"): r for r in ratios}
+    def saved(ratio_id):
+        return (by_id.get(ratio_id) or {}).get("display_value", "N/A")
 
     f       = figures
     td      = n(f.get("shortTermDebt")) + n(f.get("longTermDebt"))
-    net_debt = td - n(f.get("cash"))
-    debt_service = (abs(n(f.get("financeCost"))) or (n(f.get("shortTermDebt")) * n(f.get("shortTermInterestRate")) + n(f.get("longTermDebt")) * n(f.get("longTermInterestRate")))) + n(f.get("shortTermDebt"))
-    dscr    = f"{n(f.get('ebitda')) / debt_service:.2f}" if debt_service > 0 else "N/A"
-    net_dte = f"{net_debt / n(f.get('ebitda')):.2f}" if n(f.get("ebitda")) > 0 else "N/A"
     de      = f"{td / n(f.get('shareholdersEquity')) * 100:.1f}" if n(f.get("shareholdersEquity")) > 0 else "N/A"
 
     # ── Prior year derived metrics ────────────────────────────
@@ -345,12 +323,11 @@ async def generate_narrative(figures: dict, ratios: list, client_info: dict) -> 
     py_eq     = n(f.get("priorYearShareholdersEquity"))
 
     def chg(curr, prior):
-        try:
-            return f"{((curr - prior) / abs(prior) * 100):+.1f}%" if prior else "N/A"
-        except: return "N/A"
+        return f"{((curr - prior) / abs(prior) * 100):+.1f}%" if prior else "N/A"
 
     ratio_lines = "\n".join(
-        f"  • {r['name']}: {r['display_value']} | Band: {r['band']} | Score: {r['score']}/{r['max_score']}"
+        f"  • {r['name']}: {r['display_value']} | Band: {r['band']} | "
+        + ("Info only, not scored" if r.get("display_only") else f"Score: {r['score']}/{r['max_score']}")
         for r in ratios
     )
 
@@ -366,6 +343,8 @@ FINANCIAL FIGURES — CURRENT vs PRIOR YEAR (₦'000):
   EBIT:                {fmt(f.get('ebit'))}  |  Prior: {fmt(py_ebit)}  |  Change: {chg(n(f.get('ebit')), py_ebit)}
   EBITDA:              {fmt(f.get('ebitda'))}
   Cash & Equivalents:  {fmt(f.get('cash'))}
+  Current Assets:      {fmt(f.get('currentAssets'))}
+  Current Liabilities: {fmt(f.get('currentLiabilities'))}
   Total Assets:        {fmt(f.get('totalAssets'))}  |  Prior: {fmt(py_assets)}
   Total Liabilities:   {fmt(f.get('totalLiabilities'))}
   Shareholders Equity: {fmt(f.get('shareholdersEquity'))}  |  Prior: {fmt(py_eq)}  |  Change: {chg(n(f.get('shareholdersEquity')), py_eq)}
@@ -377,15 +356,17 @@ DERIVED METRICS:
   Return on Assets:    {pct(f.get('netIncome'), f.get('totalAssets'))}%
   Return on Equity:    {pct(f.get('netIncome'), f.get('shareholdersEquity'))}%
   Debt to Equity:      {de}%
-  Net Debt / EBITDA:   {net_dte}x
-  DSCR (EBITDA / (Finance Cost + Short-term Debt)):  {dscr}x
+  Net Debt / EBITDA:   {saved('debt_to_ebitda')}
+  DSCR (EBITDA / (Finance Cost + Short-term Debt)):  {saved('dscr')}
+  Current Ratio:       {saved('current_ratio')}
+  Cash Ratio:          {saved('cash_ratio')}
 
 COMPUTED SCORING RATIOS:
 {ratio_lines}
 
 SCORING RESULT:
-  Total Score: {client_info.get('totalScore')} / 56
-  Eligible: {'YES — meets the 34-point cut-off' if client_info.get('eligible') else 'NO — below the 34-point cut-off'}
+  Total Score: {client_info.get('totalScore')} / {MAX_SCORE}
+  Eligible: {f'YES — meets the {CUTOFF_SCORE}-point cut-off' if client_info.get('eligible') else f'NO — below the {CUTOFF_SCORE}-point cut-off'}
   Score Tier: {'STRONG (≥ 42 pts)' if (client_info.get('totalScore') or 0) >= 42 else 'MARGINAL (34–41 pts)' if client_info.get('eligible') else 'BELOW THRESHOLD (< 34 pts)'} 
 
 INSTRUCTIONS:
@@ -405,7 +386,7 @@ Return ONLY valid JSON with no markdown and no backticks:
   "financialStanding": "Strong|Fair|Weak",
   "financialStandingReview": "2-3 sentences: primary profitability metric driving this status, its YoY movement",
   "cashFlowRating": "Strong|Moderate|Weak",
-  "cashFlowReview": "2-3 sentences: EBITDA or liquidity figure driving this status, what it means for debt service",
+  "cashFlowReview": "2-3 sentences: EBITDA or liquidity figure driving this status, what it means for debt service. One sentence MUST state how far current assets (Current Ratio) and cash (Cash Ratio) cover current liabilities, citing both ratios.",
   "creditRiskLevel": "Low|Moderate|High",
   "creditRiskReview": "2-3 sentences: primary leverage metric, what it means for creditors",
   "futureRiskLevel": "Low|Moderate|High",

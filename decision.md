@@ -19,6 +19,11 @@
 - D016 2026-10-26 Interest coverage uses reported finance cost; debt x rates only as fallback
 - D017 2026-10-26 DSCR = EBITDA / (finance cost + short-term debt), higher is better
 - D018 2026-10-26 Extraction prompt: year-neutral columns; CP, bonds and overdrafts count as debt
+- D019 2026-10-27 Keep true DSCR (D017) instead of spec item 5 EBITDA / Total Debt
+- D020 2026-10-27 Score preview comes from the server engine (/assessment/preview); frontend copy removed
+- D021 2026-10-27 Scoring bands are versioned tables in scoring.py; assessments.model_version (0003)
+- D022 2026-10-27 Interest rates are always percentages, marked by figures.rateUnit
+- D023 2026-10-27 Go live with model v2.0 (Liquidity 2 to 8 points, total 56, cutoff 34)
 
 ## D001 Start Supabase empty
 Render database is suspended for non-payment and unreachable. User confirmed the app stores no data worth keeping. Tenants are recreated by backend/seed.py. Edge cases: no stamping of an existing schema needed; tenant rows must exist before any login, so seed runs after upgrade head.
@@ -74,3 +79,18 @@ Old DSCR was EBITDA / total debt with low values scoring highest, contradicting 
 
 ## D018 Extraction prompt fixes
 Prompt hardcoded "COMPANY 2024 / 2023" columns, wrong for FYE 2025 statements; now "current year / prior year". Debt now explicitly includes commercial papers, bonds, notes, overdrafts and finance leases, and the model must open the notes behind "Other liabilities" lines. Reason: Sonnet 4.5 missed 17.2bn (CP 7.2bn, bond 10bn) on Veritasi; Opus 5.5 found them, the prompt now asks for it explicitly.
+
+## D019 Keep true DSCR
+Eddu's spec (item 5) proposed EBITDA / Total Debt with reversed bands. That is a leverage ratio already covered by Net Debt / EBITDA, Debt to Asset and Debt to Capital, and D017 is close to the spec's own "full fix" (EBITDA / (interest + principal due in 12 months)) using short-term debt as the principal. Eddu agreed. Effect: Streadvest DSCR 6.60x, full points.
+
+## D020 Server-side score preview
+The Scores step had a JavaScript copy of the engine that already disagreed with the server (Net Debt / EBITDA above 4.0x: -5 vs 0). Replaced by POST /assessment/preview (auth, 30/minute, no AI, no credit, no save). Ratio tables in Scores, Result and Dashboard now share frontend/src/components/RatioTable.jsx. PDF header and AI narrative read the saved ratios; old assessments fall back to the engine. Edge cases: preview failure shows a message and the run still works; display-only ratios never enter the total.
+
+## D021 Versioned band tables
+backend/api/scoring.py keeps one band table per model (v1.2, v2.0); MODEL_VERSION selects the live one; each model must total 56 at import; cutoff = ceil(max x 60%). Every saved assessment stores model_version (0003_model_version, backfill v1.1 if ratios hold current_ratio, else v1.0; drafts stay NULL). Old reports keep their stored scores; re-running a draft uses the live model. backend/scripts/backtest_models.py re-scores saved figures under two models in a read-only transaction. Also: acid-test uses current assets (item 4), EBITDA <= 0 scores 0 on Net Debt / EBITDA (item 6), no debt scores full interest coverage (item 7), Altman Z' private-firm formula (item 8).
+
+## D022 Rates as percentages
+Old rule (rate > 1 means percent) read 0.8% as 80%. Extraction now returns 21.5 for 21.5%, figures carry rateUnit "percent" and the engine divides by 100. Figures without rateUnit (older drafts and assessments) are converted once with the old rule by normalise_rates. Review Data rejects rates outside 0 to 100. Edge case: an extracted rate below 1% without rateUnit would be read as a decimal; not realistic for Nigerian borrowing.
+
+## D023 Model v2.0 live
+User chose to go live with v2.0 on 2026-10-27: Liquidity 8 (Acid-Test 2, Current 3, Cash 3), Coverage 16 (Interest Coverage 6, DSCR 5, Net Debt / EBITDA 5), Altman Z' 8, others unchanged. DSCR 5-point bands: >= 1.5x 5, 1.25 to 1.49x 3, 1.0 to 1.24x 2, < 1.0x 0, no debt 5. Streadvest: 53/56. Back-test against Supabase recommended before deploy (Supabase started empty on 2026-10-26).

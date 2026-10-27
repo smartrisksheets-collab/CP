@@ -106,7 +106,7 @@ export default function Register() {
               </p>
               {[
                 "Lightening fast financial statement extraction",
-                "10-ratio quantitative scoring model",
+                "12-ratio quantitative scoring model",
                 "Professional PDF report generation",
                 "Nigerian capital markets calibrated",
               ].map((f, i) => (
