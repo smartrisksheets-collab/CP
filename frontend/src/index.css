@@ -30,6 +30,22 @@ body {
   min-height: 100vh;
 }
 
+/* ── Offline banner ───────────────────────────────────────── */
+.sr-offline-banner {
+  position: sticky;
+  top: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  background: var(--error-bg);
+  color: var(--error);
+  border-bottom: 1px solid var(--error);
+}
+
 /* ── Mobile / Tablet responsiveness ──────────────────────── */
 .sr-table-scroll {
   overflow-x: auto;

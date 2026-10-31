@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { useIsMobile } from "../hooks/useBreakpoint.js";
 import { Users, BarChart2, ArrowLeft, Plus, Minus, Shield, RefreshCw, Loader } from "lucide-react";
 import axios from "axios";
+import { errorMessage } from "../api/client.js";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
@@ -48,7 +49,7 @@ export default function AdminDashboard() {
       setUsers(usersRes.data);
       setStats(statsRes.data);
     } catch (e) {
-      setError("Failed to load admin data.");
+      setError(errorMessage(e, "Failed to load admin data."));
     } finally {
       setLoading(false);
     }
@@ -70,7 +71,7 @@ export default function AdminDashboard() {
       setAdjustAmt("");
       setAdjustReason("");
     } catch (e) {
-      setAdjustErr(e.response?.data?.detail || "Failed to adjust credits.");
+      setAdjustErr(errorMessage(e, "Failed to adjust credits."));
     } finally {
       setAdjusting(false);
     }
@@ -84,7 +85,7 @@ export default function AdminDashboard() {
       );
       await loadData();
     } catch (e) {
-      alert(e.response?.data?.detail || "Failed to update role.");
+      alert(errorMessage(e, "Failed to update role."));
     }
   }
 
@@ -299,4 +300,4 @@ export default function AdminDashboard() {
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
-}
+}

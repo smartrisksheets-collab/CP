@@ -5,7 +5,7 @@ import LegalModal from "../components/LegalModal.jsx";
 import { useIsMobile } from "../hooks/useBreakpoint.js";
 import { useTenant } from "../context/TenantContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
-import { requestOTP, verifyOTP } from "../api/client.js";
+import { requestOTP, verifyOTP, errorMessage } from "../api/client.js";
 
 const S = {
   wrapper  : { display:"flex", height:"100vh", width:"100vw", overflow:"hidden" },
@@ -163,7 +163,7 @@ export default function Login() {
       setStep(STEPS.OTP);
       startResendCooldown();
     } catch (e) {
-      setEmailErr(e.response?.data?.detail || "Could not send verification code. Please try again.");
+      setEmailErr(errorMessage(e, "Could not send verification code. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -216,7 +216,7 @@ export default function Login() {
       });
       navigate("/", { replace: true });
     } catch (e) {
-      setOtpErr(e.response?.data?.detail || "Incorrect or expired code. Please try again.");
+      setOtpErr(errorMessage(e, "Incorrect or expired code. Please try again."));
       setOtp(["","","","","",""]);
       document.getElementById("otp-0")?.focus();
     } finally {
@@ -240,7 +240,7 @@ export default function Login() {
       setOtpErr("");
       startResendCooldown();
     } catch (e) {
-      setOtpErr("Could not resend code. Please try again.");
+      setOtpErr(errorMessage(e, "Could not resend code. Please try again."));
     } finally {
       setLoading(false);
     }

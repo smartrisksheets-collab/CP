@@ -14,18 +14,55 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// ── Global 401 handler — clear token and reload ───────────────
+// ── Global error handler — 401 logout, JSON errors from blob requests ──
 api.interceptors.response.use(
   (res) => res,
-  (err) => {
+  async (err) => {
     if (err.response?.status === 401) {
       localStorage.removeItem("sr_token");
       localStorage.removeItem("sr_user");
       window.location.href = "/login";
     }
+    // Report downloads use responseType "blob", so their error bodies arrive as a Blob
+    const data = err.response?.data;
+    if (data instanceof Blob && data.type.includes("json")) {
+      try { err.response.data = JSON.parse(await data.text()); } catch { /* keep the blob; errorMessage falls back */ }
+    }
     return Promise.reject(err);
   }
 );
+
+// ── User-facing error text ────────────────────────────────────
+export const OFFLINE_MESSAGE = "No internet connection. Check your connection and try again.";
+
+// Turns any request error into one plain sentence for the UI. Order matters:
+// offline first, then no response, then the server's own message, then by status.
+export function errorMessage(err, fallback = "Something went wrong. Please try again.") {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return OFFLINE_MESSAGE;
+
+  if (!err?.response) {
+    if (err?.code === "ERR_CANCELED") return fallback;
+    if (err?.code === "ECONNABORTED" || err?.code === "ETIMEDOUT") {
+      return "The server took too long to respond. Check your internet connection and try again.";
+    }
+    // No response at all: network drop, DNS, server asleep, or an error page without CORS headers
+    return "Cannot reach SmartRisk. Check your internet connection, or try again in a minute.";
+  }
+
+  const { status, data } = err.response;
+  const detail = data?.detail;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (typeof detail?.message === "string" && detail.message.trim()) return detail.message;
+
+  if (status === 429) return "Too many requests. Please wait a minute and try again.";
+  if (status === 413) return "The upload is too large. Use a smaller file.";
+  if (status === 422) return "Some of the details sent were not valid. Check the form and try again.";
+  if (status === 502 || status === 503 || status === 504) {
+    return "SmartRisk is temporarily unavailable. Check your internet connection, or try again in a minute.";
+  }
+  if (status >= 500) return "Something went wrong on our side. Please try again.";
+  return fallback;
+}
 
 
 async function withRetry(fn, maxAttempts = 2) {
@@ -75,7 +112,7 @@ export const extractFigures = (formData, onUploadProgress) =>
   withRetry(() =>
     api.post("/assessment/extract", formData, {
       headers: { "Content-Type": "multipart/form-data" },
-      timeout: 120000,
+      timeout: 600000, // scanned documents and backend AI retries can take minutes; a client timeout here still charges a credit
       onUploadProgress,
     })
   );
@@ -83,7 +120,7 @@ export const extractFigures = (formData, onUploadProgress) =>
 export const extractCpTerms = (formData) =>
   api.post("/assessment/extract-cp", formData, {
     headers: { "Content-Type": "multipart/form-data" },
-    timeout: 90000,
+    timeout: 330000, // one AI call can take up to 300s on a long scanned document
   });
 
 export const runAssessment = (figures, clientInfo, extractedFigures = null, draftId = null) =>
@@ -121,4 +158,4 @@ export const updateNarrative = (id, narrative) =>
   api.patch(`/assessment/${id}/narrative`, { narrative });
 
 export const saveOnboarding = (data) =>
-  api.post("/auth/onboarding", data);
+  api.post("/auth/onboarding", data);

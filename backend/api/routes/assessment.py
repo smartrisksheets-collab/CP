@@ -5,17 +5,15 @@ from sqlalchemy import select, and_, update
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, timezone, timedelta
-import base64
 
 from api.deps import get_db, get_current_user, limiter
 from api.models import CreditTransaction, User, Assessment
 from api.scoring import compute_all_ratios, normalise_rates, CUTOFF_SCORE
 from api.claude import extract_figures, extract_rating, extract_cp_terms, generate_narrative
 from api.report import build_pdf
+from api.documents import read_document
 
 router = APIRouter()
-
-MAX_PDF_SIZE_MB = 20
 
 
 # ── Schemas ───────────────────────────────────────────────────
@@ -77,7 +75,8 @@ async def _check_quota(user: User, db: AsyncSession = None) -> None:
         )
 
 
-async def _decrement_credits(user: User, db: AsyncSession, assessment_id: int = None) -> None:
+async def _decrement_credits(user: User, db: AsyncSession, assessment_id: int = None) -> int:
+    """Charge one credit and log the debit. Returns the ledger row id for a refund."""
 
     result = await db.execute(
         update(User)
@@ -98,7 +97,7 @@ async def _decrement_credits(user: User, db: AsyncSession, assessment_id: int = 
         )
 
     # Log the debit — completes the ledger
-    db.add(CreditTransaction(
+    debit = CreditTransaction(
         user_email       = user.email,
         tenant_id        = user.tenant_id,
         pack             = user.plan,
@@ -107,15 +106,23 @@ async def _decrement_credits(user: User, db: AsyncSession, assessment_id: int = 
         transaction_type = "usage",
         assessment_id    = assessment_id,
         expires_at       = datetime.now(timezone.utc),  # not meaningful for debits but non-null
-    ))
+    )
+    db.add(debit)
+    await db.flush()
+    debit_id = debit.id
     await db.commit()
+    return debit_id
 
 
-def _validate_pdf(file: UploadFile, content: bytes) -> None:
-    if len(content) > MAX_PDF_SIZE_MB * 1024 * 1024:
-        raise HTTPException(status_code=413, detail=f"PDF exceeds {MAX_PDF_SIZE_MB}MB limit.")
-    if not content[:4] == b"%PDF":
-        raise HTTPException(status_code=400, detail="Uploaded file does not appear to be a valid PDF.")
+async def _refund_credit(user: User, debit_id: int, db: AsyncSession) -> None:
+    """Give back a credit whose extraction failed and mark its ledger debit refunded."""
+    await db.execute(update(User).where(User.id == user.id).values(credits=User.credits + 1))
+    await db.execute(
+        update(CreditTransaction)
+        .where(CreditTransaction.id == debit_id)
+        .values(status="refunded")
+    )
+    await db.commit()
 
 
 async def _get_draft(assessment_id: int, email: str, tenant_id: int, db: AsyncSession):
@@ -136,48 +143,41 @@ async def _get_draft(assessment_id: int, email: str, tenant_id: int, db: AsyncSe
 @limiter.limit("10/minute")
 async def extract(
     request       : Request,
-    financial_pdf : UploadFile           = File(...),
-    rating_pdf    : Optional[UploadFile] = File(None),
-    cp_terms_pdf  : Optional[UploadFile] = File(None),
-    client_name   : Optional[str]        = Form(None),
-    draft_id      : Optional[int]        = Form(None),
-    current_user  : dict                 = Depends(get_current_user),
-    db            : AsyncSession         = Depends(get_db),
+    financial_pdf : list[UploadFile]        = File(...),  # one PDF or page photos
+    rating_pdf    : list[UploadFile] | None = File(None),
+    cp_terms_pdf  : list[UploadFile] | None = File(None),
+    client_name   : str | None              = Form(None),
+    draft_id      : int | None              = Form(None),
+    current_user  : dict                    = Depends(get_current_user),
+    db            : AsyncSession            = Depends(get_db),
 ):
     user = await _get_user(current_user["email"], current_user["tenant_id"], db)
     await _check_quota(user, db)
-    await _decrement_credits(user, db)
 
-    fin_bytes = await financial_pdf.read()
-    _validate_pdf(financial_pdf, fin_bytes)
-    fin_b64 = base64.b64encode(fin_bytes).decode()
+    # Check every file before charging, so a bad upload never costs a credit
+    fin_doc    = await read_document(financial_pdf, "Financial statement")
+    rating_doc = await read_document(rating_pdf, "Credit rating report") if rating_pdf else None
+    cp_doc     = await read_document(cp_terms_pdf, "CP terms") if cp_terms_pdf else None
+
+    debit_id = await _decrement_credits(user, db)
 
     try:
-        figures = await extract_figures(fin_b64)
+        figures = await extract_figures(fin_doc)
     except RuntimeError as e:
-        await db.execute(
-            update(User)
-            .where(User.id == user.id)
-            .values(credits=User.credits + 1)
-        )
-        await db.commit()
+        await _refund_credit(user, debit_id, db)
         raise HTTPException(status_code=502, detail=str(e))
 
     result = {"figures": figures}
 
-    if rating_pdf:
-        rating_bytes = await rating_pdf.read()
-        _validate_pdf(rating_pdf, rating_bytes)
+    if rating_doc:
         try:
-            result["ratingData"] = await extract_rating(base64.b64encode(rating_bytes).decode())
+            result["ratingData"] = await extract_rating(rating_doc)
         except RuntimeError as e:
             result["ratingError"] = str(e)
 
-    if cp_terms_pdf:
-        cp_bytes = await cp_terms_pdf.read()
-        _validate_pdf(cp_terms_pdf, cp_bytes)
+    if cp_doc:
         try:
-            result["cpTerms"] = await extract_cp_terms(base64.b64encode(cp_bytes).decode())
+            result["cpTerms"] = await extract_cp_terms(cp_doc)
         except RuntimeError as e:
             result["cpTermsError"] = str(e)
 
@@ -214,14 +214,13 @@ async def extract(
 @limiter.limit("10/minute")
 async def extract_cp(
     request      : Request,
-    cp_terms_pdf : UploadFile   = File(...),
-    current_user : dict         = Depends(get_current_user),
-    db           : AsyncSession = Depends(get_db),
+    cp_terms_pdf : list[UploadFile] = File(...),  # one PDF or page photos
+    current_user : dict             = Depends(get_current_user),
+    db           : AsyncSession     = Depends(get_db),
 ):
-    cp_bytes = await cp_terms_pdf.read()
-    _validate_pdf(cp_terms_pdf, cp_bytes)
+    cp_doc = await read_document(cp_terms_pdf, "CP terms")
     try:
-        cp_terms = await extract_cp_terms(base64.b64encode(cp_bytes).decode())
+        cp_terms = await extract_cp_terms(cp_doc)
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e))
     return {"cpTerms": cp_terms}
@@ -345,6 +344,7 @@ async def run_assessment(
             CreditTransaction.user_email        == current_user["email"],
             CreditTransaction.tenant_id         == current_user["tenant_id"],
             CreditTransaction.transaction_type  == "usage",
+            CreditTransaction.status            == "success",
             CreditTransaction.assessment_id     == None,
         ))
         .values(assessment_id=assessment.id)
@@ -580,4 +580,4 @@ async def delete_assessment(
 
     assessment.deleted_at = datetime.now(timezone.utc)
     await db.commit()
-    return {"deleted": True}
+    return {"deleted": True}

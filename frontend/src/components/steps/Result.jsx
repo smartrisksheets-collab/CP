@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useIsMobile } from "../../hooks/useBreakpoint.js";
-import { generateReport } from "../../api/client.js";
+import { generateReport, errorMessage } from "../../api/client.js";
 import { Download, Loader, Plus, Eye, AlertTriangle } from "lucide-react";
 import ReportPreview from "../ReportPreview.jsx";
 import RatioTable from "../RatioTable.jsx";
@@ -46,8 +46,8 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
       a.download = `SmartRisk_${(clientInfo.clientName || "Report").replace(/\s+/g,"_")}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      setDlError("Failed to generate PDF. Please try again.");
+    } catch (e) {
+      setDlError(errorMessage(e, "Failed to generate PDF. Please try again."));
     } finally {
       setDownloading(false);
     }
@@ -170,4 +170,4 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
       )}
     </div>
   );
-}
+}

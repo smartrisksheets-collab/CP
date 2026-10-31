@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useIsMobile } from "../../hooks/useBreakpoint.js";
-import { runAssessment, previewScores } from "../../api/client.js";
+import { runAssessment, previewScores, errorMessage } from "../../api/client.js";
 import RatioTable from "../RatioTable.jsx";
 import { Loader, Zap, ChevronRight } from "lucide-react";
 
@@ -68,9 +68,9 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
     } catch (e) {
       const detail = e.response?.data?.detail;
       if (detail?.quotaExceeded) {
-        onQuotaExceeded?.(`You've used ${detail.used} of your ${detail.limit} assessments this month.`);
+        onQuotaExceeded?.(errorMessage(e, "You have 0 credits remaining."));
       } else {
-        setError(typeof detail === "string" ? detail : "Failed to run assessment. Please try again.");
+        setError(errorMessage(e, "Failed to run assessment. Please try again."));
       }
     } finally {
       setLoading(false);
@@ -139,4 +139,4 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
-}
+}

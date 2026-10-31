@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { Upload as UploadIcon, CheckCircle, Loader, AlertTriangle, AlertCircle, X, ChevronRight } from "lucide-react";
 import { useIsMobile } from "../../hooks/useBreakpoint.js";
-import { extractFigures } from "../../api/client.js";
+import { extractFigures, errorMessage } from "../../api/client.js";
 import CPTerms from "./CPTerms.jsx";
+import { ACCEPT, PHOTO_WARNING, inspectPdf, prepareDocument, checkWarnings, appendDocument, countKw } from "../../utils/documentInput.js";
 
 const RATINGS = ["","AAA","AA+","AA","AA-","A+","A","A-", "A1+", "A1", "A2", "A3", "BBB+","BBB","BBB-","BB+","BB","BB-","B+","B","B-","CCC","CC","C","D"];
 
@@ -23,18 +24,6 @@ const FIN_KW = [
   "financial statements","earnings","equity","borrowings",
   "depreciation","ebitda","turnover","comprehensive income",
   "naira","n'000","ngn","ifrs","independent auditor",
-];
-
-const CP_REQUIRED_KW = [
-  "commercial paper","tenor","discount rate","offer",
-  "maturity","issuer","programme","implied yield",
-  "offer open","offer close","funding date","subscription",
-];
-
-const CP_PROSPECTUS_KW = [
-  "programme memorandum","information memorandum",
-  "securities exchange commission","trust deed",
-  "listing particulars","guarantee",
 ];
 
 const UNAUDITED_KW = [
@@ -62,35 +51,6 @@ const IS_KW = [
   "earnings","comprehensive income",
 ];
 
-// ── PDF.js ────────────────────────────────────────────────
-let _pdfjs = null;
-async function loadPdfJs() {
-  if (_pdfjs) return _pdfjs;
-  if (window.pdfjsLib) { _pdfjs = window.pdfjsLib; return _pdfjs; }
-  await new Promise((res, rej) => {
-    const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-    s.onload = res; s.onerror = rej;
-    document.head.appendChild(s);
-  });
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-  _pdfjs = window.pdfjsLib;
-  return _pdfjs;
-}
-
-async function extractText(file, maxPages = 15) {
-  const lib = await loadPdfJs();
-  const pdf = await lib.getDocument({ data: await file.arrayBuffer() }).promise;
-  const n   = Math.min(pdf.numPages, maxPages);
-  let text  = "";
-  for (let i = 1; i <= n; i++) {
-    const content = await (await pdf.getPage(i)).getTextContent();
-    text += content.items.map((s) => s.str).join(" ") + " ";
-  }
-  return { text, numPages: pdf.numPages };
-}
-
 // ── Helpers ───────────────────────────────────────────────
 function tokenScore(name, text) {
   const STOP = new Set(["of","the","and","for","in","a","an","plc","ltd","limited","co","company","nigeria","nig","group","holdings","international"]);
@@ -103,10 +63,6 @@ function tokenScore(name, text) {
   return matches / aSet.size;
 }
 
-function countKw(text, list) {
-  const lc = text.toLowerCase();
-  return list.filter((k) => lc.includes(k.toLowerCase())).length;
-}
 
 function formatReviewDate(val) {
   if (!val) return "";
@@ -115,50 +71,48 @@ function formatReviewDate(val) {
   return d.toLocaleDateString("en-NG", { day:"2-digit", month:"short", year:"numeric" });
 }
 
-function maxOccurrences(text, list) {
-  const lc = text.toLowerCase();
-  return Math.max(0, ...list.map((k) => {
-    const re = new RegExp(k.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g");
-    return (lc.match(re) || []).length;
-  }));
-}
-
 // ── Validation ────────────────────────────────────────────
-async function runFinValidation(file, clientName) {
-  let text = "", numPages = 0;
+const FIN_PAGES_CHECKED = 100; // statements often sit after page 15 of an annual report
+
+async function runFinValidation(doc, clientName) {
+  if (doc.kind === "images") return { ok: true, warnings: [PHOTO_WARNING] };
+
+  let info;
   try {
-    ({ text, numPages } = await extractText(file, 15));
+    info = await inspectPdf(doc.files[0], FIN_PAGES_CHECKED);
   } catch {
-    return { ok: true, warnings: ["PDF could not be fully read (possibly encrypted). Accepted — verify all figures manually."] };
+    return { ok: true, warnings: ["PDF could not be checked in the browser. Accepted — verify all figures manually."] };
   }
+  if (info.error) return { ok: false, hard: info.error };
+  const { text } = info;
 
   if (text.replace(/\s/g, "").length < 300) {
     return { ok: true, warnings: ["Scanned or image-based PDF detected. Text extraction was limited — review all figures carefully on the next screen."] };
   }
 
-  const lc = text.toLowerCase();
+  const problems = [];
 
   // C — Require both balance sheet AND income statement evidence
-  const hasBS = BS_KW.some(k => lc.includes(k));
-  const hasIS = IS_KW.some(k => lc.includes(k));
+  const hasBS = countKw(text, BS_KW) > 0;
+  const hasIS = countKw(text, IS_KW) > 0;
   if (!hasBS || !hasIS) {
     const missing = !hasBS ? "Balance Sheet" : "Income Statement";
-    return { ok: false, hard: `This document does not appear to contain a ${missing}. Please upload complete audited annual financial statements including both sections.` };
+    problems.push(`This document does not appear to contain a ${missing}. Please upload complete audited annual financial statements including both sections.`);
   }
 
   if (countKw(text, FIN_KW) < 3) {
-    return { ok: false, hard: "This does not appear to be a financial statement. Key financial terms were not found. Please upload the audited annual accounts." };
+    problems.push("This does not appear to be a financial statement. Key financial terms were not found. Please upload the audited annual accounts.");
   }
 
   if (countKw(text, RAT_KW) >= 3 && countKw(text, FIN_KW) < 8) {
-    return { ok: false, hard: "This looks like a credit rating report, not a financial statement. Please upload it in the Credit Rating PDF slot instead." };
+    problems.push("This looks like a credit rating report, not a financial statement. Please upload it in the Credit Rating slot instead.");
   }
 
   if (clientName?.trim() && tokenScore(clientName, text.slice(0, 5000)) < 0.5) {
-    return { ok: false, hard: `Company name mismatch — "${clientName}" was not found in this document. Please verify you have uploaded the correct financial statements.` };
+    problems.push(`Company name mismatch — "${clientName}" was not found in this document. Please verify you have uploaded the correct financial statements.`);
   }
 
-  const warnings = [];
+  const warnings = checkWarnings(problems, info.imagePages);
 
   // B — Numeric density check
   const nonSpace = text.replace(/\s/g, "");
@@ -166,7 +120,7 @@ async function runFinValidation(file, clientName) {
     warnings.push("Very few numbers were detected in this document. Verify this is a complete financial statement containing figures.");
   }
 
-  if (UNAUDITED_KW.some(k => lc.includes(k))) {
+  if (countKw(text, UNAUDITED_KW) > 0) {
     warnings.push("This document may be unaudited or interim accounts. SmartRisk Credit requires audited annual financial statements.");
   }
 
@@ -182,30 +136,35 @@ async function runFinValidation(file, clientName) {
   return { ok: true, warnings };
 }
 
-async function runRatValidation(file, clientName) {
-  let text = "";
+async function runRatValidation(doc, clientName) {
+  if (doc.kind === "images") return { ok: true, warnings: [PHOTO_WARNING] };
+
+  let info;
   try {
-    ({ text } = await extractText(file, 10));
+    info = await inspectPdf(doc.files[0], 10);
   } catch {
-    return { ok: true, warnings: ["Rating PDF could not be fully read. Accepted — verify rating details manually."] };
+    return { ok: true, warnings: ["Rating PDF could not be checked in the browser. Accepted — verify rating details manually."] };
   }
+  if (info.error) return { ok: false, hard: info.error };
+  const { text } = info;
 
   if (text.replace(/\s/g, "").length < 300) {
     return { ok: true, warnings: ["Scanned or image-based rating PDF detected. Accepted — verify rating details manually."] };
   }
 
+  const problems = [];
   if (countKw(text, RAT_KW) < 2) {
-    return { ok: false, hard: "This does not appear to be a credit rating report. Key rating terms were not found. Please upload the rating certificate or report from Agusto & Co., GCR, DataPro, or similar." };
+    problems.push("This does not appear to be a credit rating report. Key rating terms were not found. Please upload the rating certificate or report from Agusto & Co., GCR, DataPro, or similar.");
   }
 
   if (clientName?.trim() && tokenScore(clientName, text.slice(0, 5000)) < 0.5) {
-    return { ok: false, hard: `Company name mismatch — "${clientName}" was not found in this rating report. Please verify you have uploaded the correct document.` };
+    problems.push(`Company name mismatch — "${clientName}" was not found in this rating report. Please verify you have uploaded the correct document.`);
   }
 
-  const warnings = [];
+  const warnings = checkWarnings(problems, info.imagePages);
 
   // F — Rating symbol detection
-  if (!/\b(AAA|AA[+\-]?|A[+\-]?|BBB[+\-]?|BB[+\-]?|B[+\-]?|CCC[+\-]?|CC|SD|D)\b/.test(text)) {
+  if (!/\b(AAA|AA[+-]?|A[+-]?|BBB[+-]?|BB[+-]?|B[+-]?|CCC[+-]?|CC|SD|D)\b/.test(text)) {
     warnings.push("No rating grade symbols (e.g. AA+, BBB-) were detected. Verify this document contains an explicit rating assignment.");
   }
 
@@ -233,49 +192,6 @@ async function runRatValidation(file, clientName) {
   }
 
   return { ok: true, warnings };
-}
-
-async function runCPValidation(file, clientName) {
-  let text = "", numPages = 0;
-  try {
-    ({ text, numPages } = await extractText(file, 10));
-  } catch {
-    return { ok: true, warnings: ["CP terms PDF could not be fully read. Accepted — verify extracted fields manually."] };
-  }
-
-  if (text.replace(/\s/g, "").length < 300) {
-    return { ok: true, warnings: ["Scanned or image-based PDF detected. Terms accepted — verify all extracted fields carefully."] };
-  }
-
-  if (clientName?.trim() && tokenScore(clientName, text.slice(0, 3000)) < 0.6) {
-    return { ok: false, hard: `Company name mismatch — "${clientName}" was not found in this CP terms document. Please verify you have uploaded the correct file.` };
-  }
-
-  if (countKw(text, CP_REQUIRED_KW) < 4) {
-    return { ok: false, hard: "This does not appear to be an indicative terms email. Key CP terms (Discount Rate, Implied Yield, Offer Open/Close, etc.) were not found. Please upload the forwarded CP email PDF." };
-  }
-
-  if (countKw(text, CP_PROSPECTUS_KW) >= 3) {
-    return { ok: false, hard: "This looks like a full Programme Memorandum or Information Memorandum, not an indicative terms email. Please upload the short forwarded email (typically 3–6 pages)." };
-  }
-
-  const warnings = [];
-  if (numPages > 6) {
-    warnings.push(`This document is ${numPages} pages long. Indicative terms emails are usually 3–6 pages — please verify all extracted fields.`);
-  }
-
-  return { ok: true, warnings };
-}
-
-// ── Progress reader ───────────────────────────────────────
-function readWithProgress(file, onProgress) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100)); };
-    reader.onload    = resolve;
-    reader.onerror   = reject;
-    reader.readAsArrayBuffer(file);
-  });
 }
 
 // ── Styles ────────────────────────────────────────────────
@@ -327,13 +243,13 @@ function UploadZone({ label, sub, file, onFile, onClear, validating, onGuard, pr
 
   return (
     <>
-      <input ref={ref} type="file" accept=".pdf" style={{ display:"none" }}
-        onChange={(e) => e.target.files[0] && onFile(e.target.files[0])} />
+      <input ref={ref} type="file" accept={ACCEPT} multiple style={{ display:"none" }}
+        onChange={(e) => { if (e.target.files.length) onFile(Array.from(e.target.files)); e.target.value = ""; }} />
       <div style={css.zone(hover)}
         onClick={() => { if (onGuard?.()) return; ref.current.click(); }}
         onDragOver={(e) => { e.preventDefault(); setHover(true); }}
         onDragLeave={() => setHover(false)}
-        onDrop={(e) => { e.preventDefault(); setHover(false); if (onGuard?.()) return; const f = e.dataTransfer.files[0]; if (f?.type === "application/pdf") onFile(f); }}
+        onDrop={(e) => { e.preventDefault(); setHover(false); if (onGuard?.()) return; if (e.dataTransfer.files.length) onFile(Array.from(e.dataTransfer.files)); }}
         onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       >
         <UploadIcon size={36} style={{ margin:"0 auto 12px", opacity:0.35, display:"block" }} />
@@ -477,8 +393,8 @@ const BLANK = { validating: false, warnings: [], error: "" };
 const BLANK_PROG = { show: false, pct: 0, name: "" };
 
 export default function Upload({ clientInfo, onClientInfoChange, onExtracted, onQuotaError, figures, onFiguresChange, onContinue, draftId, hasDownstreamData, onNewAssessment }) {
-  const [finFile, setFinFile] = useState(null);
-  const [ratFile, setRatFile] = useState(null);
+  const [finDoc, setFinDoc] = useState(null);
+  const [ratDoc, setRatDoc] = useState(null);
 
   const [finV, setFinV] = useState(BLANK);
   const [ratV, setRatV] = useState(BLANK);
@@ -508,85 +424,94 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
   const isMobile = useIsMobile();
   const info = clientInfo;
   const set  = (k, v) => onClientInfoChange({ ...info, [k]: v });
-  const showRatingReminder = !!ratFile && !info.creditRating;
+  const showRatingReminder = !!ratDoc && !info.creditRating;
 
   function goToSubStep(n) {
     setSubStep(n);
-    try { sessionStorage.setItem("sr_uploadSubStep", String(n)); } catch {}
+    try { sessionStorage.setItem("sr_uploadSubStep", String(n)); } catch { /* storage blocked; in-memory state still works */ }
   }
 
   useEffect(() => {
-    if (!loading) { setMsgIdx(0); return; }
+    if (!loading) return; // doExtract resets msgIdx before loading starts
     const t = setInterval(() => setMsgIdx(i => Math.min(i + 1, EXTRACT_MESSAGES.length - 1)), 8000);
     return () => clearInterval(t);
   }, [loading]);
 
   
-  const currentFileKey = finFile ? `${finFile.name}-${finFile.size}` : "";
+  const currentFileKey = finDoc ? `${finDoc.name}-${finDoc.size}` : "";
   const fileChanged    = !!extractedFileKey && !!currentFileKey && currentFileKey !== extractedFileKey;
 
   // ── File handlers ───────────────────────────────────────
-  async function _processFinFile(file) {
-    setFinFile(file);
-    setFinProgress({ show: true, pct: 0, name: file.name });
-    await readWithProgress(file, (pct) => setFinProgress({ show: true, pct, name: file.name }));
-    setFinProgress(BLANK_PROG);
+  // Turns picked files into a document, showing progress while photos are prepared
+  async function loadDocument(files, setProgress, setV) {
+    const name = files.length === 1 ? files[0].name : `${files.length} files`;
+    setV(BLANK);
+    setProgress({ show: true, pct: 0, name });
+    const { doc, error } = await prepareDocument(files, (pct) => setProgress({ show: true, pct, name }));
+    setProgress(BLANK_PROG);
+    if (error) setV({ validating: false, warnings: [], error });
+    return doc;
+  }
+
+  async function _processFinFiles(files) {
+    setFinDoc(null);
+    const doc = await loadDocument(files, setFinProgress, setFinV);
+    if (!doc) return;
     setFinV({ validating: true, warnings: [], error: "" });
-    const result = await runFinValidation(file, info.clientName);
+    const result = await runFinValidation(doc, info.clientName);
     if (result.ok === false) {
-      setFinFile(null);
       setFinV({ validating: false, warnings: [], error: result.hard });
       return;
     }
     if (result.ok === "confirm") {
-      setConfirm({ year: result.statementYear, file, warnings: result.warnings });
+      setConfirm({ year: result.statementYear, doc, warnings: result.warnings });
       setFinV({ validating: false, warnings: [], error: "" });
       return;
     }
+    setFinDoc(doc);
     setFinV({ validating: false, warnings: result.warnings, error: "" });
   }
 
-  async function handleFinFile(file) {
+  async function handleFinFiles(files) {
     if (hasDownstreamData) {
-      setNewAssessModal({ pendingFile: file });
+      setNewAssessModal({ pendingFiles: files });
       return;
     }
-    await _processFinFile(file);
+    await _processFinFiles(files);
   }
 
   function handleNewAssessConfirm() {
-    const file = newAssessModal.pendingFile;
+    const files = newAssessModal.pendingFiles;
     setNewAssessModal(null);
     setExtractionCount(0);
     setExtractedFileKey("");
     onNewAssessment?.();
-    _processFinFile(file);
+    _processFinFiles(files);
   }
 
   function handleConfirm() {
-    setFinFile(confirm.file);
+    setFinDoc(confirm.doc);
     setFinV({ validating: false, warnings: [...(confirm.warnings || []), `Statement year ${confirm.year} accepted.`], error: "" });
     setConfirm(null);
   }
 
   function handleCancelConfirm() {
-    setFinFile(null);
+    setFinDoc(null);
     setFinV(BLANK);
     setConfirm(null);
   }
 
-  async function handleRatFile(file) {
-    setRatFile(file);
-    setRatProgress({ show: true, pct: 0, name: file.name });
-    await readWithProgress(file, (pct) => setRatProgress({ show: true, pct, name: file.name }));
-    setRatProgress(BLANK_PROG);
+  async function handleRatFiles(files) {
+    setRatDoc(null);
+    const doc = await loadDocument(files, setRatProgress, setRatV);
+    if (!doc) return;
     setRatV({ validating: true, warnings: [], error: "" });
-    const result = await runRatValidation(file, info.clientName);
+    const result = await runRatValidation(doc, info.clientName);
     if (result.ok === false) {
-      setRatFile(null);
       setRatV({ validating: false, warnings: [], error: result.hard });
       return;
     }
+    setRatDoc(doc);
     setRatV({ validating: false, warnings: result.warnings, error: "" });
   }
 
@@ -598,8 +523,8 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
     setMsgIdx(0);
     setUploadPct(0);
     const fd = new FormData();
-    fd.append("financial_pdf", finFile);
-    if (ratFile)         fd.append("rating_pdf",  ratFile);
+    appendDocument(fd, "financial_pdf", finDoc);
+    if (ratDoc)          appendDocument(fd, "rating_pdf", ratDoc);
     if (info.clientName) fd.append("client_name", info.clientName);
     if (draftId)         fd.append("draft_id",    String(draftId));
     try {
@@ -619,20 +544,20 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
       onClientInfoChange(updatedInfo);
       onExtracted(data.figures, updatedInfo, data.draftId || null);
       const newCount = extractionCount + 1;
-      const fileKey  = `${finFile.name}-${finFile.size}`;
+      const fileKey  = `${finDoc.name}-${finDoc.size}`;
       setExtractionCount(newCount);
       setExtractedFileKey(fileKey);
       try {
         sessionStorage.setItem("sr_extractionCount", String(newCount));
         sessionStorage.setItem("sr_extractedFileKey", fileKey);
-      } catch {}
+      } catch { /* storage blocked; in-memory state still works */ }
       goToSubStep(1);
     } catch (e) {
       const detail = e.response?.data?.detail;
       if (detail?.quotaExceeded) {
-        onQuotaError(detail.message || "You have 0 credits remaining.");
+        onQuotaError(errorMessage(e, "You have 0 credits remaining."));
       } else {
-        setError(typeof detail === "string" ? detail : "Extraction failed. Please try again.");
+        setError(errorMessage(e, "Extraction failed. Please try again."));
       }
     } finally {
       setLoading(false);
@@ -642,8 +567,8 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
 
   function handleExtract() {
     if (!info.clientName?.trim()) { setError("Client name is required."); return; }
-    if (!finFile)                  { setError("Please upload the financial statement PDF."); return; }
-    if (ratFile && !info.creditRating) {
+    if (!finDoc)                  { setError("Please upload the financial statement."); return; }
+    if (ratDoc && !info.creditRating) {
       setError("You uploaded a credit rating report — please select the rating from the dropdown before extracting.");
       return;
     }
@@ -655,11 +580,11 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
   const anyValidating = finV.validating || ratV.validating;
   const hasExtracted  = extractionCount > 0;
   const canGoNext     = hasExtracted && !fileChanged;
-  const canExtract    = !!finFile && !!info.clientName?.trim() && !loading && !anyValidating && (!hasExtracted || fileChanged);
+  const canExtract    = !!finDoc && !!info.clientName?.trim() && !loading && !anyValidating && (!hasExtracted || fileChanged);
   const progressPct   = loading
     ? uploadPct < 100
       ? uploadPct                                                          // real upload progress
-      : Math.min(99, 100 + (msgIdx / (EXTRACT_MESSAGES.length - 1)) * 0) // hold at 99 while Claude works
+      : 99                                                                 // hold at 99 while Claude works
     : 0;
 
   if (subStep === 1) {
@@ -715,13 +640,13 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
 
       {/* Financial statement */}
       <div style={css.card}>
-        <div style={css.title}>Financial Statement PDF</div>
+        <div style={css.title}>Financial Statement</div>
         <UploadZone
           label="Click to upload financial statement"
-          sub="Balance sheet + income statement — PDF only"
-          file={finFile}
-          onFile={handleFinFile}
-          onClear={() => { setFinFile(null); setFinV(BLANK); setFinProgress(BLANK_PROG); }}
+          sub="Balance sheet + income statement — one PDF, or photos of the pages"
+          file={finDoc}
+          onFile={handleFinFiles}
+          onClear={() => { setFinDoc(null); setFinV(BLANK); setFinProgress(BLANK_PROG); }}
           validating={finV.validating}
           onGuard={nameGuard}
           progress={finProgress}
@@ -732,13 +657,13 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
 
       {/* Credit rating */}
       <div style={css.card}>
-        <div style={css.title}>Credit Rating PDF <span style={{ fontWeight:"normal", fontSize:11, color:"#888" }}>(optional)</span></div>
+        <div style={css.title}>Credit Rating <span style={{ fontWeight:"normal", fontSize:11, color:"#888" }}>(optional)</span></div>
         <UploadZone
           label="Click to upload credit rating report"
-          sub="DataPro, Agusto & Co, or similar — PDF only"
-          file={ratFile}
-          onFile={handleRatFile}
-          onClear={() => { setRatFile(null); setRatV(BLANK); setRatProgress(BLANK_PROG); }}
+          sub="DataPro, Agusto & Co, or similar — one PDF, or photos of the pages"
+          file={ratDoc}
+          onFile={handleRatFiles}
+          onClear={() => { setRatDoc(null); setRatV(BLANK); setRatProgress(BLANK_PROG); }}
           validating={ratV.validating}
           onGuard={nameGuard}
           progress={ratProgress}
@@ -839,4 +764,4 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
       )}
     </div>
   );
-}
+}

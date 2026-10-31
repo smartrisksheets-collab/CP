@@ -3,7 +3,6 @@ import asyncio
 import json
 import re
 import os
-from typing import Optional
 
 from api.scoring import CUTOFF_SCORE, MAX_SCORE, normalise_rates
 
@@ -22,13 +21,17 @@ def _strip_fences(text: str) -> str:
 
 
 def _parse_json(raw: str) -> dict:
+    """RuntimeError on failure, so callers refund the credit and return a clean 502."""
     try:
         return json.loads(_strip_fences(raw))
     except json.JSONDecodeError:
         match = re.search(r"\{[\s\S]*\}", raw)
         if match:
-            return json.loads(match.group())
-        raise ValueError(f"Could not parse JSON from Claude response: {raw[:200]}")
+            try:
+                return json.loads(match.group())
+            except json.JSONDecodeError:
+                pass
+        raise RuntimeError("The AI response could not be read. Please try again.")
 
 
 async def _create(content):
@@ -81,24 +84,30 @@ async def _call(content) -> str:
                 await asyncio.sleep(delay)
                 delay *= 2
                 continue
+            if e.status_code in (400, 413) and _is_document_error(e.message):
+                raise RuntimeError(
+                    "The document could not be read. If it is password-protected or damaged, "
+                    "save an unlocked copy (or photos of the pages) and upload again."
+                )
             raise RuntimeError(f"Claude API error ({e.status_code}): {e.message}")
         except anthropic.APIError as e:
             raise RuntimeError(f"Claude API error: {e}")
 
 
-async def _call_with_pdf(base64_pdf: str, prompt: str) -> str:
-    """Call Claude with a PDF document and a text prompt."""
-    return await _call([
-        {
-            "type": "document",
-            "source": {
-                "type"      : "base64",
-                "media_type": "application/pdf",
-                "data"      : base64_pdf,
-            },
-        },
-        {"type": "text", "text": prompt},
-    ])
+def _is_document_error(message: str) -> bool:
+    lc = str(message or "").lower()
+    return any(k in lc for k in ("pdf", "image", "document", "password", "encrypt"))
+
+
+# Applies to every extraction prompt: uploads may be scans or phone photos
+SCAN_NOTE = """
+The pages may be scanned or photographed: possibly rotated, skewed, faint or split across several images in page order.
+Read them as printed. If a figure is illegible, return null for it rather than guess."""
+
+
+async def _call_with_document(blocks: list[dict], prompt: str) -> str:
+    """Call Claude with a document's content blocks (one PDF or page photos) and a text prompt."""
+    return await _call([*blocks, {"type": "text", "text": prompt + SCAN_NOTE}])
 
 
 async def _call_text_only(prompt: str) -> str:
@@ -219,8 +228,8 @@ Return ONLY this JSON — no other text:
 "priorYearTotalAssets":number,"priorYearShareholdersEquity":number}"""
 
 
-async def extract_figures(base64_pdf: str) -> dict:
-    raw     = await _call_with_pdf(base64_pdf, EXTRACTION_PROMPT)
+async def extract_figures(blocks: list[dict]) -> dict:
+    raw     = await _call_with_document(blocks, EXTRACTION_PROMPT)
     figures = _parse_json(raw)
     # The prompt asks for percentages; if the model still returns a decimal (0.215),
     # the legacy rule converts it, then rateUnit marks the figures as percentages
@@ -254,8 +263,8 @@ Return ONLY a valid JSON object, no markdown, no backticks:
 "ratingOutlook":string,"issueDate":string,"expiryDate":string|null}"""
 
 
-async def extract_rating(base64_pdf: str) -> dict:
-    raw = await _call_with_pdf(base64_pdf, RATING_PROMPT)
+async def extract_rating(blocks: list[dict]) -> dict:
+    raw = await _call_with_document(blocks, RATING_PROMPT)
     return _parse_json(raw)
 
 
@@ -287,8 +296,8 @@ Return ONLY valid JSON, no markdown, no backticks:
 "issuerRating":null,"minSubscription":null,"useOfProceeds":null,"taxation":null}"""
 
 
-async def extract_cp_terms(base64_pdf: str) -> dict:
-    raw = await _call_with_pdf(base64_pdf, CP_TERMS_PROMPT)
+async def extract_cp_terms(blocks: list[dict]) -> dict:
+    raw = await _call_with_document(blocks, CP_TERMS_PROMPT)
     return _parse_json(raw)
 
 
@@ -398,4 +407,4 @@ Return ONLY valid JSON with no markdown and no backticks:
 }}"""
 
     raw = await _call_text_only(prompt)
-    return _parse_json(raw)
+    return _parse_json(raw)
