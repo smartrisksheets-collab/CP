@@ -5,6 +5,7 @@ import LegalModal from "../components/LegalModal.jsx";
 import { Loader, Check } from "lucide-react";
 import { useTenant } from "../context/TenantContext.jsx";
 import axios from "axios";
+import { errorMessage } from "../api/client.js";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
@@ -56,9 +57,8 @@ export default function Register() {
         setDone(true);
       }
     } catch (e) {
-      const detail = e.response?.data?.detail;
       if (e.response?.status === 429) setGlobalErr("Too many sign-up attempts. Please wait an hour and try again.");
-      else setGlobalErr(typeof detail === "string" ? detail : "Registration failed. Please try again.");
+      else setGlobalErr(errorMessage(e, "Registration failed. Please try again."));
     } finally {
       setLoading(false);
     }

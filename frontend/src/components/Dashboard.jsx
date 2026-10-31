@@ -1,19 +1,8 @@
 import { useEffect, useState } from "react";
 import { useIsMobile } from "../hooks/useBreakpoint.js";
-import { getHistory, generateReport, getAssessment, updateNarrative, deleteAssessment } from "../api/client.js";
+import { getHistory, generateReport, getAssessment, updateNarrative, deleteAssessment, errorMessage } from "../api/client.js";
 import { Loader, Download, Eye, X, Save, Trash2, Search } from "lucide-react";
 import RatioTable from "./RatioTable.jsx";
-
-async function parseAxiosError(e, fallback) {
-  try {
-    if (e.response?.data instanceof Blob) {
-      const text = await e.response.data.text();
-      const json = JSON.parse(text);
-      return json.detail || fallback;
-    }
-    return e.response?.data?.detail || fallback;
-  } catch { return fallback; }
-}
 
 export default function Dashboard() {
   const [rows, setRows]               = useState([]);
@@ -37,7 +26,7 @@ export default function Dashboard() {
         setRows((prev) => page === 1 ? res.data : [...prev, ...res.data]);
         setHasMore(res.data.length === 20);
       })
-      .catch(() => setError("Failed to load history."))
+      .catch((e) => setError(errorMessage(e, "Failed to load history.")))
       .finally(() => setLoading(false));
   }, [page]);
 
@@ -47,8 +36,8 @@ export default function Dashboard() {
     try {
       await deleteAssessment(r.id);
       setRows((prev) => prev.filter((x) => x.id !== r.id));
-    } catch {
-      setErrModal("Failed to delete assessment. Please try again.");
+    } catch (e) {
+      setErrModal(errorMessage(e, "Failed to delete assessment. Please try again."));
     } finally {
       setDeleting(null);
     }
@@ -82,8 +71,8 @@ export default function Dashboard() {
     try {
       const res = await getAssessment(r.id);
       setViewing(res.data);
-    } catch {
-      setErrModal("Failed to load assessment. Please try again.");
+    } catch (e) {
+      setErrModal(errorMessage(e, "Failed to load assessment. Please try again."));
     } finally {
       setLoadingView(null);
     }
@@ -100,7 +89,7 @@ export default function Dashboard() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      setErrModal(await parseAxiosError(e, "Failed to generate report. Please try again."));
+      setErrModal(errorMessage(e, "Failed to generate report. Please try again."));
     } finally {
       setDownloading(null);
     }
@@ -229,8 +218,8 @@ function AssessmentModal({ data, onClose, onSaved, onError }) {
       setSaved(true);
       onSaved({ ...data, narrative: narr });
       setTimeout(() => setSaved(false), 2000);
-    } catch {
-      onError("Failed to save narrative. Please try again."); // handled locally — see note below
+    } catch (e) {
+      onError(errorMessage(e, "Failed to save narrative. Please try again."));
     } finally {
       setSaving(false);
     }
@@ -247,8 +236,7 @@ function AssessmentModal({ data, onClose, onSaved, onError }) {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      const msg = await parseAxiosError(e, "Failed to generate PDF. Please try again.");
-      onError(msg);
+      onError(errorMessage(e, "Failed to generate PDF. Please try again."));
     } finally {
       setDlBusy(false);
     }
@@ -333,4 +321,4 @@ function AssessmentModal({ data, onClose, onSaved, onError }) {
       </div>
     </div>
   );
-}
+}

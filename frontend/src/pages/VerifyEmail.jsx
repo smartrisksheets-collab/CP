@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Loader } from "lucide-react";
 import { useTenant } from "../context/TenantContext.jsx";
 import axios from "axios";
+import { errorMessage } from "../api/client.js";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
@@ -26,7 +27,7 @@ export default function VerifyEmail() {
       })
       .catch((e) => {
         setStatus("error");
-        setMessage(e.response?.data?.detail || "Verification failed. The link may have expired.");
+        setMessage(errorMessage(e, "Verification failed. The link may have expired."));
       });
   }
 
@@ -85,4 +86,4 @@ export default function VerifyEmail() {
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
-}
+}

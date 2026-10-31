@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { generateReport } from "../api/client.js";
+import { generateReport, errorMessage } from "../api/client.js";
 import { X, Download, Loader } from "lucide-react";
 
 const SECTIONS = [
@@ -38,8 +38,8 @@ export default function ReportPreview({ assessmentId, narrative, clientInfo, sco
       a.download = `SmartRisk_${(clientInfo.clientName || "Report").replace(/\s+/g,"_")}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      setError("Failed to generate PDF. Please try again.");
+    } catch (e) {
+      setError(errorMessage(e, "Failed to generate PDF. Please try again."));
     } finally {
       setDownloading(false);
     }
@@ -135,4 +135,4 @@ export default function ReportPreview({ assessmentId, narrative, clientInfo, sco
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
-}
+}

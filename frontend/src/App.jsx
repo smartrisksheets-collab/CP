@@ -9,6 +9,7 @@ import VerifyEmail from "./pages/VerifyEmail.jsx";
 import Pricing from "./pages/Pricing.jsx";
 import PaymentCallback from "./pages/Paymentcallback.jsx";
 import AdminDashboard from "./pages/Admindashboard.jsx";
+import OfflineBanner from "./components/OfflineBanner.jsx";
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -124,6 +125,7 @@ export default function App() {
 
   return (
     <>
+      <OfflineBanner />
       {user && !splashDone && <SplashScreen onContinue={dismissSplash} />}
       <BrowserRouter>
         <Routes>

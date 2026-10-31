@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Loader, CheckCircle, AlertTriangle, Mail, MessageCircle } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
-import { generateReport } from "../api/client.js";
+import { errorMessage } from "../api/client.js";
 import axios from "axios";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
@@ -13,14 +13,19 @@ export default function PaymentCallback() {
   const navigate        = useNavigate();
   const reference       = searchParams.get("reference") || searchParams.get("trxref");
 
-  const [status, setStatus]   = useState("loading");
-  const [message, setMessage] = useState("");
+  // Problems known before any request are shown from the first render
+  const [precheck] = useState(() =>
+    !reference                          ? "No payment reference found."
+    : !localStorage.getItem("sr_token") ? "You must be logged in to verify payment."
+    : ""
+  );
+  const [status, setStatus]   = useState(precheck ? "error" : "loading");
+  const [message, setMessage] = useState(precheck);
 
   useEffect(() => {
-    if (!reference) { setStatus("error"); setMessage("No payment reference found."); return; }
+    if (precheck) return;
 
     const token = localStorage.getItem("sr_token");
-    if (!token) { setStatus("error"); setMessage("You must be logged in to verify payment."); return; }
     axios.get(`${BASE_URL}/payments/verify/${reference}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
@@ -37,7 +42,7 @@ export default function PaymentCallback() {
       })
       .catch((e) => {
         setStatus("error");
-        setMessage(e.response?.data?.detail || "Payment verification failed. Contact support if you were debited.");
+        setMessage(errorMessage(e, "Payment verification failed. Contact support if you were debited."));
       });
   }, [reference]);
 
@@ -109,4 +114,4 @@ export default function PaymentCallback() {
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
-}
+}

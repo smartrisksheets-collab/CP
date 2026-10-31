@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
-import { useTenant } from "../context/TenantContext.jsx";
-import { getQuotaStatus } from "../api/client.js";
+import { getQuotaStatus, errorMessage } from "../api/client.js";
 import { Loader, ArrowLeft, Check, Mail, MessageCircle, X } from "lucide-react";
 import { useIsMobile } from "../hooks/useBreakpoint.js";
 import axios from "axios";
@@ -62,7 +61,6 @@ export default function Pricing() {
   const isMobile = useIsMobile(640);
   const isTablet = useIsMobile(960);
   const { user }   = useAuth();
-  const { tenant } = useTenant();
   const navigate   = useNavigate();
   const hostname   = window.location.hostname;
 
@@ -94,9 +92,9 @@ export default function Pricing() {
         { pack: packKey, hostname },
         { headers: { Authorization: `Bearer ${localStorage.getItem("sr_token")}` } },
       );
-      window.location.href = res.data.authorization_url;
+      window.location.assign(res.data.authorization_url);
     } catch (e) {
-      setError(e.response?.data?.detail || "Payment initialization failed. Please try again.");
+      setError(errorMessage(e, "Payment initialization failed. Please try again."));
       setPaying(null);
     }
   }

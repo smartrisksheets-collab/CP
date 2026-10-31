@@ -24,6 +24,12 @@
 - D021 2026-10-27 Scoring bands are versioned tables in scoring.py; assessments.model_version (0003)
 - D022 2026-10-27 Interest rates are always percentages, marked by figures.rateUnit
 - D023 2026-10-27 Go live with model v2.0 (Liquidity 2 to 8 points, total 56, cutoff 34)
+- D024 2026-10-31 Uploads take one PDF or up to 20 photos per slot; file type read from bytes
+- D025 2026-10-31 Every file is checked before a credit is charged; failed extraction refunds it
+- D026 2026-10-31 Keyword and client-name checks warn, never block; only unprocessable files are blocked
+- D027 2026-10-31 Keyword matching normalised (NFKC, spacing, apostrophes); financial check reads 100 pages
+- D028 2026-10-31 One errorMessage helper for API errors, offline banner, CORS kept on unhandled 500s
+- D029 2026-10-31 Client timeouts: extract 600s, CP extract 330s
 
 ## D001 Start Supabase empty
 Render database is suspended for non-payment and unreachable. User confirmed the app stores no data worth keeping. Tenants are recreated by backend/seed.py. Edge cases: no stamping of an existing schema needed; tenant rows must exist before any login, so seed runs after upgrade head.
@@ -94,3 +100,21 @@ Old rule (rate > 1 means percent) read 0.8% as 80%. Extraction now returns 21.5 
 
 ## D023 Model v2.0 live
 User chose to go live with v2.0 on 2026-10-27: Liquidity 8 (Acid-Test 2, Current 3, Cash 3), Coverage 16 (Interest Coverage 6, DSCR 5, Net Debt / EBITDA 5), Altman Z' 8, others unchanged. DSCR 5-point bands: >= 1.5x 5, 1.25 to 1.49x 3, 1.0 to 1.24x 2, < 1.0x 0, no debt 5. Streadvest: 53/56. Back-test against Supabase recommended before deploy (Supabase started empty on 2026-10-26).
+
+## D024 Photo and scanned uploads
+Claude reads PDF pages as images, so scans need no text layer; the old frontend text checks were the only blocker. Each slot takes one PDF or up to 20 JPG, PNG or WebP photos (form field names unchanged). backend/api/documents.py sniffs bytes, not names. The browser applies EXIF rotation and downscales photos to 2576px JPEG (the model's full-detail size, under the API's 5MB image limit), dedupes repeats and orders pages by file name. Edge cases: HEIC, mixed PDF and photos, several PDFs, empty files, renamed files, over 20MB per slot, 21+ photos; all rejected with a message.
+
+## D025 Validate before charging, refund on failure
+/assessment/extract checked files after charging and rating or CP files after extraction, so a bad file lost a credit. All files are now checked first. Any extraction failure (including unreadable AI JSON, previously a 500) refunds the credit and sets the usage row's status to refunded; the /run back-fill skips refunded rows. No migration: status already allowed refunded.
+
+## D026 Content checks warn, never block
+Text layers are unreliable (spacing, OCR, ligatures, unusual wording, statements after page 100), the AI reads the whole document and the user reviews every figure, so a false rejection costs more than a warning. Hard blocks remain for locked, damaged, empty, wrong type, too large, over 600 pages. Confirm-before-credit step unchanged.
+
+## D027 Keyword normalisation
+UNA 2025 statements were rejected because pdf.js text had 19,324 double spaces. matchText() applies NFKC, removes apostrophes, turns , ; : into spaces and collapses whitespace on both text and keywords. Financial check reads up to 100 pages (statements were on page 31).
+
+## D028 Error messages
+Screens showed detail or a fixed line, so offline, timeouts and Render's own 503 page never said to check the connection, and 422 (list) or 402 (object) details could crash React. errorMessage(err, fallback) in frontend/src/api/client.js: offline first, then no response, then the server's string or detail.message, then by status. The interceptor parses JSON errors from blob downloads. backend/main.py middleware sits inside CORSMiddleware so unhandled 500s return JSON with CORS headers (verified missing before).
+
+## D029 Client timeouts
+Extract 120s to 600s and CP extract 90s to 330s, because one AI call may take 300s and a client timeout still charges. Backend worst case (3 x 300s) can exceed 600s; Render's request limit is unknown.

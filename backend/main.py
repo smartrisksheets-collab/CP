@@ -1,7 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
+import logging
 import os
 
 from api.db import engine
@@ -32,6 +34,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Registered before CORSMiddleware so it sits inside it: an unhandled error then
+# returns JSON with CORS headers, instead of a bare 500 the browser reports as
+# a network failure ("check your internet connection") with no detail.
+@app.middleware("http")
+async def unhandled_error_as_json(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception:
+        logging.getLogger("smartrisk").exception("Unhandled error on %s %s", request.method, request.url.path)
+        return JSONResponse(status_code=500, content={"detail": "Something went wrong on our side. Please try again."})
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -54,4 +68,4 @@ app.include_router(admin.router,      prefix="/admin",      tags=["admin"])
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    return {"status": "ok"}

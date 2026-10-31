@@ -1,7 +1,8 @@
 import { useState, useRef } from "react";
 import { useIsMobile } from "../../hooks/useBreakpoint.js";
 import { Upload as UploadIcon, CheckCircle, Loader, AlertTriangle, AlertCircle, X, ChevronRight, SkipForward } from "lucide-react";
-import { extractCpTerms } from "../../api/client.js";
+import { extractCpTerms, errorMessage } from "../../api/client.js";
+import { ACCEPT, PHOTO_WARNING, inspectPdf, prepareDocument, checkWarnings, appendDocument, countKw } from "../../utils/documentInput.js";
 
 // ── Reuse validation helpers inline ──────────────────────────
 const CP_REQUIRED_KW = [
@@ -15,54 +16,25 @@ const CP_PROSPECTUS_KW = [
   "listing particulars","guarantee",
 ];
 
-function countKw(text, list) {
-  const lc = text.toLowerCase();
-  return list.filter((k) => lc.includes(k.toLowerCase())).length;
-}
+async function validateCpDocument(doc) {
+  if (doc.kind === "images") return { ok: true, warnings: [PHOTO_WARNING] };
 
-let _pdfjs = null;
-async function loadPdfJs() {
-  if (_pdfjs) return _pdfjs;
-  if (window.pdfjsLib) { _pdfjs = window.pdfjsLib; return _pdfjs; }
-  await new Promise((res, rej) => {
-    const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-    s.onload = res; s.onerror = rej;
-    document.head.appendChild(s);
-  });
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-  _pdfjs = window.pdfjsLib;
-  return _pdfjs;
-}
+  let info;
+  try { info = await inspectPdf(doc.files[0], 10); }
+  catch { return { ok: true, warnings: ["PDF could not be checked in the browser. Accepted — verify extracted fields manually."] }; }
+  if (info.error) return { ok: false, hard: info.error };
 
-async function extractText(file, maxPages = 10) {
-  const lib = await loadPdfJs();
-  const pdf = await lib.getDocument({ data: await file.arrayBuffer() }).promise;
-  const n   = Math.min(pdf.numPages, maxPages);
-  let text  = "";
-  for (let i = 1; i <= n; i++) {
-    const content = await (await pdf.getPage(i)).getTextContent();
-    text += content.items.map((s) => s.str).join(" ") + " ";
-  }
-  return { text, numPages: pdf.numPages };
-}
-
-async function validateCpPdf(file, clientName) {
-  let text = "", numPages = 0;
-  try { ({ text, numPages } = await extractText(file, 10)); }
-  catch { return { ok: true, warnings: ["PDF could not be fully read. Accepted — verify extracted fields manually."] }; }
-
+  const { text, numPages, imagePages } = info;
   if (text.replace(/\s/g, "").length < 300)
     return { ok: true, warnings: ["Scanned or image-based PDF. Accepted — verify all fields carefully."] };
 
+  const problems = [];
   if (countKw(text, CP_REQUIRED_KW) < 4)
-    return { ok: false, hard: "This does not appear to be an indicative terms email. Key CP terms were not found. Please upload the forwarded CP email PDF." };
-
+    problems.push("This does not appear to be an indicative terms email. Key CP terms were not found. Please upload the forwarded CP email PDF.");
   if (countKw(text, CP_PROSPECTUS_KW) >= 3)
-    return { ok: false, hard: "This looks like a full Programme Memorandum, not an indicative terms email. Please upload the short forwarded email (typically 3–6 pages)." };
+    problems.push("This looks like a full Programme Memorandum, not an indicative terms email. Please upload the short forwarded email (typically 3–6 pages).");
 
-  const warnings = [];
+  const warnings = checkWarnings(problems, imagePages);
   if (numPages > 6) warnings.push(`This document is ${numPages} pages — indicative terms emails are usually 3–6 pages. Verify all extracted fields.`);
   return { ok: true, warnings };
 }
@@ -127,19 +99,20 @@ export default function CPTerms({ figures, onFiguresChange, onBack, onNext, clie
 
   const hasAnyField = Object.values(fields).some((v) => v?.trim());
 
-  async function handleFile(f) {
-    setFile(f);
+  async function handleFile(fileList) {
+    setFile(null);
     setFileError("");
     setFileWarns([]);
     setValidating(true);
-    const result = await validateCpPdf(f);
+    const { doc, error } = await prepareDocument(fileList);
+    const result = doc ? await validateCpDocument(doc) : { ok: false, hard: error };
     setValidating(false);
 
     if (result.ok === false) {
-      setFile(null);
       setFileError(result.hard);
       return;
     }
+    setFile(doc);
     setFileWarns(result.warnings || []);
     // User must now click "Extract Fields" manually
   }
@@ -150,7 +123,7 @@ export default function CPTerms({ figures, onFiguresChange, onBack, onNext, clie
     setExtractErr("");
     try {
       const fd = new FormData();
-      fd.append("cp_terms_pdf", file);
+      appendDocument(fd, "cp_terms_pdf", file);
       const res  = await extractCpTerms(fd);
       const data = res.data?.cpTerms || {};
       setFields((prev) => {
@@ -160,8 +133,8 @@ export default function CPTerms({ figures, onFiguresChange, onBack, onNext, clie
         });
         return merged;
       });
-    } catch {
-      setExtractErr("Extraction failed — please try again after a few seconds or fill manually.");
+    } catch (e) {
+      setExtractErr(errorMessage(e, "Extraction failed — please try again after a few seconds or fill manually."));
     } finally {
       setExtracting(false);
     }
@@ -189,12 +162,12 @@ export default function CPTerms({ figures, onFiguresChange, onBack, onNext, clie
         </div>
       )}
       <div style={{ fontSize:13, color:"#5A5A5A", marginBottom:14 }}>
-        Upload the indicative terms email PDF to auto-fill the fields below, or enter them manually. This section is <strong>optional</strong> — click Skip if not applicable.
+        Upload the indicative terms email (PDF or photos) to auto-fill the fields below, or enter them manually. This section is <strong>optional</strong> — click Skip if not applicable.
       </div>
 
       {/* Upload zone */}
       <div style={css.card}>
-        <div style={css.title}>CP Indicative Terms PDF <span style={{ fontWeight:"normal", fontSize:11, color:"#888" }}>(optional)</span></div>
+        <div style={css.title}>CP Indicative Terms <span style={{ fontWeight:"normal", fontSize:11, color:"#888" }}>(optional)</span></div>
 
         {validating ? (
           <div style={{ padding:"12px 14px", borderRadius:6, fontSize:13, background:"#F0F4FF", color:"#1A5276", border:"1px solid #9DBFEA", display:"flex", alignItems:"center", gap:8 }}>
@@ -209,18 +182,18 @@ export default function CPTerms({ figures, onFiguresChange, onBack, onNext, clie
           </div>
         ) : (
           <>
-            <input ref={ref} type="file" accept=".pdf" style={{ display:"none" }}
-              onChange={(e) => e.target.files[0] && handleFile(e.target.files[0])} />
+            <input ref={ref} type="file" accept={ACCEPT} multiple style={{ display:"none" }}
+              onChange={(e) => e.target.files.length && handleFile(e.target.files)} />
             <div style={css.zone(hover)}
               onClick={() => ref.current.click()}
               onDragOver={(e) => { e.preventDefault(); setHover(true); }}
               onDragLeave={() => setHover(false)}
-              onDrop={(e) => { e.preventDefault(); setHover(false); const f = e.dataTransfer.files[0]; if (f?.type === "application/pdf") handleFile(f); }}
+              onDrop={(e) => { e.preventDefault(); setHover(false); if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files); }}
               onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
             >
               <UploadIcon size={32} style={{ margin:"0 auto 10px", opacity:0.35, display:"block" }} />
               <div style={{ fontSize:14, fontWeight:"bold", color:"#1F2854", marginBottom:4 }}>Click to upload indicative terms email</div>
-              <div style={{ fontSize:12, color:"#888" }}>Forwarded CP email PDF — CP terms will be extracted into the fields below .</div>
+              <div style={{ fontSize:12, color:"#888" }}>Forwarded CP email as PDF, or photos of its pages. CP terms will be extracted into the fields below.</div>
             </div>
           </>
         )}
@@ -241,7 +214,7 @@ export default function CPTerms({ figures, onFiguresChange, onBack, onNext, clie
         {file && !extracting && (
           <button onClick={handleExtract}
             style={{ marginTop:8, padding:"8px 14px", fontSize:12, borderRadius:6, cursor:"pointer", border:"1px solid #1F2854", background:"#1F2854", color:"#fff", fontFamily:"Arial,sans-serif", display:"flex", alignItems:"center", gap:6 }}>
-            <Loader size={12} style={{ opacity:0 }} /> Extract Fields from PDF
+            <Loader size={12} style={{ opacity:0 }} /> Extract Fields
           </button>
         )}
         {extracting && (
@@ -311,4 +284,4 @@ export default function CPTerms({ figures, onFiguresChange, onBack, onNext, clie
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
-}
+}
