@@ -15,13 +15,22 @@ export function AuthProvider({ children }) {
     }
 
     getMe()
-      .then((res) => setUser(res.data))
+      .then((res) => {
+        localStorage.setItem("sr_user", JSON.stringify(res.data));
+        setUser(res.data);
+      })
       .catch((err) => {
         if (err.response?.status === 401) {
           localStorage.removeItem("sr_token");
           localStorage.removeItem("sr_user");
+          return;
         }
-        // any other error (network, 500, timeout) — leave token intact
+        // Network, 500 or timeout: keep the session and use the last known
+        // user so a blip does not send a signed-in user to /login
+        try {
+          const cached = JSON.parse(localStorage.getItem("sr_user") || "null");
+          if (cached?.email) setUser(cached);
+        } catch { /* corrupt cache, stay signed out */ }
       })
       .finally(() => setLoading(false));
   }, []);
@@ -38,7 +47,10 @@ export function AuthProvider({ children }) {
   };
 
   const refreshUser = () =>
-    getMe().then((res) => setUser(res.data));
+    getMe().then((res) => {
+      localStorage.setItem("sr_user", JSON.stringify(res.data));
+      setUser(res.data);
+    });
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>
@@ -51,4 +63,4 @@ export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
-}
+}

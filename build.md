@@ -1,10 +1,5 @@
 # Build Log
 
-## 2026-10-26 Scoring fixes
-- Changed: backend/api/scoring.py, backend/api/report.py, backend/api/claude.py (prompt, narrative DSCR), frontend/src/components/steps/Scores.jsx, ReviewData.jsx, frontend/src/pages/AppPage.jsx
-- Checks: Veritasi figures give ICR 1.89x (4 pts), DSCR 0.44x (0 pts); edge cases (no debt, negative cost, missing cost, negative EBITDA, string values) pass; npm run build passes; no new lint issues (18 pre-existing); app starts
-- Decisions: D016 to D018
-
 ## 2026-10-27 FAM scoring fixes (p7, p8, p9)
 - p7 (spec P1): Current and Cash ratios, Liquidity Ratios group, CURRENT RATIO in PDF header, tradePayables and current liabilities split, /assessment/preview, RatioTable.jsx, backend/tests
 - p8 (spec P2): band tables, items 4 and 6 to 9, labels 13 and 14, model_version (backend/alembic/versions/0003_model_version.py, backend/alembic/sql/0003_model_version.sql), backend/scripts/backtest_models.py
@@ -20,3 +15,12 @@
 - Checks: fresh dev checkout with p11 to p14, pytest 51 passed, import, npm run build, eslint clean on touched files, headless Chromium tests (scanned, mixed, locked, damaged PDFs, rotated photos, offline banner), UNA PDF passes
 - Not tested in sandbox: real AI extraction of scans and photos, refund against Supabase
 - Decisions: D024 to D029
+
+## 2026-11-02 Admin test-email allowlist (p16, p16b, p16c)
+- p16: email_allowlist table (backend/alembic/versions/0004_email_allowlist.py, backend/alembic/sql/0004_email_allowlist.sql); backend/api/allowlist.py (domain lists moved from register.py, normalize_email, is_revoked); routes GET/POST /admin/allowlist and POST /admin/allowlist/revoke; register and verify-email allow listed personal emails; revoked users get 401 on API calls and 403 on request-otp and verify-otp; /auth/me returns role (fixes admin menu and /admin vanishing after refresh); AuthContext keeps the session on network errors; Admindashboard uses the api client, confirm dialogs, retry, Test emails tab, CSS variables; access code no longer printed in request_otp log; admin emails stripped, credit amount 0 rejected
+- p16b: frontend/vite.config.js lets a browser refresh on /admin load the app instead of a backend 404 (local dev only)
+- p16c: revoked badge in Users tab, revoked users cannot be made admin, tab counts all entries
+- Checks: fresh dev checkout, git apply, import, PostgreSQL 16 upgrade / downgrade -1 / upgrade, schema matches models.py, pytest 63 passed (12 allowlist tests), npm run build, eslint clean on touched files (repo 20 errors, all pre-existing); Vite refresh on /admin returns the app
+- User tested locally: add, register, revoke, restore
+- Not tested in sandbox: Resend emails; Supabase SQL (user runs backend/alembic/sql/0004_email_allowlist.sql)
+- Decisions: D030 to D032

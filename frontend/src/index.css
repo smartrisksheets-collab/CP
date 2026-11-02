@@ -21,6 +21,13 @@ input, select, textarea, button { max-width: 100%; box-sizing: border-box; }
   --score-part-bg: #d1fae5;
   --warning      : #854F0B;
   --chip-bg      : #F0F0F0;
+  --text-secondary: #5A5A5A;
+  --input-border : #D8D8D8;
+  --info         : #1A5276;
+  --info-bg      : #EEF4FF;
+  --info-border  : #9DBFEA;
+  --header-text  : #cccccc;
+  --header-border: #3a4a7a;
 }
 
 body {
@@ -45,6 +52,36 @@ body {
   color: var(--error);
   border-bottom: 1px solid var(--error);
 }
+
+/* ── Admin dashboard ──────────────────────────────────────── */
+.sr-admin-input {
+  width: 100%;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-family: Arial, sans-serif;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+}
+.sr-admin-form {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+.sr-admin-form > .sr-admin-input { flex: 1 1 220px; }
+.sr-pill {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--muted);
+}
+.sr-pill-success { background: var(--success-bg); color: var(--success); }
+.sr-pill-error   { background: var(--error-bg);   color: var(--error); }
+.sr-pill-info    { background: var(--info-bg);    color: var(--info); border: 1px solid var(--info-border); }
+.sr-pill-primary { background: var(--primary);    color: var(--white); }
 
 /* ── Mobile / Tablet responsiveness ──────────────────────── */
 .sr-table-scroll {

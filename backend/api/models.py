@@ -147,3 +147,23 @@ class CreditTransaction(Base):
     created_at           : Mapped[datetime]      = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     tenant               : Mapped["Tenant"]      = relationship(back_populates="credit_transactions")
+
+class EmailAllowlist(Base):
+    """
+    Personal email addresses (gmail, yahoo, ...) an admin lets register on
+    one tenant, usually for test users. One row per email per tenant:
+    revoking sets revoked_at, re-adding clears it.
+    """
+    __tablename__ = "email_allowlist"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "email", name="uq_allowlist_tenant_email"),
+    )
+
+    id         : Mapped[int]             = mapped_column(Integer, primary_key=True)
+    tenant_id  : Mapped[int]             = mapped_column(ForeignKey("tenants.id"), nullable=False)
+    email      : Mapped[str]             = mapped_column(Text, nullable=False)
+    note       : Mapped[str | None]      = mapped_column(Text, nullable=True)
+    added_by   : Mapped[str]             = mapped_column(Text, nullable=False)
+    created_at : Mapped[datetime]        = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    revoked_at : Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_by : Mapped[str | None]      = mapped_column(Text, nullable=True)

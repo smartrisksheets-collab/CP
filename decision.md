@@ -30,6 +30,9 @@
 - D027 2026-10-31 Keyword matching normalised (NFKC, spacing, apostrophes); financial check reads 100 pages
 - D028 2026-10-31 One errorMessage helper for API errors, offline banner, CORS kept on unhandled 500s
 - D029 2026-10-31 Client timeouts: extract 600s, CP extract 330s
+- D030 2026-11-02 Personal emails register only via a per-tenant admin allowlist (email_allowlist, 0004)
+- D031 2026-11-02 Revoke blocks access immediately; only a revoked entry blocks, legacy accounts unaffected
+- D032 2026-11-02 /auth/me returns role; AuthContext falls back to the cached user on non-401 errors
 
 ## D001 Start Supabase empty
 Render database is suspended for non-payment and unreachable. User confirmed the app stores no data worth keeping. Tenants are recreated by backend/seed.py. Edge cases: no stamping of an existing schema needed; tenant rows must exist before any login, so seed runs after upgrade head.
@@ -118,3 +121,12 @@ Screens showed detail or a fixed line, so offline, timeouts and Render's own 503
 
 ## D029 Client timeouts
 Extract 120s to 600s and CP extract 90s to 330s, because one AI call may take 300s and a client timeout still charges. Backend worst case (3 x 300s) can exceed 600s; Render's request limit is unknown.
+
+## D030 Personal email allowlist
+Admins needed to let specific Gmail, Yahoo and similar test users register. New table email_allowlist (tenant_id, email, note, added_by, created_at, revoked_at, revoked_by), unique per tenant and email, RLS on, one row per email: revoke sets revoked_at, re-adding clears it. Only personal domains can be added; disposable stay blocked. Emails normalised as at registration (lowercase, trimmed, + alias dropped). Admin and superadmin manage the tenant they are logged into, like every admin route. Tenant.allowed_emails and auth._is_allowed are unused legacy, left untouched. Edge cases: empty or malformed or work email (400), duplicate active (409), concurrent add (IntegrityError to 409), revoke unknown (404) or twice (409), revoke between register and verify-email (verify refused), tenant isolation, role user (403), mixed case and + aliases.
+
+## D031 Revoke blocks access immediately
+User chose block over registration-only. get_current_user returns 401 (frontend already signs out on 401); request-otp and verify-otp return 403 with "Your access has been revoked". Account and assessments kept; re-adding restores access. Only a revoked entry blocks, so personal-domain accounts created before this change with no entry keep working. Admins cannot revoke their own email; only a superadmin can revoke a superadmin; revoked users cannot be made admin. Extra cost: one indexed lookup per request, only for personal-domain users.
+
+## D032 Role in /auth/me
+/auth/me omitted role, so after any refresh or refreshUser() the admin menu and /admin disappeared. It now returns role, and AuthContext stores it in sr_user. On network or 500 errors AuthContext uses the cached sr_user instead of sending a signed-in user to /login; 401 still signs out.

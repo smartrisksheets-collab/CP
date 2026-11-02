@@ -158,4 +158,26 @@ export const updateNarrative = (id, narrative) =>
   api.patch(`/assessment/${id}/narrative`, { narrative });
 
 export const saveOnboarding = (data) =>
-  api.post("/auth/onboarding", data);
+  api.post("/auth/onboarding", data);
+
+// ── Admin ─────────────────────────────────────────────────────
+export const adminGetUsers = () =>
+  api.get("/admin/users");
+
+export const adminGetStats = () =>
+  api.get("/admin/stats");
+
+export const adminAdjustCredits = (email, amount, reason) =>
+  api.post("/admin/users/credits", { email, amount, reason });
+
+export const adminSetRole = (email, role) =>
+  api.post("/admin/users/role", { email, role });
+
+export const adminGetAllowlist = () =>
+  api.get("/admin/allowlist");
+
+export const adminAddAllowlist = (email, note) =>
+  api.post("/admin/allowlist", { email, note });
+
+export const adminRevokeAllowlist = (email) =>
+  api.post("/admin/allowlist/revoke", { email });
