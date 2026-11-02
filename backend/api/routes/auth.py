@@ -13,11 +13,15 @@ import hmac
 from fastapi import Request
 from api.db import SessionLocal
 from api.models import Tenant, User, OTP
+from api.allowlist import is_revoked
 from api.deps import get_db, get_current_user, get_current_user, JWT_SECRET, JWT_ALGORITHM, limiter
 
 router = APIRouter()
 
 import hashlib
+
+REVOKED_MSG = "Your access has been revoked. Contact your administrator."
+
 
 def _hash_otp(otp: str) -> str:
     return hashlib.sha256(otp.encode()).hexdigest()
@@ -105,7 +109,7 @@ async def _send_otp_email(email: str, otp: str, tenant_name: str):
 @router.post("/request-otp")
 @limiter.limit("5/minute")
 async def request_otp(request: Request, body: OTPRequestBody, db: AsyncSession = Depends(get_db)):
-    print(f"[request_otp] email={body.email} hostname={body.hostname} code={body.code}")
+    print(f"[request_otp] email={body.email} hostname={body.hostname}")
     # 1. Resolve tenant
     result = await db.execute(select(Tenant).where(Tenant.hostname == body.hostname))
     tenant = result.scalar_one_or_none()
@@ -136,6 +140,8 @@ async def request_otp(request: Request, body: OTPRequestBody, db: AsyncSession =
             status_code=403,
             detail="Your email is not yet verified. Please check your inbox for the verification link.",
         )
+    if await is_revoked(db, tenant.id, existing_user.email):
+        raise HTTPException(status_code=403, detail=REVOKED_MSG)
 
     # 4. Invalidate any existing unused OTPs for this email + tenant
     existing = await db.execute(
@@ -176,6 +182,10 @@ async def verify_otp(request: Request, body: OTPVerifyBody, db: AsyncSession = D
     tenant = result.scalar_one_or_none()
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not configured.")
+
+    # A code sent before the admin revoked access must not log in
+    if await is_revoked(db, tenant.id, body.email.lower()):
+        raise HTTPException(status_code=403, detail=REVOKED_MSG)
 
     # 2. Find latest unused OTP for this email + tenant
     result = await db.execute(
@@ -254,10 +264,12 @@ async def me(
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
 
+    # role is needed by the frontend after a page refresh (admin menu and /admin)
     return {
         "email"  : user.email,
         "plan"   : user.plan,
         "credits": user.credits,
+        "role"   : user.role,
     }
 
 
@@ -292,4 +304,4 @@ async def save_onboarding(
 @router.post("/logout")
 async def logout():
     # JWT is stateless — logout is handled client-side by deleting the token
-    return {"ok": True}
+    return {"ok": True}

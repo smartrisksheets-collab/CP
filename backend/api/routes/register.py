@@ -11,37 +11,12 @@ import os
 from api.db import SessionLocal
 from api.models import Tenant, User, Registration, CreditTransaction
 from api.deps import get_db, limiter
+from api.allowlist import normalize_email, is_personal, get_entry
 
 router = APIRouter()
 
 FREE_CREDITS       = 2
 VERIFICATION_EXPIRY = 24  # hours
-
-# ── Disposable email domains blocklist ────────────────────────
-DISPOSABLE_DOMAINS = {
-    "mailinator.com", "guerrillamail.com", "10minutemail.com",
-    "tempmail.com", "throwaway.email", "yopmail.com",
-    "sharklasers.com", "guerrillamailblock.com", "grr.la",
-    "guerrillamail.info", "guerrillamail.biz", "guerrillamail.de",
-    "guerrillamail.net", "guerrillamail.org", "spam4.me",
-    "trashmail.com", "trashmail.me", "trashmail.net",
-    "dispostable.com", "mailnull.com", "spamgourmet.com",
-    "trashmail.at", "trashmail.io", "trashmail.xyz",
-    "getnada.com", "maildrop.cc", "discard.email",
-    "fakeinbox.com", "tempr.email", "temp-mail.org",
-    "emailondeck.com", "owlpic.com", "spamhereplease.com",
-}
-
-
-# ── Personal / consumer email domains ─────────────────────────
-PERSONAL_DOMAINS = {
-    "gmail.com", "yahoo.com", "yahoo.co.uk", "yahoo.co.in",
-    "outlook.com", "hotmail.com", "hotmail.co.uk", "live.com",
-    "icloud.com", "me.com", "mac.com", "aol.com",
-    "protonmail.com", "proton.me", "zoho.com",
-    "yandex.com", "yandex.ru", "gmx.com", "gmx.net",
-}
-
 
 # ── Schemas ───────────────────────────────────────────────────
 class RegisterBody(BaseModel):
@@ -57,20 +32,20 @@ class VerifyEmailBody(BaseModel):
 
 # ── Helpers ───────────────────────────────────────────────────
 def _validate_email(email: str) -> str:
-    email = email.lower().strip()
-    parts = email.split("@")
-    if len(parts) != 2 or not parts[0] or "." not in parts[1]:
-        raise HTTPException(status_code=400, detail="Invalid email address.")
-    
-    # Strip + aliases (e.g. john+test@gmail.com → john@gmail.com)
-    local, domain = parts[0].split("+")[0], parts[1]
-    email = f"{local}@{domain}"
+    try:
+        return normalize_email(email)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-    if domain in DISPOSABLE_DOMAINS:
-        raise HTTPException(status_code=400, detail="Disposable email addresses are not allowed.")
-    if domain in PERSONAL_DOMAINS:
+
+async def _check_personal_allowed(db: AsyncSession, tenant_id: int, email: str) -> None:
+    # Personal domains (gmail, yahoo, ...) only register when an admin
+    # allowlisted the address on this tenant and has not revoked it.
+    if not is_personal(email):
+        return
+    entry = await get_entry(db, tenant_id, email)
+    if entry is None or entry.revoked_at is not None:
         raise HTTPException(status_code=400, detail="Please use your work email address to register.")
-    return email
 
 
 async def _send_verification_email(email: str, name: str, token: str, tenant_name: str, hostname: str):
@@ -127,6 +102,8 @@ async def register(
     tenant = result.scalar_one_or_none()
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not configured.")
+
+    await _check_personal_allowed(db, tenant.id, email)
 
     # Check if already registered and verified
     result = await db.execute(
@@ -212,6 +189,9 @@ async def verify_email(body: VerifyEmailBody, db: AsyncSession = Depends(get_db)
     if datetime.now(timezone.utc) > expires:
         raise HTTPException(status_code=400, detail="Verification link has expired. Please register again.")
 
+    # The allowlist entry may have been revoked since the link was sent
+    await _check_personal_allowed(db, reg.tenant_id, reg.email)
+
     # Mark registration verified
     reg.verified = True
 
@@ -262,4 +242,4 @@ async def verify_email(body: VerifyEmailBody, db: AsyncSession = Depends(get_db)
         "ok"     : True,
         "message": f"Email verified. {FREE_CREDITS} free credits added to your account.",
         "email"  : reg.email,
-    }
+    }

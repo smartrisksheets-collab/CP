@@ -10,6 +10,7 @@ import os
 
 from api.db import SessionLocal
 from api.models import User, Tenant
+from api.allowlist import is_revoked
 
 JWT_SECRET    = os.getenv("JWT_SECRET")
 JWT_ALGORITHM = "HS256"
@@ -77,6 +78,9 @@ async def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found.")
     if not user.verified:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email not verified. Check your inbox.")
+    # 401, not 403, so the frontend's existing 401 handler signs the user out
+    if await is_revoked(db, tenant_id, email):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Your access has been revoked. Contact your administrator.")
 
     # Verify tenant still exists
     tenant = await db.get(Tenant, tenant_id)
@@ -116,4 +120,4 @@ async def get_tenant_by_hostname(
     tenant = result.scalar_one_or_none()
     if not tenant:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not configured.")
-    return tenant
+    return tenant
