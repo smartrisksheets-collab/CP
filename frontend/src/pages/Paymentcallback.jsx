@@ -2,10 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Loader, CheckCircle, AlertTriangle, Mail, MessageCircle } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
-import { errorMessage } from "../api/client.js";
-import axios from "axios";
+import { errorMessage, verifyPayment } from "../api/client.js";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
 export default function PaymentCallback() {
   const [searchParams] = useSearchParams();
@@ -25,10 +23,7 @@ export default function PaymentCallback() {
   useEffect(() => {
     if (precheck) return;
 
-    const token = localStorage.getItem("sr_token");
-    axios.get(`${BASE_URL}/payments/verify/${reference}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    verifyPayment(reference)
       .then((res) => {
         if (res.data.ok) {
           setStatus("success");

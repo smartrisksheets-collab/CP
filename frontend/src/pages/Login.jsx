@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Lock, Check, Loader } from "lucide-react";
+import { Lock, Check, Loader, Clock } from "lucide-react";
 import LegalModal from "../components/LegalModal.jsx";
 import { useIsMobile } from "../hooks/useBreakpoint.js";
 import { useTenant } from "../context/TenantContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
-import { requestOTP, verifyOTP, errorMessage } from "../api/client.js";
+import { requestOTP, verifyOTP, errorMessage, takeLogoutReason, IDLE_TIMEOUT_MS } from "../api/client.js";
 
 const S = {
   wrapper  : { display:"flex", height:"100vh", width:"100vw", overflow:"hidden" },
@@ -113,6 +113,13 @@ const S = {
 
 const STEPS = { CODE: "code", EMAIL: "email", OTP: "otp" };
 
+const idleMinutes = Math.round(IDLE_TIMEOUT_MS / 60000);
+const LOGOUT_NOTICES = {
+  idle   : `You were signed out after ${idleMinutes === 60 ? "1 hour" : `${idleMinutes} minutes`} of inactivity. Please sign in again.`,
+  expired: "Your session expired. Please sign in again.",
+  ended  : "Your session has ended. Please sign in again.",
+};
+
 export default function Login() {
   const { tenant }    = useTenant();
   const { login }     = useAuth();
@@ -135,6 +142,7 @@ export default function Login() {
   const [loading, setLoading]     = useState(false);
   const [resendCd,   setResendCd]   = useState(0);
   const [legalModal, setLegalModal] = useState(null);
+  const [logoutNotice] = useState(() => LOGOUT_NOTICES[takeLogoutReason()] || "");
 
   // ── Access code ───────────────────────────────────────────
   function handleCodeChange(val) {
@@ -321,6 +329,13 @@ export default function Login() {
           <div style={S.eyebrow}>{tenant?.loginEyebrow || "Analyst Portal"}</div>
           <h2 style={S.heading}>Welcome back</h2>
           <p style={S.sub}>{tenant?.loginSubtext || "Sign in and start scoring."}</p>
+
+          {logoutNotice && (
+            <div className="sr-session-notice" role="status">
+              <Clock size={14} />
+              <span>{logoutNotice}</span>
+            </div>
+          )}
 
           {/* ACCESS CODE STEP */}
           {step === STEPS.CODE && (
