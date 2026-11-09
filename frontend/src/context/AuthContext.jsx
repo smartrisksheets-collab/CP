@@ -1,5 +1,8 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { getMe, logout as apiLogout } from "../api/client";
+import {
+  getMe, logout as apiLogout, endSession, isIdleExpired, isTokenExpired, lastActive, markActive,
+} from "../api/client";
+import useIdleLogout from "../hooks/useIdleLogout.js";
 
 const AuthContext = createContext(null);
 
@@ -13,6 +16,15 @@ export function AuthProvider({ children }) {
       setLoading(false);
       return;
     }
+    // Stale session from an earlier visit: clear it here; ProtectedRoute
+    // then sends the user to /login, which shows the reason
+    const staleReason = isTokenExpired(token) ? "expired" : isIdleExpired() ? "idle" : null;
+    if (staleReason) {
+      endSession(staleReason, { redirect: false });
+      setLoading(false);
+      return;
+    }
+    if (lastActive() === null) markActive(); // session from before this feature
 
     getMe()
       .then((res) => {
@@ -35,7 +47,11 @@ export function AuthProvider({ children }) {
       .finally(() => setLoading(false));
   }, []);
 
+  useIdleLogout(Boolean(user));
+
   const login = (token, userData) => {
+    localStorage.removeItem("sr_logout_reason");
+    markActive();
     localStorage.setItem("sr_token", token);
     localStorage.setItem("sr_user", JSON.stringify(userData));
     setUser(userData);

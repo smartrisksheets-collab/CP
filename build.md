@@ -1,12 +1,5 @@
 # Build Log
 
-## 2026-10-27 FAM scoring fixes (p7, p8, p9)
-- p7 (spec P1): Current and Cash ratios, Liquidity Ratios group, CURRENT RATIO in PDF header, tradePayables and current liabilities split, /assessment/preview, RatioTable.jsx, backend/tests
-- p8 (spec P2): band tables, items 4 and 6 to 9, labels 13 and 14, model_version (backend/alembic/versions/0003_model_version.py, backend/alembic/sql/0003_model_version.sql), backend/scripts/backtest_models.py
-- p9: MODEL_VERSION v2.0, User Guide points, "12-ratio" wording
-- Checks: fresh dev checkout, git apply, import, pytest 35 passed, PostgreSQL 16 upgrade / downgrade / upgrade with backfill, npm run build, eslint clean on touched files (repo 57 to 44 problems)
-- Decisions: D019 to D023
-
 ## 2026-10-31 Upload hardening and error messages (p11 to p14)
 - p11: photos (up to 20 per slot) and scanned PDFs accepted; new backend/api/documents.py and frontend/src/utils/documentInput.js; files checked before the credit is charged; failed extraction refunds and marks the debit refunded; financial check reads 100 pages (was 15); client timeouts 600s / 330s; backend/tests/test_documents.py
 - p12: errorMessage() in frontend/src/api/client.js used by every screen (offline, timeout, unreachable, 429, 413, 422, 502 to 504, 500); OfflineBanner.jsx; backend/main.py middleware keeps CORS headers on unhandled 500s; backend/tests/test_errors.py; Scores out-of-credit message fixed
@@ -24,3 +17,10 @@
 - User tested locally: add, register, revoke, restore
 - Not tested in sandbox: Resend emails; Supabase SQL (user runs backend/alembic/sql/0004_email_allowlist.sql)
 - Decisions: D030 to D032
+
+## 2026-11-09 Session expiry and inactivity logout (p17, p17b)
+- p17: frontend only. New frontend/src/hooks/useIdleLogout.js (used by AuthContext) signs out after 60 minutes without input (VITE_IDLE_TIMEOUT_MINUTES overrides), timer shared across tabs via localStorage sr_last_active, running requests count as activity, other tabs follow a sign-out; frontend/src/api/client.js adds endSession, isTokenExpired (JWT exp, 30s leeway), pending request count, 401 signs out only when the request carried a token; AuthContext clears stale sessions on load; Login.jsx shows idle, expired or ended notice (.sr-session-notice in index.css)
+- p17b: Pricing.jsx and Paymentcallback.jsx use getPacks, initializePayment, verifyPayment from client.js instead of raw axios
+- Checks: fresh dev checkout, git apply, npm ci, npm run build, npm run lint 23 problems before and after (all pre-existing), headless Chromium with mocked API and fake clock (idle and expired on load, 401 without reload loop, activity keeps session, 61 min idle signs out, pending request keeps session, cross-tab follow, manual sign-out without notice, notice shown once, payment verify success and 401)
+- Not tested in sandbox: real backend, OTP login and Paystack; tenant session_ttl values in Supabase unknown
+- Decisions: D033 to D035

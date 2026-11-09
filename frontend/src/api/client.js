@@ -7,21 +7,103 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
+// ── Session lifetime ──────────────────────────────────────────
+// Idle limit in minutes; VITE_IDLE_TIMEOUT_MINUTES overrides it (handy for testing)
+export const IDLE_TIMEOUT_MS = (Number(import.meta.env.VITE_IDLE_TIMEOUT_MINUTES) || 60) * 60 * 1000;
+const EXP_LEEWAY_MS = 30 * 1000;           // tolerate a client clock running slightly fast
+const LAST_ACTIVE_KEY = "sr_last_active";  // shared by all tabs of this origin
+const REASON_KEY      = "sr_logout_reason";
+
+let pendingRequests = 0;
+export const hasPendingRequests = () => pendingRequests > 0;
+
+export function markActive() {
+  try { localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now())); } catch { /* storage blocked */ }
+}
+
+export function lastActive() {
+  const v = Number(localStorage.getItem(LAST_ACTIVE_KEY));
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
+
+export function isIdleExpired(now = Date.now()) {
+  const last = lastActive();
+  return last !== null && now - last >= IDLE_TIMEOUT_MS;
+}
+
+// Reads exp from the JWT payload. A token that cannot be decoded counts as expired.
+export function isTokenExpired(token = localStorage.getItem("sr_token"), now = Date.now()) {
+  if (!token) return false;
+  try {
+    const part = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const { exp } = JSON.parse(atob(part.padEnd(part.length + ((4 - (part.length % 4)) % 4), "=")));
+    if (typeof exp !== "number") return false; // no exp claim: the server decides
+    return now >= exp * 1000 + EXP_LEEWAY_MS;
+  } catch {
+    return true;
+  }
+}
+
+// Ends the session. reason: "idle" | "expired" | "ended" | null (manual sign out).
+// The reason goes to sessionStorage for the login page, and to localStorage
+// briefly so other open tabs can show the same message.
+export function endSession(reason = null, { redirect = true } = {}) {
+  try {
+    if (reason) {
+      sessionStorage.setItem(REASON_KEY, reason);
+      localStorage.setItem(REASON_KEY, reason);
+    } else {
+      localStorage.removeItem(REASON_KEY);
+    }
+    localStorage.removeItem("sr_token");
+    localStorage.removeItem("sr_user");
+    localStorage.removeItem(LAST_ACTIVE_KEY);
+  } catch { /* storage blocked */ }
+  if (redirect && window.location.pathname !== "/login") window.location.replace("/login");
+}
+
+// Login page: read once, then clear
+export function takeLogoutReason() {
+  try {
+    const r = sessionStorage.getItem(REASON_KEY);
+    sessionStorage.removeItem(REASON_KEY);
+    return r;
+  } catch {
+    return null;
+  }
+}
+
 // ── Attach JWT to every request ───────────────────────────────
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("sr_token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (token) {
+    if (isTokenExpired(token)) {
+      endSession("expired");
+      return Promise.reject(new axios.CanceledError("Session expired"));
+    }
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  pendingRequests += 1;
+  config._srTracked = true;
   return config;
 });
 
 // ── Global error handler — 401 logout, JSON errors from blob requests ──
+const settle = (config) => {
+  if (config?._srTracked) {
+    config._srTracked = false;
+    pendingRequests = Math.max(0, pendingRequests - 1);
+  }
+};
+
 api.interceptors.response.use(
-  (res) => res,
+  (res) => { settle(res.config); return res; },
   async (err) => {
-    if (err.response?.status === 401) {
-      localStorage.removeItem("sr_token");
-      localStorage.removeItem("sr_user");
-      window.location.href = "/login";
+    settle(err.config);
+    // Only a request that carried a token can mean the session ended (expired,
+    // revoked). A 401 on a public call, such as login, is left to the page.
+    if (err.response?.status === 401 && err.config?.headers?.Authorization) {
+      endSession("ended");
     }
     // Report downloads use responseType "blob", so their error bodies arrive as a Blob
     const data = err.response?.data;
@@ -91,10 +173,7 @@ export const verifyOTP = (email, hostname, otp) =>
 export const getMe = () =>
   api.get("/auth/me");
 
-export const logout = () => {
-  localStorage.removeItem("sr_token");
-  localStorage.removeItem("sr_user");
-};
+export const logout = () => endSession(null, { redirect: false });
 
 
 // ── Tenant ────────────────────────────────────────────────────
@@ -105,6 +184,17 @@ export const getTenant = (hostname) =>
 // ── Quota ─────────────────────────────────────────────────────
 export const getQuotaStatus = () =>
   api.get("/quota/status");
+
+
+// ── Payments ──────────────────────────────────────────────────
+export const getPacks = () =>
+  api.get("/payments/packs");
+
+export const initializePayment = (pack, hostname) =>
+  api.post("/payments/initialize", { pack, hostname });
+
+export const verifyPayment = (reference) =>
+  api.get(`/payments/verify/${encodeURIComponent(reference)}`);
 
 
 // ── Assessment ────────────────────────────────────────────────

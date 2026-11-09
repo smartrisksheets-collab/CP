@@ -1,12 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
-import { getQuotaStatus, errorMessage } from "../api/client.js";
+import { getQuotaStatus, getPacks, initializePayment, errorMessage } from "../api/client.js";
 import { Loader, ArrowLeft, Check, Mail, MessageCircle, X } from "lucide-react";
 import { useIsMobile } from "../hooks/useBreakpoint.js";
-import axios from "axios";
 
-const BASE_URL    = import.meta.env.VITE_API_BASE_URL || "";
 const PAYSTACK_PK = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "";
 
 // ── Static pack definitions ────────────────────────────────────
@@ -73,7 +71,7 @@ export default function Pricing() {
 
   useEffect(() => {
     Promise.all([
-      axios.get(`${BASE_URL}/payments/packs`),
+      getPacks(),
       user ? getQuotaStatus() : Promise.resolve(null),
     ]).then(([packsRes, quotaRes]) => {
       setPacks(packsRes.data.filter(p => PACK_ORDER.includes(p.key)));
@@ -87,11 +85,7 @@ export default function Pricing() {
     setPaying(packKey);
     setError("");
     try {
-      const res = await axios.post(
-        `${BASE_URL}/payments/initialize`,
-        { pack: packKey, hostname },
-        { headers: { Authorization: `Bearer ${localStorage.getItem("sr_token")}` } },
-      );
+      const res = await initializePayment(packKey, hostname);
       window.location.assign(res.data.authorization_url);
     } catch (e) {
       setError(errorMessage(e, "Payment initialization failed. Please try again."));

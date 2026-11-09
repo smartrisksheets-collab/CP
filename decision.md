@@ -33,6 +33,9 @@
 - D030 2026-11-02 Personal emails register only via a per-tenant admin allowlist (email_allowlist, 0004)
 - D031 2026-11-02 Revoke blocks access immediately; only a revoked entry blocks, legacy accounts unaffected
 - D032 2026-11-02 /auth/me returns role; AuthContext falls back to the cached user on non-401 errors
+- D033 2026-11-09 Sign out after 60 minutes of inactivity, enforced in the browser, shared across tabs
+- D034 2026-11-09 Client checks JWT exp; 401 signs out only on requests that carried a token; login page shows the reason
+- D035 2026-11-09 Pricing and payment callback call the API through the shared api client
 
 ## D001 Start Supabase empty
 Render database is suspended for non-payment and unreachable. User confirmed the app stores no data worth keeping. Tenants are recreated by backend/seed.py. Edge cases: no stamping of an existing schema needed; tenant rows must exist before any login, so seed runs after upgrade head.
@@ -130,3 +133,12 @@ User chose block over registration-only. get_current_user returns 401 (frontend 
 
 ## D032 Role in /auth/me
 /auth/me omitted role, so after any refresh or refreshUser() the admin menu and /admin disappeared. It now returns role, and AuthContext stores it in sr_user. On network or 500 errors AuthContext uses the cached sr_user instead of sending a signed-in user to /login; 401 still signs out.
+
+## D033 Inactivity logout
+User asked for automatic sign-out after 1 hour of inactivity. Before this the only limit was the JWT exp (tenant.session_ttl, absolute, default 24h). Chosen: client-side idle timer in frontend/src/hooks/useIdleLogout.js, last activity in localStorage sr_last_active so all tabs share it, checked every 30s and on tab focus by comparing timestamps (correct after laptop sleep), writes throttled to 15s. A running request counts as activity so a 10 minute extraction cannot sign the user out. Rejected for now: server-side idle enforcement, which needs sliding or refresh tokens and a schema change. Edge cases: several tabs, sleep and wake, long uploads, sessions from before this change (no sr_last_active, timer starts on load), blocked storage, all roles treated alike, tenant session_ttl stays the hard cap.
+
+## D034 Expired token handling
+The 401 interceptor sent every 401 to /login with a full reload, even on a public call, and gave no reason; an expired token was only noticed on the next click. Now the request interceptor reads exp from the JWT (30s leeway for a fast client clock, undecodable token counts as expired) and the idle check also catches it. endSession(reason) clears sr_token, sr_user, sr_last_active and redirects unless already on /login; a 401 only signs out when the request carried a token. Reasons idle, expired, ended go through sessionStorage to Login.jsx, shown once; manual sign-out shows none. Edge cases: 401 on /login (no loop), revoked allowlist entry (ended), stale session on load (cleared before /auth/me).
+
+## D035 Payment pages through the api client
+frontend/src/pages/Pricing.jsx and frontend/src/pages/Paymentcallback.jsx used raw axios with their own BASE_URL and token header, so they skipped the 401 and expiry handling. They now use getPacks, initializePayment and verifyPayment in frontend/src/api/client.js. Behaviour change: a session that expires while the user is on Paystack now leads to sign-in instead of an error; the Paystack webhook still credits the payment.
