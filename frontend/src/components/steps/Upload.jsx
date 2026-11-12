@@ -680,8 +680,9 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
       {/* Client info */}
       <div style={css.card}>
         <div style={css.title}>Client Information</div>
-        <div style={{ ...css.grid, gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill,minmax(200px,1fr))" }}>
-          <div style={{ gridColumn:"span 2" }}>
+        {/* One row on desktop: client name twice as wide, the other fields equal */}
+        <div style={{ ...css.grid, gridTemplateColumns: isMobile ? "1fr" : `minmax(0,2fr) repeat(${historyOn ? 3 : 2},minmax(0,1fr))` }}>
+          <div>
             <label style={css.label}>Client name *</label>
             <input style={css.input} type="text" placeholder="e.g. Flour Mills of Nigeria Plc"
               value={info.clientName || ""} onChange={(e) => set("clientName", e.target.value)} />
