@@ -36,3 +36,4 @@
 - Changed: backend/api/routes/assessment.py (HISTORY_MAX_TOTAL_MB 30, HISTORY_AI_CONCURRENCY 2), backend/tests/test_history_api.py (+2), frontend Upload.jsx note
 - Checks: pytest 119 passed; memory measured for 4 x 5MB, 4 x 10MB and 4 x 20MB uploads
 - Decision: D045
+- Added backend/set_history_mode.py (switch history per tenant from the Render Shell; tested --list, on, off, bad mode, unknown host)
