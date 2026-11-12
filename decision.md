@@ -36,6 +36,15 @@
 - D033 2026-11-09 Sign out after 60 minutes of inactivity, enforced in the browser, shared across tabs
 - D034 2026-11-09 Client checks JWT exp; 401 signs out only on requests that carried a token; login page shows the reason
 - D035 2026-11-09 Pricing and payment callback call the API through the shared api client
+- D036 2026-11-12 Issuer history behind tenants.history_mode, off by default
+- D037 2026-11-12 Phase 1 is shadow mode: history adjustment calculated and saved, never added to the score
+- D038 2026-11-12 Trend uses the model's own ratios; bands and caps are starting values for the back-test
+- D039 2026-11-12 Separate multi-period extraction, run in parallel on every document, one credit
+- D040 2026-11-12 One record per period: current statement wins its year, then audited, then newest document
+- D041 2026-11-12 Issuer history stored per tenant by RC number, only after a completed run
+- D042 2026-11-12 Half-year interim is an early warning only; a triggered check needs an analyst comment
+- D043 2026-11-12 One-off items leave the trend only and need a reason
+- D044 2026-11-12 Report: two scorecard tiles, a Historical Performance section and a footer note
 
 ## D001 Start Supabase empty
 Render database is suspended for non-payment and unreachable. User confirmed the app stores no data worth keeping. Tenants are recreated by backend/seed.py. Edge cases: no stamping of an existing schema needed; tenant rows must exist before any login, so seed runs after upgrade head.
@@ -142,3 +151,30 @@ The 401 interceptor sent every 401 to /login with a full reload, even on a publi
 
 ## D035 Payment pages through the api client
 frontend/src/pages/Pricing.jsx and frontend/src/pages/Paymentcallback.jsx used raw axios with their own BASE_URL and token header, so they skipped the 401 and expiry handling. They now use getPacks, initializePayment and verifyPayment in frontend/src/api/client.js. Behaviour change: a session that expires while the user is on Paystack now leads to sign-in instead of an error; the Paystack webhook still credits the payment.
+
+## D036 history_mode per tenant
+First Asset Management raised the lack of an issuer historical review during procurement. There is no staging environment, so the feature ships switched off: tenants.history_mode (0005_issuer_history) is "off" for every existing row and only seed.py's localhost tenant gets "shadow". "off" hides the RC field and history slots, skips the extra AI calls and returns history null from /preview. Turn it on per tenant in the Supabase SQL editor: UPDATE tenants SET history_mode = 'shadow' WHERE hostname = '...'. Edge cases: a draft started with history and finished after the tenant is switched off is scored without history; /assessment/issuer/{rc} answers found false when off.
+
+## D037 Shadow mode
+The adjustment (A direction + B stability + C red flags, clamped to -5..+3, times the confidence factor 1.0 / 0.5 / 0) has not been back-tested, so it is saved in assessments.history and shown as "indicative, not applied" in the app, PDF and AI narrative, and total_score, eligible and the cut-off are unchanged. history.applied is always false. "applied" is reserved for Phase 2 after the back-test; total_score is an integer column, so applying a 0.5-step adjustment will need a rounding rule or a new column then.
+
+## D038 Trend ratios and bands
+Direction compares the oldest and latest year on the model's own ratios: Net Income Margin, Interest Coverage, Net Debt / EBITDA (lower is better) and Acid-Test, each +/-0.5 when the relative change exceeds 10%. The relative change is measured against max(|old|, floor) (1 pt, 0.5x, 0.5x, 0.1x) so near-zero values do not swing it; interest coverage is capped at 10x (60x to 40x is not weaker) and "no debt" counts as 10x; negative EBITDA appearing or disappearing is weaker or better. Stability: coefficient of variation of EBITDA margin below 15% +1, above 35% -1, mean margin at or below zero -1. Red flags (-1 each, max 4): a loss year, negative operating cash flow in the latest year or in two years, debt growth more than 25 points above EBITDA growth, Altman Z' below 1.23 (the model's own distress band, not the original Z's 1.8). Trends never use naira growth, so inflation and devaluation do not read as improvement. DSCR and Altman Z' are shown for context only.
+
+## D039 History extraction
+backend/api/claude.py PERIODS_PROMPT returns every Company column of a statement (period end, length, audited, 17 fields including operating cash flow); the main EXTRACTION_PROMPT is untouched so the scored figures do not change. With history on, the scored statement is read twice (main prompt plus PERIODS_PROMPT for its prior-year column and operating cash flow), plus one call per prior, older or interim upload, all with asyncio.gather. So the current statement plus one older statement gives three years, and a stored issuer may need none. Cost: up to four extra Opus calls per assessment, still one credit (open question for pricing). Only the scored statement can fail the extraction (refund as D025); a failed history document becomes a warning in figures.history.warnings. History files are checked before the credit is charged, like every other file.
+
+## D040 Merge rule
+backend/api/history.py merge_periods keeps one record per (period end, length): the analyst-reviewed scored statement always wins its own year; otherwise audited beats unaudited, then the newest document (docPeriodEnd), so a restated comparative replaces the original. A difference above 2% on revenue, net income, EBIT, total assets or equity is kept as a restatement note and shown on Review Data, Scores and the PDF. The merge runs at extraction too, so Review Data shows one column per period. Interim prior halves are kept without a balance sheet (interim reports compare the balance sheet with the last year end). Years are lined up 9 to 18 months apart; a gap of more than 1.5 months from 12 is noted as an irregular period (year-end change) and lowers confidence to partial. A missing year is never bridged by an older one.
+
+## D041 Storage
+issuers (tenant, RC number) and issuer_periods (one row per issuer, period end and length; RLS on). Periods are saved by /run only, so only figures the analyst reviewed are kept, and only when an RC number is given. A row is replaced only by a document at least as new (or the scored statement); the replaced figures go to previous_figures. A storage error is logged and rolled back without failing the run, because the result is already saved. History is never shared across tenants, including tenants with history on (tested). RC numbers are digits only, leading zeros dropped.
+
+## D042 Interim early warning
+The latest half-year is compared with the same half a year earlier: net income margin down more than 2 points, interest coverage down more than 20%, acid-test down more than 15%, operating cash flow negative. Half-years are never annualised and Debt / EBITDA is not calculated for them. An interim not later than the latest audited year is ignored ("stale"); one without the prior half shows "no comparison" and a check without data shows "Not available", never "Passed". It never changes the score or the history adjustment. A triggered check needs an analyst comment: the Scores step asks for it and /run returns 422 without it. The comment is saved in figures.history and printed in the PDF.
+
+## D043 One-off items
+Review Data lets the analyst enter a one-off amount per period (and for the scored year) with a required reason. It is removed from EBIT, EBITDA and net income for the trend only; the 56-point score keeps the figures as entered. The PDF notes list each exclusion and its reason.
+
+## D044 Report and narrative
+Only when at least two years are available: the header adds "N-year history: Weakening/Stable/Improving", the scorecard adds HISTORICAL PERFORMANCE and INTERIM EARLY WARNING tiles (8 tiles), a HISTORICAL PERFORMANCE section follows the scoring breakdown (6-ratio table with interim columns, adjustment breakdown, notes and sources) and the disclaimer says the adjustment is indicative. The narrative prompt gets the history block, must ground futureRisksReview in the trend and say plainly when the latest year and the trend disagree, must not claim the score was adjusted, and returns historicalReview. Assessments saved before 0005 have no history and print as before. Not done in Phase 1: trend lines under the PDF KPI strip.

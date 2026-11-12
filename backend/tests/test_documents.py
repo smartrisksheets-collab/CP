@@ -119,11 +119,17 @@ def _patch_route(monkeypatch, calls: _Calls, extract_result=None, extract_error=
     monkeypatch.setattr(assessment, "_refund_credit", refund)
     monkeypatch.setattr(assessment, "extract_figures", extract)
 
+    async def history_off(*_):
+        return "off"
+
+    monkeypatch.setattr(assessment, "_history_mode", history_off)
+
 
 def _run_extract(financial, rating=None):
     route = inspect.unwrap(assessment.extract)  # skip the rate limiter wrapper
     return asyncio.run(route(
         request=None, financial_pdf=financial, rating_pdf=rating, cp_terms_pdf=None,
+        prior_pdf=None, older_pdf=None, interim_pdf=None, rc_number=None,
         client_name=None, draft_id=None, current_user={"email": "a@b.c", "tenant_id": 1}, db=None,
     ))
 

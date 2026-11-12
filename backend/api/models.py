@@ -1,11 +1,11 @@
 from sqlalchemy import (
-    Integer, Boolean, Text, DateTime, BigInteger,
+    Integer, Boolean, Text, DateTime, Date, BigInteger,
     ForeignKey, ARRAY, func, UniqueConstraint
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date
 from api.db import Base
 
 
@@ -28,6 +28,7 @@ class Tenant(Base):
     allowed_emails  : Mapped[List]          = mapped_column(ARRAY(Text), default=list)
     allowed_domains : Mapped[List]          = mapped_column(ARRAY(Text), default=list)
     session_ttl     : Mapped[int]           = mapped_column(Integer, default=86400)
+    history_mode    : Mapped[str]           = mapped_column(Text, default="off", server_default="off")  # off | shadow
     created_at      : Mapped[datetime]      = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     users                : Mapped[List["User"]]               = relationship(back_populates="tenant")
@@ -114,6 +115,8 @@ class Assessment(Base):
     narrative          : Mapped[Optional[dict]]= mapped_column(JSONB, nullable=True)
     pdf_url            : Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     review_date        : Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    rc_number          : Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    history            : Mapped[Optional[dict]]= mapped_column(JSONB, nullable=True)  # history analysis (api/history.py)
     status             : Mapped[str]                = mapped_column(Text, default="complete")
     deleted_at         : Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at         : Mapped[datetime]           = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -167,3 +170,46 @@ class EmailAllowlist(Base):
     created_at : Mapped[datetime]        = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     revoked_at : Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     revoked_by : Mapped[str | None]      = mapped_column(Text, nullable=True)
+
+
+class Issuer(Base):
+    """An issuer on one tenant, keyed by RC number. History is never shared across tenants."""
+    __tablename__ = "issuers"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "rc_number", name="uq_issuer_tenant_rc"),
+    )
+
+    id         : Mapped[int]                = mapped_column(Integer, primary_key=True)
+    tenant_id  : Mapped[int]                = mapped_column(ForeignKey("tenants.id"), nullable=False)
+    rc_number  : Mapped[str]                = mapped_column(Text, nullable=False)
+    name       : Mapped[Optional[str]]      = mapped_column(Text, nullable=True)
+    created_at : Mapped[datetime]           = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at : Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class IssuerPeriod(Base):
+    """
+    Confirmed figures for one financial year or half-year of an issuer.
+    One row per period; a newer document's figures replace older ones and the
+    replaced figures are kept in previous_figures.
+    """
+    __tablename__ = "issuer_periods"
+    __table_args__ = (
+        UniqueConstraint("issuer_id", "period_end", "period_months", name="uq_issuer_period"),
+    )
+
+    id               : Mapped[int]                = mapped_column(Integer, primary_key=True)
+    tenant_id        : Mapped[int]                = mapped_column(ForeignKey("tenants.id"), nullable=False)
+    issuer_id        : Mapped[int]                = mapped_column(ForeignKey("issuers.id", ondelete="CASCADE"), nullable=False)
+    period_end       : Mapped[date]               = mapped_column(Date, nullable=False)
+    period_months    : Mapped[int]                = mapped_column(Integer, nullable=False)
+    audited          : Mapped[Optional[bool]]     = mapped_column(Boolean, nullable=True)
+    basis            : Mapped[Optional[str]]      = mapped_column(Text, nullable=True)
+    figures          : Mapped[dict]               = mapped_column(JSONB, nullable=False)
+    doc_period_end   : Mapped[date]               = mapped_column(Date, nullable=False)
+    source           : Mapped[str]                = mapped_column(Text, nullable=False)
+    one_off          : Mapped[Optional[dict]]     = mapped_column(JSONB, nullable=True)
+    previous_figures : Mapped[Optional[dict]]     = mapped_column(JSONB, nullable=True)
+    assessment_id    : Mapped[Optional[int]]      = mapped_column(ForeignKey("assessments.id"), nullable=True)
+    created_at       : Mapped[datetime]           = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at       : Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

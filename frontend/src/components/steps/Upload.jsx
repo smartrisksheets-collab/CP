@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { Upload as UploadIcon, CheckCircle, Loader, AlertTriangle, AlertCircle, X, ChevronRight } from "lucide-react";
 import { useIsMobile } from "../../hooks/useBreakpoint.js";
-import { extractFigures, errorMessage } from "../../api/client.js";
+import { extractFigures, getIssuerHistory, errorMessage } from "../../api/client.js";
+import { useTenant } from "../../context/TenantContext.jsx";
 import CPTerms from "./CPTerms.jsx";
 import { ACCEPT, PHOTO_WARNING, inspectPdf, prepareDocument, checkWarnings, appendDocument, countKw } from "../../utils/documentInput.js";
 
@@ -193,6 +194,28 @@ async function runRatValidation(doc, clientName) {
 
   return { ok: true, warnings };
 }
+
+// Older statements are expected to be old, so the "statement is 2+ years old" prompt is
+// skipped; interim reports are expected to be unaudited, so that warning is dropped too.
+async function runHistoryValidation(doc, clientName, interim) {
+  const result = await runFinValidation(doc, clientName);
+  if (result.ok === false) return result;
+  const warnings = (result.warnings || []).filter((w) => !(interim && w.includes("unaudited")));
+  return { ok: true, warnings };
+}
+
+const HISTORY_SLOTS = [
+  { key: "prior",   field: "prior_pdf",   title: "Prior-year audited statement",
+    label: "Click to upload the previous year's audited statement",
+    sub: "Its comparative column adds a third year — one PDF, or photos of the pages", interim: false },
+  { key: "older",   field: "older_pdf",   title: "Older audited statement (optional)",
+    label: "Click to upload an older audited statement",
+    sub: "Only if the prior-year statement is not available — one PDF, or photos", interim: false },
+  { key: "interim", field: "interim_pdf", title: "Half-year interim (optional, unaudited)",
+    label: "Click to upload the latest half-year interim report",
+    sub: "Compared with the same half of last year as an early warning — never changes the score", interim: true },
+];
+const BLANK_SLOT = { doc: null, v: { validating: false, warnings: [], error: "" }, progress: { show: false, pct: 0, name: "" } };
 
 // ── Styles ────────────────────────────────────────────────
 const css = {
@@ -422,6 +445,10 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
   const [showExtractConfirm, setShowExtractConfirm] = useState(false);
 
   const isMobile = useIsMobile();
+  const { tenant } = useTenant();
+  const historyOn  = !!tenant?.historyMode && tenant.historyMode !== "off";
+  const [slots, setSlots]       = useState({ prior: BLANK_SLOT, older: BLANK_SLOT, interim: BLANK_SLOT });
+  const [stored, setStored]     = useState(null); // issuer lookup: null | { found, periods, name } | { error }
   const info = clientInfo;
   const set  = (k, v) => onClientInfoChange({ ...info, [k]: v });
   const showRatingReminder = !!ratDoc && !info.creditRating;
@@ -438,7 +465,8 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
   }, [loading]);
 
   
-  const currentFileKey = finDoc ? `${finDoc.name}-${finDoc.size}` : "";
+  const historyKey     = HISTORY_SLOTS.map((h) => slots[h.key].doc ? `${slots[h.key].doc.name}-${slots[h.key].doc.size}` : "").join("|");
+  const currentFileKey = finDoc ? `${finDoc.name}-${finDoc.size}${historyOn ? `|${historyKey}` : ""}` : "";
   const fileChanged    = !!extractedFileKey && !!currentFileKey && currentFileKey !== extractedFileKey;
 
   // ── File handlers ───────────────────────────────────────
@@ -516,6 +544,33 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
   }
 
 
+  // ── Issuer history ──────────────────────────────────────
+  const setSlot = (key, patch) => setSlots((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
+
+  async function handleHistoryFiles(slot, files) {
+    setSlot(slot.key, { doc: null });
+    const doc = await loadDocument(files, (progress) => setSlot(slot.key, { progress }), (v) => setSlot(slot.key, { v }));
+    if (!doc) return;
+    setSlot(slot.key, { v: { validating: true, warnings: [], error: "" } });
+    const result = await runHistoryValidation(doc, info.clientName, slot.interim);
+    if (result.ok === false) {
+      setSlot(slot.key, { v: { validating: false, warnings: [], error: result.hard } });
+      return;
+    }
+    setSlot(slot.key, { doc, v: { validating: false, warnings: result.warnings, error: "" } });
+  }
+
+  async function lookupIssuer() {
+    const rc = (info.rcNumber || "").replace(/\D/g, "");
+    if (!historyOn || !rc) { setStored(null); return; }
+    try {
+      const res = await getIssuerHistory(rc);
+      setStored(res.data);
+    } catch (e) {
+      setStored({ error: errorMessage(e, "Stored issuer history could not be checked.") });
+    }
+  }
+
   // ── Extract ─────────────────────────────────────────────
   async function doExtract() {
     setError("");
@@ -527,6 +582,10 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
     if (ratDoc)          appendDocument(fd, "rating_pdf", ratDoc);
     if (info.clientName) fd.append("client_name", info.clientName);
     if (draftId)         fd.append("draft_id",    String(draftId));
+    if (historyOn) {
+      for (const h of HISTORY_SLOTS) if (slots[h.key].doc) appendDocument(fd, h.field, slots[h.key].doc);
+      if (info.rcNumber?.trim()) fd.append("rc_number", info.rcNumber.trim());
+    }
     try {
       const res  = await extractFigures(fd, (e) => {
         if (e.lengthComputable) setUploadPct(Math.round((e.loaded / e.total) * 100));
@@ -542,9 +601,12 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
       }
       if (data.cpTerms) updatedInfo.cpTerms = data.cpTerms;
       onClientInfoChange(updatedInfo);
-      onExtracted(data.figures, updatedInfo, data.draftId || null);
+      const figs = data.figures?.history
+        ? { ...data.figures, history: { ...data.figures.history, warnings: data.historyWarnings || [] } }
+        : data.figures;
+      onExtracted(figs, updatedInfo, data.draftId || null);
       const newCount = extractionCount + 1;
-      const fileKey  = `${finDoc.name}-${finDoc.size}`;
+      const fileKey  = currentFileKey;
       setExtractionCount(newCount);
       setExtractedFileKey(fileKey);
       try {
@@ -577,7 +639,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
     setShowExtractConfirm(true);
   }
 
-  const anyValidating = finV.validating || ratV.validating;
+  const anyValidating = finV.validating || ratV.validating || HISTORY_SLOTS.some((h) => slots[h.key].v.validating);
   const hasExtracted  = extractionCount > 0;
   const canGoNext     = hasExtracted && !fileChanged;
   const canExtract    = !!finDoc && !!info.clientName?.trim() && !loading && !anyValidating && (!hasExtracted || fileChanged);
@@ -624,6 +686,13 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
             <input style={css.input} type="text" placeholder="e.g. Flour Mills of Nigeria Plc"
               value={info.clientName || ""} onChange={(e) => set("clientName", e.target.value)} />
           </div>
+          {historyOn && (
+            <div>
+              <label style={css.label} htmlFor="sr-rc-number">RC number</label>
+              <input id="sr-rc-number" style={css.input} type="text" inputMode="numeric" placeholder="e.g. RC 123456"
+                value={info.rcNumber || ""} onChange={(e) => set("rcNumber", e.target.value)} onBlur={lookupIssuer} />
+            </div>
+          )}
           <div>
             <label style={css.label}>Credit rating (external)</label>
             <select style={css.select} value={info.creditRating || ""} onChange={(e) => set("creditRating", e.target.value)}>
@@ -654,6 +723,47 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
         {finV.error    && <ValidationError msg={finV.error} onClear={() => setFinV(BLANK)} />}
         {!finV.error   && <ValidationWarnings warnings={finV.warnings} />}
       </div>
+
+      {/* Issuer history: prior years and interim */}
+      {historyOn && (
+        <div style={css.card}>
+          <div style={css.title}>Prior Years &amp; Interim <span style={{ fontWeight:"normal", fontSize:11, color:"#888" }}>(for the 3-year trend)</span></div>
+          {stored?.found && (
+            <div role="status" style={{ marginBottom:12, padding:"8px 12px", borderRadius:6, background:"#ecfdf5", border:"1px solid #6ee7b7", fontSize:12, color:"#065f46" }}>
+              <strong>Issuer history found.</strong> Stored from earlier assessments: {stored.periods.map((p) => p.label).join(", ")}. Upload only the years that are missing.
+            </div>
+          )}
+          {stored && !stored.found && !stored.error && (
+            <div style={{ marginBottom:12, fontSize:12, color:"#888" }}>No stored history for this RC number yet. It is saved after this assessment.</div>
+          )}
+          {stored?.error && <div style={{ marginBottom:12, fontSize:12, color:"#854F0B" }}>{stored.error}</div>}
+          {!info.rcNumber?.trim() && (
+            <div style={{ marginBottom:12, fontSize:12, color:"#888" }}>Add the RC number above to reuse and save this issuer's history.</div>
+          )}
+          <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit,minmax(240px,1fr))", gap:12 }}>
+            {HISTORY_SLOTS.map((h) => (
+              <div key={h.key}>
+                <div style={{ fontSize:12, fontWeight:"bold", color:"#5A5A5A", marginBottom:6 }}>{h.title}</div>
+                <UploadZone
+                  label={h.label}
+                  sub={h.sub}
+                  file={slots[h.key].doc}
+                  onFile={(files) => handleHistoryFiles(h, files)}
+                  onClear={() => setSlot(h.key, BLANK_SLOT)}
+                  validating={slots[h.key].v.validating}
+                  onGuard={nameGuard}
+                  progress={slots[h.key].progress}
+                />
+                {slots[h.key].v.error  && <ValidationError msg={slots[h.key].v.error} onClear={() => setSlot(h.key, { v: BLANK_SLOT.v })} />}
+                {!slots[h.key].v.error && <ValidationWarnings warnings={slots[h.key].v.warnings} />}
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize:11, color:"#888", marginTop:10 }}>
+            Each audited statement also gives the year before it, so the current statement plus one older statement covers three years. Everything is read in the same extraction and uses no extra credit.
+          </div>
+        </div>
+      )}
 
       {/* Credit rating */}
       <div style={css.card}>
@@ -764,4 +874,4 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
       )}
     </div>
   );
-}
+}
