@@ -45,6 +45,7 @@
 - D042 2026-11-12 Half-year interim is an early warning only; a triggered check needs an analyst comment
 - D043 2026-11-12 One-off items leave the trend only and need a reason
 - D044 2026-11-12 Report: two scorecard tiles, a Historical Performance section and a footer note
+- D045 2026-11-12 Stay on the 512MB Render instance: 30MB cap on history files, two history reads at a time
 
 ## D001 Start Supabase empty
 Render database is suspended for non-payment and unreachable. User confirmed the app stores no data worth keeping. Tenants are recreated by backend/seed.py. Edge cases: no stamping of an existing schema needed; tenant rows must exist before any login, so seed runs after upgrade head.
@@ -178,3 +179,6 @@ Review Data lets the analyst enter a one-off amount per period (and for the scor
 
 ## D044 Report and narrative
 Only when at least two years are available: the header adds "N-year history: Weakening/Stable/Improving", the scorecard adds HISTORICAL PERFORMANCE and INTERIM EARLY WARNING tiles (8 tiles), a HISTORICAL PERFORMANCE section follows the scoring breakdown (6-ratio table with interim columns, adjustment breakdown, notes and sources) and the disclaimer says the adjustment is indicative. The narrative prompt gets the history block, must ground futureRisksReview in the trend and say plainly when the latest year and the trend disagree, must not claim the score was adjusted, and returns historicalReview. Assessments saved before 0005 have no history and print as before. Not done in Phase 1: trend lines under the PDF KPI strip.
+
+## D045 Memory on the 512MB Render instance
+User keeps the 0.5 CPU / 512MB instance. Measured in the sandbox: the app idles at about 120MB; four 20MB documents read in parallel (the scored statement is sent twice) peak at about 325MB more, too close to 512MB once the SDK and server are added; four 5MB documents add about 90MB. So the history slots together are capped at HISTORY_MAX_TOTAL_MB (default 30MB, checked before the credit is charged, 413 with a clear message) and at most HISTORY_AI_CONCURRENCY (default 2) history reads run at once beside the main extraction. The scored statement keeps its own 20MB limit. Worst case is now about 50MB of files and three AI requests at once. Trade-off: with four history reads the extraction takes about two rounds instead of one, still inside the 600s client timeout in normal conditions. Both values are environment variables, so they can change on Render without a deploy of new code. Edge case: a large scanned statement is the most likely to hit the cap; the message tells the analyst to upload only the statements pages.

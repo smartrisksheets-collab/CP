@@ -248,3 +248,26 @@ def test_run_without_rc_stores_nothing(client):
     r = _run_assessment(client, SHADOW, body["figures"], body["draftId"])
     assert r.status_code == 200 and r.json()["history"]["yearsAvailable"] == 3
     assert _run(_sql("SELECT count(*) FROM issuers"))[0][0] == 0
+
+
+def test_history_uploads_over_total_limit_rejected_before_charge(client, monkeypatch):
+    monkeypatch.setattr(assessment, "HISTORY_MAX_TOTAL_MB", 0)
+    r = _extract(client, SHADOW)
+    assert r.status_code == 413 and "together exceed" in r.json()["detail"]
+    assert _credits(client, SHADOW) == 10 and client.calls == []
+
+
+def test_history_reads_limited_to_two_at_once(client, monkeypatch):
+    running, peak = 0, 0
+
+    async def slow_periods(blocks, key):
+        nonlocal running, peak
+        running += 1
+        peak = max(peak, running)
+        await asyncio.sleep(0.05)
+        running -= 1
+        return clean_periods({"basis": "company", "periods": DOCS.get(key, [])}, key)
+
+    monkeypatch.setattr(assessment, "extract_periods", slow_periods)
+    r = _extract(client, SHADOW, older=True)  # four history reads: current, prior, older, interim
+    assert r.status_code == 200 and peak == 2

@@ -760,7 +760,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
             ))}
           </div>
           <div style={{ fontSize:11, color:"#888", marginTop:10 }}>
-            Each audited statement also gives the year before it, so the current statement plus one older statement covers three years. Everything is read in the same extraction and uses no extra credit.
+            Each audited statement also gives the year before it, so the current statement plus one older statement covers three years. Everything is read in the same extraction and uses no extra credit. These files can be up to 30MB together; upload only the financial statements pages if a file is large.
           </div>
         </div>
       )}

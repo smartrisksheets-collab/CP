@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from fastapi.responses import Response
 import asyncio
 import logging
+import os
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, update
 from pydantic import BaseModel
@@ -19,6 +20,11 @@ from api.issuer_store import load_periods, save_periods
 
 router = APIRouter()
 log    = logging.getLogger(__name__)
+
+# Memory on the 512MB Render instance (D045): history documents together stay under
+# HISTORY_MAX_TOTAL_MB, and at most HISTORY_AI_CONCURRENCY history reads run at once.
+HISTORY_MAX_TOTAL_MB   = int(os.getenv("HISTORY_MAX_TOTAL_MB", "30"))
+HISTORY_AI_CONCURRENCY = max(1, int(os.getenv("HISTORY_AI_CONCURRENCY", "2")))
 
 
 # ── Schemas ───────────────────────────────────────────────────
@@ -130,6 +136,11 @@ async def _refund_credit(user: User, debit_id: int, db: AsyncSession) -> None:
     await db.commit()
 
 
+def _blocks_bytes(blocks: list[dict]) -> int:
+    """Size of a document's files from its base64 content blocks."""
+    return sum(len(b.get("source", {}).get("data", "")) * 3 // 4 for b in blocks)
+
+
 async def _history_mode(tenant_id: int, db: AsyncSession) -> str:
     result = await db.execute(select(Tenant.history_mode).where(Tenant.id == tenant_id))
     return result.scalar_one_or_none() or "off"
@@ -215,15 +226,27 @@ async def extract(
                                   (interim_pdf, "Half-year interim", "interim")):
             if files:
                 history_docs.append((key, label, await read_document(files, label)))
+        if sum(_blocks_bytes(doc) for _, _, doc in history_docs) > HISTORY_MAX_TOTAL_MB * 1024 * 1024:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Prior years and interim: the files together exceed {HISTORY_MAX_TOTAL_MB}MB. "
+                       "Upload smaller PDFs (only the financial statements pages) or fewer documents.",
+            )
 
     debit_id = await _decrement_credits(user, db)
 
     # The scored statement and the history documents are read in parallel. Only the
     # scored statement can fail the extraction; a failed history document is a warning.
+    gate = asyncio.Semaphore(HISTORY_AI_CONCURRENCY)
+
+    async def history_read(doc, key):
+        async with gate:
+            return await extract_periods(doc, key)
+
     jobs = [extract_figures(fin_doc)]
     if mode != "off":
-        jobs.append(extract_periods(fin_doc, "current"))
-        jobs += [extract_periods(doc, key) for key, _, doc in history_docs]
+        jobs.append(history_read(fin_doc, "current"))
+        jobs += [history_read(doc, key) for key, _, doc in history_docs]
     outcomes = await asyncio.gather(*jobs, return_exceptions=True)
 
     if isinstance(outcomes[0], BaseException):
