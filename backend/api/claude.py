@@ -246,6 +246,91 @@ async def extract_figures(blocks: list[dict]) -> dict:
     return figures
 
 
+# ── 1b. Multi-period extraction (issuer history) ──────────────
+PERIODS_PROMPT = """You are a senior financial analyst extracting figures from a Nigerian company's financial statements
+for a multi-year credit review. The document is either audited annual financial statements or an unaudited
+interim (half-year) report.
+
+Extract EVERY period column the primary statements show for the COMPANY (standalone) entity: normally the
+current period and the comparative prior period. Never use Group (consolidated) columns when Company columns exist.
+If the statements are only presented for the group (no Company columns), extract the group figures and set "basis" to "group".
+
+RULES:
+- All figures in N'000 as plain numbers. No symbols, commas or brackets. Losses and outflows as negative numbers.
+- Use the PRIMARY STATEMENTS (income statement, statement of financial position, cash flow statement) and their notes.
+- If a figure cannot be found for a period, return null for it. Never copy a figure from one period to another.
+- For an interim report, the comparative income statement and cash flow columns are the same half of the prior year;
+  the comparative balance sheet is often the last year end. Report each column with its own period end and length.
+- periodMonths: 12 for a full year, 6 for a half-year, otherwise the number of months the column covers.
+- audited: true only if an independent auditor's report covers that period; interim and management accounts are false.
+
+FIELD DEFINITIONS (same as the main extraction):
+- revenue: top-line Revenue / Turnover / Investment income. Not gross profit.
+- netIncome: Profit (loss) for the period after tax.
+- ebit: Operating profit / Profit before finance costs and tax. If not shown: Profit before tax + Finance costs - Finance income.
+- depreciationAndAmortisation: from the cash flow adjustments, or the PPE / intangibles notes. Add both if separate.
+- financeCost: finance costs / interest expense for the period, as a positive number. Exclude finance income.
+- operatingCashFlow: Net cash generated from (used in) operating activities.
+- cash, inventory (0 if none), prepaidExpenses (0 if none), currentAssets, currentLiabilities (every current liability line),
+  totalAssets, totalLiabilities, shareholdersEquity, retainedEarnings: balance sheet at the period end.
+- shortTermDebt: interest-bearing obligations in current liabilities, including commercial papers and overdrafts.
+- longTermDebt: interest-bearing obligations in non-current liabilities, including bonds and finance leases.
+  Open the notes behind "Other liabilities" lines; commercial papers and bonds are often only there.
+
+Return ONLY this JSON, no markdown:
+{"basis":"company"|"group","periods":[{"periodEnd":"YYYY-MM-DD","periodMonths":number,"audited":boolean,
+"figures":{"revenue":number,"netIncome":number,"ebit":number,"depreciationAndAmortisation":number,
+"financeCost":number,"operatingCashFlow":number,"cash":number,"inventory":number,"prepaidExpenses":number,
+"currentAssets":number,"currentLiabilities":number,"totalAssets":number,"totalLiabilities":number,
+"shortTermDebt":number,"longTermDebt":number,"shareholdersEquity":number,"retainedEarnings":number}}]}"""
+
+_PERIOD_FIELDS = (
+    "revenue", "netIncome", "ebit", "depreciationAndAmortisation", "financeCost", "operatingCashFlow",
+    "cash", "inventory", "prepaidExpenses", "currentAssets", "currentLiabilities", "totalAssets",
+    "totalLiabilities", "shortTermDebt", "longTermDebt", "shareholdersEquity", "retainedEarnings",
+)
+
+
+def _num_or_none(v):
+    if v is None or v == "":
+        return None
+    try:
+        return float(str(v).replace(",", ""))
+    except ValueError:
+        return None
+
+
+def clean_periods(data: dict, source_doc: str) -> list[dict]:
+    """Turn the model's reply into period records for api/history.py. Drops unusable columns."""
+    from api.history import parse_period_end
+    basis = data.get("basis") if data.get("basis") in ("company", "group") else None
+    raw = [p for p in (data.get("periods") or []) if isinstance(p, dict)]
+    ends = [parse_period_end(p.get("periodEnd")) for p in raw]
+    doc_end = max((e for e in ends if e), default=None)
+    out = []
+    for p, end in zip(raw, ends):
+        if not end:
+            continue
+        figs = {k: _num_or_none((p.get("figures") or {}).get(k)) for k in _PERIOD_FIELDS}
+        try:
+            months = int(p.get("periodMonths") or 12)
+        except (TypeError, ValueError):
+            months = 12
+        out.append({
+            "periodEnd": end, "periodMonths": months,
+            "audited": p.get("audited") if isinstance(p.get("audited"), bool) else None,
+            "basis": basis, "figures": figs, "docPeriodEnd": doc_end,
+            "source": "upload" if end == doc_end else "comparative", "document": source_doc,
+        })
+    return out
+
+
+async def extract_periods(blocks: list[dict], source_doc: str) -> list[dict]:
+    """Every Company period column in one statement (annual or interim)."""
+    raw = await _call_with_document(blocks, PERIODS_PROMPT)
+    return clean_periods(_parse_json(raw), source_doc)
+
+
 # ── 2. Credit rating extraction ───────────────────────────────
 RATING_PROMPT = """You are extracting credit rating data from a Nigerian corporate rating report.
 The report may be from Agusto & Co., GCR Ratings, DataPro, or another agency.
@@ -302,6 +387,50 @@ async def extract_cp_terms(blocks: list[dict]) -> dict:
 
 
 # ── 4. Narrative generation ───────────────────────────────────
+HISTORY_RULES = """- futureRisksReview MUST be grounded in the multi-year trend above, citing the figures for the oldest and latest year.
+  If the latest year is strong but the trend is weakening (or the reverse), say so plainly; never average them.
+- Strengths and weaknesses may cite multi-year evidence. Never say the score was adjusted for history.
+- Interim figures are unaudited; label them as such when cited.
+"""
+
+HISTORY_FIELD = (',\n  "historicalReview": "2-3 sentences: the three-year direction of profitability, coverage and '
+                 'leverage with the oldest and latest figures, and what it means for repayment over the tenor"')
+
+
+def _history_prompt(history: dict | None) -> tuple[str, str, str]:
+    """Prompt block, extra rules and extra JSON field for the issuer history, or three empty strings."""
+    if not history or history.get("status") != "ok" or history.get("yearsAvailable", 0) < 2:
+        return "", "", ""
+    years = history["years"]
+    labels = " | ".join(y["label"] for y in years)
+    rows = []
+    for rid, name in (("net_income_margin", "Net Income Margin"), ("interest_coverage", "Interest Coverage"),
+                      ("debt_to_ebitda", "Net Debt / EBITDA"), ("quick_ratio", "Acid-Test Ratio"),
+                      ("dscr", "DSCR"), ("altman_z", "Altman Z'")):
+        rows.append(f"  {name}: " + " | ".join(y["ratios"][rid]["display"] for y in years))
+    directions = "; ".join(f"{d['label']} {d['direction']}" for d in history.get("direction", []))
+    flags = "; ".join(f["label"] for f in history.get("redFlags", [])) or "none"
+    interim = history.get("interim") or {}
+    if interim.get("status") == "ok":
+        checks = "; ".join(f"{c['label']} {c['prior']} -> {c['current']}"
+                           + (" (TRIGGERED)" if c["triggered"] else "") for c in interim["checks"])
+        interim_line = f"INTERIM ({interim['current']} vs {interim['prior']}, unaudited): {checks}"
+    else:
+        interim_line = "INTERIM: none provided"
+    block = (
+        f"\nISSUER HISTORY ({labels}, confidence {history['confidence']}):\n"
+        + "\n".join(rows)
+        + f"\n  Trend, oldest to latest year: {directions}"
+        + f"\n  EBITDA margin stability: {history['stability']['detail']}"
+        + f"\n  Red flags: {flags}"
+        + f"\n  Indicative history adjustment: {history['adjustment']:+.1f} points "
+          "(NOT applied to the score; model under validation)"
+        + f"\n  {interim_line}"
+        + f"\n  Analyst comment on interim: {history.get('analystComment') or 'none'}\n"
+    )
+    return block, HISTORY_RULES, HISTORY_FIELD
+
+
 async def generate_narrative(figures: dict, ratios: list, client_info: dict) -> dict:
     def n(v):
         try: return float(v) if v is not None else 0
@@ -333,6 +462,8 @@ async def generate_narrative(figures: dict, ratios: list, client_info: dict) -> 
 
     def chg(curr, prior):
         return f"{((curr - prior) / abs(prior) * 100):+.1f}%" if prior else "N/A"
+
+    history_block, history_rules, history_json = _history_prompt(client_info.get("history"))
 
     ratio_lines = "\n".join(
         f"  • {r['name']}: {r['display_value']} | Band: {r['band']} | "
@@ -372,7 +503,7 @@ DERIVED METRICS:
 
 COMPUTED SCORING RATIOS:
 {ratio_lines}
-
+{history_block}
 SCORING RESULT:
   Total Score: {client_info.get('totalScore')} / {MAX_SCORE}
   Eligible: {f'YES — meets the {CUTOFF_SCORE}-point cut-off' if client_info.get('eligible') else f'NO — below the {CUTOFF_SCORE}-point cut-off'}
@@ -389,7 +520,7 @@ INSTRUCTIONS:
 For strengths and weaknesses:
 - Each item must be exactly ONE sentence: name the metric, cite the figure, and state the business implication.
 - Do not just restate the score — explain why it matters to a creditor.
-
+{history_rules}
 Return ONLY valid JSON with no markdown and no backticks:
 {{
   "financialStanding": "Strong|Fair|Weak",
@@ -403,8 +534,8 @@ Return ONLY valid JSON with no markdown and no backticks:
   "creditRatingReview": "1-2 sentences: what the external rating implies for this specific issuance",
   "recommendation": "2–3 sentences. Opening MUST match the score tier exactly — no exceptions: STRONG (≥ 42 pts): start with 'The quantitative profile supports investment consideration —' then state key strengths. MARGINAL (34–41 pts): start with 'Analysts are advised to proceed with caution —' then state the specific concern and which ratio drives it. BELOW THRESHOLD (< 34 pts): start with 'Analysts are advised to apply caution and supplement this quantitative assessment with thorough qualitative review —' then state the primary quantitative concern with its computed value. Final sentence: name the single ratio most decisive to the outcome and what qualitative evidence could strengthen the credit case. NEVER use the words: NOT RECOMMENDED, RECOMMENDED for investment, APPROVED FOR INVESTMENT, APPROVED WITH CAUTION, or DECLINED.",
   "strengths": ["one sentence: metric + exact figure + WHY it is a credit strength", "..."],
-  "weaknesses": ["one sentence: metric + exact figure + WHY it elevates credit risk", "..."]
+  "weaknesses": ["one sentence: metric + exact figure + WHY it elevates credit risk", "..."]{history_json}
 }}"""
 
     raw = await _call_text_only(prompt)
-    return _parse_json(raw)
+    return _parse_json(raw)

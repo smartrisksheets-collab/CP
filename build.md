@@ -24,3 +24,16 @@
 - Checks: fresh dev checkout, git apply, npm ci, npm run build, npm run lint 23 problems before and after (all pre-existing), headless Chromium with mocked API and fake clock (idle and expired on load, 401 without reload loop, activity keeps session, 61 min idle signs out, pending request keeps session, cross-tab follow, manual sign-out without notice, notice shown once, payment verify success and 401)
 - Not tested in sandbox: real backend, OTP login and Paystack; tenant session_ttl values in Supabase unknown
 - Decisions: D033 to D035
+
+## 2026-11-12 Issuer history, Phase 1 shadow mode (p18)
+- New: backend/api/history.py (merge, year selection, trend, A/B/C adjustment, confidence, interim early warning), backend/api/issuer_store.py, backend/alembic/versions/0005_issuer_history.py, backend/alembic/sql/0005_issuer_history.sql, backend/tests/test_history.py (43), backend/tests/test_history_api.py (7), frontend/src/components/HistoryEditor.jsx, HistoryPanel.jsx, frontend/src/utils/history.js
+- Changed: backend/api/models.py (Issuer, IssuerPeriod, assessments.rc_number and history, tenants.history_mode), backend/api/claude.py (PERIODS_PROMPT, history block in the narrative prompt), backend/api/routes/assessment.py (/extract history slots and rc_number, /preview and /run history, GET /assessment/issuer/{rc}), backend/api/routes/tenant.py (historyMode), backend/api/report.py (header line, two tiles, section, footer), backend/seed.py (localhost tenant shadow), backend/tests/test_documents.py and test_report.py; frontend Upload.jsx (RC number, stored-history notice, three history slots), ReviewData.jsx, Scores.jsx (history panel, analyst comment), Result.jsx, AppPage.jsx, api/client.js
+- Checks: PostgreSQL 16 upgrade / downgrade -1 / upgrade; pytest 117 passed (63 before, plus 54 new or changed); sample PDFs rendered and inspected (history with interim, two years, one year, no history); npm run build; npm run lint 23 problems before and after (all pre-existing); headless Chromium against the real API with stubbed AI calls: upload with RC number and history slots, Review Data columns and restatement warning, Scores panel, comment required, Result panel, PDF download, periods stored
+- Not tested in sandbox: real AI extraction with PERIODS_PROMPT on real statements, Supabase SQL, Render deploy
+- Decisions: D036 to D044
+
+## 2026-11-12 History memory limits for the 512MB instance (p18b)
+- Changed: backend/api/routes/assessment.py (HISTORY_MAX_TOTAL_MB 30, HISTORY_AI_CONCURRENCY 2), backend/tests/test_history_api.py (+2), frontend Upload.jsx note
+- Checks: pytest 119 passed; memory measured for 4 x 5MB, 4 x 10MB and 4 x 20MB uploads
+- Decision: D045
+- Added backend/set_history_mode.py (switch history per tenant from the Render Shell; tested --list, on, off, bad mode, unknown host)

@@ -399,6 +399,7 @@ export default function AppPage() {
         scoreResult={scoreResult}
         scoredFiguresKey={scoredFiguresKey}
         onScored={setScoreResult}
+        onFiguresChange={setFigures}
         onQuotaExceeded={(msg) => setQuotaMsg(msg)}
         onBack={() => setStep(1)}
         draftId={draftId}

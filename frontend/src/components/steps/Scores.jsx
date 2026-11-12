@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useIsMobile } from "../../hooks/useBreakpoint.js";
 import { runAssessment, previewScores, errorMessage } from "../../api/client.js";
 import RatioTable from "../RatioTable.jsx";
+import HistoryPanel from "../HistoryPanel.jsx";
 import { Loader, Zap, ChevronRight } from "lucide-react";
 
 const RUN_MESSAGES = [
@@ -21,15 +22,24 @@ function makeFiguresKey(figures) {
   return JSON.stringify(Object.entries(figures).sort());
 }
 
-export default function Scores({ figures, extractedFigures, scoreResult, scoredFiguresKey, onBack, onNext, onQuotaExceeded, clientInfo, draftId }) {
+// The analyst comment rides in figures.history, so the saved figures and the result agree
+function withComment(figures, comment) {
+  if (!figures.history) return figures;
+  return { ...figures, history: { ...figures.history, analystComment: comment.trim() || null } };
+}
+
+export default function Scores({ figures, extractedFigures, scoreResult, scoredFiguresKey, onBack, onNext, onQuotaExceeded, onFiguresChange, clientInfo, draftId }) {
   const isMobile  = useIsMobile(640);
   const [preview, setPreview]     = useState(null);
   const [previewErr, setPreviewErr] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
   const [msgIdx, setMsgIdx]   = useState(0);
+  const [comment, setComment] = useState(() => figures.history?.analystComment || "");
+  const [commentError, setCommentError] = useState("");
 
-  const currentKey   = makeFiguresKey(figures);
+  const previewKey   = makeFiguresKey(figures);            // the comment never changes the preview
+  const currentKey   = makeFiguresKey(withComment(figures, comment));
   const hasResult    = !!scoreResult;
   const figuresMatch = scoredFiguresKey === currentKey;
   const canProceed   = hasResult && figuresMatch;
@@ -41,7 +51,7 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
       .then(res => { if (active) setPreview(res.data); })
       .catch(() => { if (active) setPreviewErr("Could not load the score preview. You can still run the assessment."); });
     return () => { active = false; };
-  }, [currentKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [previewKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!loading) return; // handleViewResult resets msgIdx before each run
@@ -54,13 +64,22 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
     setError("");
     setMsgIdx(0);
 
-    const f = toEngineFigures(figures);
+    const interim = preview?.history?.interim;
+    if (interim?.status === "ok" && interim.triggered > 0 && !comment.trim()) {
+      setCommentError("Add a comment on the triggered interim warnings before running the assessment.");
+      setLoading(false);
+      return;
+    }
+    setCommentError("");
+    const merged = withComment(figures, comment);
+    if (merged !== figures) onFiguresChange?.(merged);
+    const f = toEngineFigures(merged);
 
     try {
       const res = await runAssessment(f, clientInfo, extractedFigures, draftId);
       const d   = res.data;
       onNext(
-        { ratios: d.ratios, total_score: d.totalScore, eligible: d.eligible, max_score: d.maxScore, cutoff: d.cutoff, model_version: d.modelVersion },
+        { ratios: d.ratios, total_score: d.totalScore, eligible: d.eligible, max_score: d.maxScore, cutoff: d.cutoff, model_version: d.modelVersion, history: d.history || null },
         d.assessmentId,
         d.narrative,
         currentKey,
@@ -103,6 +122,11 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
         )}
       </div>
 
+      {preview?.history && (
+        <HistoryPanel history={preview.history} comment={comment}
+          onComment={(v) => { setComment(v); if (v.trim()) setCommentError(""); }} commentError={commentError} />
+      )}
+
       <div style={{ display:"flex", flexDirection: isMobile ? "column-reverse" : "row", gap:10, justifyContent:"flex-end", marginTop:20, alignItems: isMobile ? "stretch" : "center" }}>
         <button onClick={onBack} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#1F2854", fontFamily:"Arial,sans-serif", textAlign:"center" }}>Back</button>
 
@@ -139,4 +163,4 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
-}
+}
