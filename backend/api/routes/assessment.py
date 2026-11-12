@@ -1,5 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request
 from fastapi.responses import Response
+import asyncio
+import logging
+import os
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, update
 from pydantic import BaseModel
@@ -7,13 +10,21 @@ from typing import Optional
 from datetime import datetime, timezone, timedelta
 
 from api.deps import get_db, get_current_user, limiter
-from api.models import CreditTransaction, User, Assessment
+from api.models import CreditTransaction, User, Assessment, Tenant
 from api.scoring import compute_all_ratios, normalise_rates, CUTOFF_SCORE
-from api.claude import extract_figures, extract_rating, extract_cp_terms, generate_narrative
+from api.claude import extract_figures, extract_rating, extract_cp_terms, generate_narrative, extract_periods
 from api.report import build_pdf
 from api.documents import read_document
+from api.history import analyse, merge_periods, needs_comment, normalise_rc, parse_period_end, periods_to_store
+from api.issuer_store import load_periods, save_periods
 
 router = APIRouter()
+log    = logging.getLogger(__name__)
+
+# Memory on the 512MB Render instance (D045): history documents together stay under
+# HISTORY_MAX_TOTAL_MB, and at most HISTORY_AI_CONCURRENCY history reads run at once.
+HISTORY_MAX_TOTAL_MB   = int(os.getenv("HISTORY_MAX_TOTAL_MB", "30"))
+HISTORY_AI_CONCURRENCY = max(1, int(os.getenv("HISTORY_AI_CONCURRENCY", "2")))
 
 
 # ── Schemas ───────────────────────────────────────────────────
@@ -125,6 +136,51 @@ async def _refund_credit(user: User, debit_id: int, db: AsyncSession) -> None:
     await db.commit()
 
 
+def _blocks_bytes(blocks: list[dict]) -> int:
+    """Size of a document's files from its base64 content blocks."""
+    return sum(len(b.get("source", {}).get("data", "")) * 3 // 4 for b in blocks)
+
+
+async def _history_mode(tenant_id: int, db: AsyncSession) -> str:
+    result = await db.execute(select(Tenant.history_mode).where(Tenant.id == tenant_id))
+    return result.scalar_one_or_none() or "off"
+
+
+def _history_for(figures: dict, mode: str) -> dict | None:
+    """History analysis when the tenant has history on and the figures carry history."""
+    return analyse(figures) if mode != "off" else None
+
+
+def _build_history(figures: dict, rc: str | None, current: list[dict], extra: list[dict], stored: list[dict]) -> dict:
+    """
+    figures["history"] for a fresh extraction. The current statement's own column is the
+    scored year: only its operating cash flow is taken from the history pass, so extraction
+    noise on that column never shows as a restatement.
+    """
+    fy0_end = parse_period_end(figures.get("reportingPeriod")) or max(
+        (p["periodEnd"] for p in current if p.get("periodMonths") == 12), default=None)
+    fy0_ocf, periods = None, []
+    for p in current:
+        if p["periodEnd"] == fy0_end and p.get("periodMonths") == 12:
+            fy0_ocf = (p.get("figures") or {}).get("operatingCashFlow")
+        else:
+            periods.append(p)
+    # One column per period for the Review step: the newest document wins and the
+    # differences it hides are kept as notes. The current statement's own year is
+    # never a column; it is the scored figures.
+    fy0 = {"periodEnd": fy0_end, "periodMonths": 12, "source": "current", "audited": True,
+           "figures": {**figures, "operatingCashFlow": fy0_ocf}} if fy0_end else None
+    merged, notes = merge_periods(([fy0] if fy0 else []) + [*periods, *extra, *stored])
+    return {
+        "rcNumber"            : rc,
+        "fy0PeriodEnd"        : fy0_end,
+        "fy0OperatingCashFlow": fy0_ocf,
+        "periods"             : [p for p in merged if p.get("source") != "current"],
+        "extractionNotes"     : notes,
+        "analystComment"      : None,
+    }
+
+
 async def _get_draft(assessment_id: int, email: str, tenant_id: int, db: AsyncSession):
     result = await db.execute(
         select(Assessment).where(and_(
@@ -146,28 +202,83 @@ async def extract(
     financial_pdf : list[UploadFile]        = File(...),  # one PDF or page photos
     rating_pdf    : list[UploadFile] | None = File(None),
     cp_terms_pdf  : list[UploadFile] | None = File(None),
+    prior_pdf     : list[UploadFile] | None = File(None),  # an older audited statement (history)
+    older_pdf     : list[UploadFile] | None = File(None),  # a second older audited statement (history)
+    interim_pdf   : list[UploadFile] | None = File(None),  # half-year interim report (history)
     client_name   : str | None              = Form(None),
+    rc_number     : str | None              = Form(None),
     draft_id      : int | None              = Form(None),
     current_user  : dict                    = Depends(get_current_user),
     db            : AsyncSession            = Depends(get_db),
 ):
     user = await _get_user(current_user["email"], current_user["tenant_id"], db)
     await _check_quota(user, db)
+    mode = await _history_mode(current_user["tenant_id"], db)
 
     # Check every file before charging, so a bad upload never costs a credit
     fin_doc    = await read_document(financial_pdf, "Financial statement")
     rating_doc = await read_document(rating_pdf, "Credit rating report") if rating_pdf else None
     cp_doc     = await read_document(cp_terms_pdf, "CP terms") if cp_terms_pdf else None
+    history_docs = []
+    if mode != "off":
+        for files, label, key in ((prior_pdf, "Prior-year statement", "prior"),
+                                  (older_pdf, "Older statement", "older"),
+                                  (interim_pdf, "Half-year interim", "interim")):
+            if files:
+                history_docs.append((key, label, await read_document(files, label)))
+        if sum(_blocks_bytes(doc) for _, _, doc in history_docs) > HISTORY_MAX_TOTAL_MB * 1024 * 1024:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Prior years and interim: the files together exceed {HISTORY_MAX_TOTAL_MB}MB. "
+                       "Upload smaller PDFs (only the financial statements pages) or fewer documents.",
+            )
 
     debit_id = await _decrement_credits(user, db)
 
-    try:
-        figures = await extract_figures(fin_doc)
-    except RuntimeError as e:
-        await _refund_credit(user, debit_id, db)
-        raise HTTPException(status_code=502, detail=str(e))
+    # The scored statement and the history documents are read in parallel. Only the
+    # scored statement can fail the extraction; a failed history document is a warning.
+    gate = asyncio.Semaphore(HISTORY_AI_CONCURRENCY)
 
-    result = {"figures": figures}
+    async def history_read(doc, key):
+        async with gate:
+            return await extract_periods(doc, key)
+
+    jobs = [extract_figures(fin_doc)]
+    if mode != "off":
+        jobs.append(history_read(fin_doc, "current"))
+        jobs += [history_read(doc, key) for key, _, doc in history_docs]
+    outcomes = await asyncio.gather(*jobs, return_exceptions=True)
+
+    if isinstance(outcomes[0], BaseException):
+        await _refund_credit(user, debit_id, db)
+        if isinstance(outcomes[0], RuntimeError):
+            raise HTTPException(status_code=502, detail=str(outcomes[0]))
+        raise outcomes[0]
+    figures = outcomes[0]
+    result  = {"figures": figures}
+
+    if mode != "off":
+        warnings, extra = [], []
+        current = outcomes[1] if not isinstance(outcomes[1], BaseException) else []
+        if isinstance(outcomes[1], BaseException):
+            warnings.append("Prior-year columns of the financial statement could not be read: "
+                            f"{outcomes[1] if isinstance(outcomes[1], RuntimeError) else 'unexpected error'}")
+        for (key, label, _), outcome in zip(history_docs, outcomes[2:]):
+            if isinstance(outcome, BaseException):
+                log.warning("History extraction failed for %s: %r", key, outcome)
+                warnings.append(f"{label} could not be read: "
+                                f"{outcome if isinstance(outcome, RuntimeError) else 'unexpected error'}")
+            elif not outcome:
+                warnings.append(f"{label}: no usable period columns were found.")
+            else:
+                extra += outcome
+        rc = normalise_rc(rc_number)
+        stored = []
+        if rc:
+            _, stored = await load_periods(db, current_user["tenant_id"], rc)
+        figures["history"] = _build_history(figures, rc, current, extra, stored)
+        result["historyWarnings"] = warnings
+        result["storedPeriods"]   = len(stored)
 
     if rating_doc:
         try:
@@ -232,11 +343,15 @@ async def extract_cp(
 async def preview_scores(
     request      : Request,
     body         : FiguresBody,
-    current_user : dict = Depends(get_current_user),
+    current_user : dict         = Depends(get_current_user),
+    db           : AsyncSession = Depends(get_db),
 ):
     """Score figures without AI, quota or saving. The Scores step uses it so the
     preview always comes from the same engine as the saved result."""
-    return compute_all_ratios(body.figures)
+    result = compute_all_ratios(body.figures)
+    mode   = await _history_mode(current_user["tenant_id"], db)
+    result["history"] = _history_for(body.figures, mode)
+    return result
 
 
 # ── POST /assessment/run ──────────────────────────────────────
@@ -273,16 +388,25 @@ async def run_assessment(
                 "eligible"    : completed.eligible,
                 "ratios"      : completed.ratios,
                 "narrative"   : completed.narrative,
+                "history"     : completed.history,
                 "clientInfo"  : {**body.clientInfo, "totalScore": completed.total_score, "eligible": completed.eligible},
             }
 
     figures      = normalise_rates(body.figures)
     score_result = compute_all_ratios(figures)
+    mode         = await _history_mode(current_user["tenant_id"], db)
+    history      = _history_for(figures, mode)
+    if needs_comment(history):
+        raise HTTPException(
+            status_code=422,
+            detail="The half-year interim triggered an early warning. Add an analyst comment on the Scores step before running.",
+        )
 
     client_info = {
         **body.clientInfo,
         "totalScore": score_result["total_score"],
         "eligible"  : score_result["eligible"],
+        "history"   : history,
     }
 
     try:
@@ -313,6 +437,8 @@ async def run_assessment(
         assessment.extracted_figures = body.extractedFigures
         assessment.ratios            = score_result["ratios"]
         assessment.narrative         = narrative
+        assessment.history           = history
+        assessment.rc_number         = (history or {}).get("rcNumber")
         assessment.status            = "complete"
         assessment.updated_at        = datetime.now(timezone.utc)
     else:
@@ -330,6 +456,8 @@ async def run_assessment(
             extracted_figures = body.extractedFigures,
             ratios            = score_result["ratios"],
             narrative         = narrative,
+            history           = history,
+            rc_number         = (history or {}).get("rcNumber"),
             status            = "complete",
         )
         db.add(assessment)
@@ -351,6 +479,16 @@ async def run_assessment(
     )
     await db.commit()
 
+    # Keep the reviewed figures for the next assessment of this issuer. A storage
+    # failure never fails the run: the result is already saved.
+    if history and history.get("rcNumber"):
+        try:
+            await save_periods(db, current_user["tenant_id"], history["rcNumber"],
+                               body.clientInfo.get("clientName"), periods_to_store(figures), assessment.id)
+        except Exception:
+            await db.rollback()
+            log.exception("Saving issuer history failed for assessment %s", assessment.id)
+
     return {
         "assessmentId": assessment.id,
         "totalScore"  : score_result["total_score"],
@@ -360,6 +498,7 @@ async def run_assessment(
         "eligible"    : score_result["eligible"],
         "ratios"      : score_result["ratios"],
         "narrative"   : narrative,
+        "history"     : history,
         "clientInfo"  : client_info,
     }
 
@@ -477,6 +616,27 @@ async def history(
     ]
 
 
+# ── GET /assessment/issuer/{rc_number} ────────────────────────
+@router.get("/issuer/{rc_number}")
+async def issuer_history(
+    rc_number    : str,
+    current_user : dict         = Depends(get_current_user),
+    db           : AsyncSession = Depends(get_db),
+):
+    """Periods already stored for this issuer on this tenant (Upload step notice)."""
+    if await _history_mode(current_user["tenant_id"], db) == "off":
+        return {"found": False, "periods": []}
+    issuer, periods = await load_periods(db, current_user["tenant_id"], rc_number)
+    if not issuer:
+        return {"found": False, "periods": []}
+    from api.history import period_label
+    return {
+        "found"  : True,
+        "name"   : issuer.name,
+        "periods": [{"label": period_label(p), "periodEnd": p["periodEnd"], "audited": p["audited"]} for p in periods],
+    }
+
+
 # ── GET /assessment/{id} ──────────────────────────────────────
 @router.get("/{assessment_id}")
 async def get_assessment(
@@ -508,6 +668,7 @@ async def get_assessment(
         "figures"     : assessment.figures,
         "ratios"      : assessment.ratios,
         "narrative"   : assessment.narrative,
+        "history"     : assessment.history,
         "createdAt"   : assessment.created_at.isoformat(),
         "updatedAt"   : assessment.updated_at.isoformat() if assessment.updated_at else None,
     }
@@ -580,4 +741,4 @@ async def delete_assessment(
 
     assessment.deleted_at = datetime.now(timezone.utc)
     await db.commit()
-    return {"deleted": True}
+    return {"deleted": True}

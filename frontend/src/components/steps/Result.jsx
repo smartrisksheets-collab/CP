@@ -4,6 +4,7 @@ import { generateReport, errorMessage } from "../../api/client.js";
 import { Download, Loader, Plus, Eye, AlertTriangle } from "lucide-react";
 import ReportPreview from "../ReportPreview.jsx";
 import RatioTable from "../RatioTable.jsx";
+import HistoryPanel from "../HistoryPanel.jsx";
 
 // Declared at module scope so React keeps the same component between renders
 function NarrSection({ label, rating, review, ratingColor }) {
@@ -99,6 +100,8 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
         <RatioTable ratios={ratios} maxScore={maxScore} />
       </div>
 
+      {scoreResult?.history && <HistoryPanel history={scoreResult.history} />}
+
       {/* Narrative */}
       {(n.financialStandingReview || n.cashFlowReview) && (
         <div style={css.card}>
@@ -107,6 +110,7 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
           <NarrSection label="Cash Flow"          rating={n.cashFlowRating}    review={n.cashFlowReview}          ratingColor={ratingCol(n.cashFlowRating)} />
           <NarrSection label="Credit Risk"        rating={n.creditRiskLevel}   review={n.creditRiskReview}        ratingColor={ratingCol(n.creditRiskLevel)} />
           <NarrSection label="Future Risks"       rating={n.futureRiskLevel}   review={n.futureRisksReview}       ratingColor={ratingCol(n.futureRiskLevel)} />
+          <NarrSection label="Historical Performance" rating={scoreResult?.history?.overall} review={n.historicalReview} ratingColor={ratingCol(scoreResult?.history?.overall === "Weakening" ? "Weak" : "Strong")} />
           <NarrSection label="Credit Rating"      rating={null}                review={n.creditRatingReview} />
         </div>
       )}
@@ -170,4 +174,4 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
       )}
     </div>
   );
-}
+}

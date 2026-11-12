@@ -243,6 +243,164 @@ def _sw_item(text, tick_style, ST):
     return t
 
 
+# ── Issuer history (api/history.py) ────────────────────────────
+_DIR_TXT = {"improving": ("\u2191 Improving", C_GRN_FG), "weakening": ("\u2193 Weakening", C_RED_FG),
+            "stable": ("\u2192 Stable", C_GREY_FG), "n/a": ("n/a", C_GREY_FG)}
+
+
+def _history_ok(h) -> bool:
+    return bool(h) and h.get("status") == "ok" and h.get("yearsAvailable", 0) >= 2
+
+
+def _history_span(h) -> str:
+    years = h.get("years") or []
+    return f"{years[0]['label']}\u2013{years[-1]['label']}" if years else ""
+
+
+def _history_tiles(h, n):
+    """The two extra scorecard tiles, or [] when there is no usable history."""
+    if not _history_ok(h):
+        return []
+    overall = h.get("overall") or "Stable"
+    o_bg, o_fg = ((C_RED_BG, C_RED_FG) if overall == "Weakening" else
+                  (C_GRN_BG, C_GRN_FG) if overall == "Improving" else (C_GREY_BG, C_GREY_FG))
+    body = n.get("historicalReview") or "; ".join(
+        f"{d['label']} {d['from']} to {d['to']} ({d['direction']})" for d in h.get("direction", [])) + "."
+    body += (f" Indicative history adjustment {h['adjustment']:+.1f} points, not applied to the score "
+             f"({h['confidence']} confidence).")
+
+    w = h.get("interim") or {}
+    if w.get("status") == "ok":
+        trig = [c for c in w["checks"] if c["triggered"]]
+        badge = f"{w['triggered']} of {w['available']} triggered"
+        i_bg, i_fg = (C_AMB_BG, C_AMB_FG) if trig else (C_GRN_BG, C_GRN_FG)
+        ibody = (f"{w['current']} against {w['prior']} (unaudited): "
+                 + ("; ".join(f"{c['label']} {c['prior']} to {c['current']}" for c in trig) if trig
+                    else "no early-warning check triggered")
+                 + ". The score is not changed.")
+        if h.get("analystComment"):
+            ibody += f" Analyst comment: {h['analystComment']}"
+    else:
+        badge, i_bg, i_fg = "None", C_GREY_BG, C_GREY_FG
+        ibody = w.get("message") or "No half-year interim report was provided."
+    return [
+        ("HISTORICAL PERFORMANCE", "#1F2854", overall, o_bg, o_fg, body),
+        ("INTERIM EARLY WARNING", "#1F2854", badge, i_bg, i_fg, ibody),
+    ]
+
+
+def _history_section(h, ST):
+    if not _history_ok(h):
+        return []
+    E = [_sec_hdr("HISTORICAL PERFORMANCE", ST), Spacer(1, 4)]
+    years = h["years"]
+    w = h.get("interim") or {}
+    has_interim = w.get("status") == "ok"
+    sub = ParagraphStyle("hsub", fontName=_CURRENCY_FONT, fontSize=7, textColor=C_GREY, leading=9)
+    E.append(Paragraph(
+        f"{_history_span(h)} audited" + (f" \u00b7 {w['prior']} and {w['current']} unaudited" if has_interim else "")
+        + f" \u00b7 ratios, not naira growth \u00b7 confidence: {h['confidence'].title()}", sub))
+    E.append(Spacer(1, 4))
+
+    hd  = ParagraphStyle("hhd", fontName="Helvetica-Bold", fontSize=7, textColor=C_GREY, leading=9, alignment=TA_RIGHT)
+    hdl = ParagraphStyle("hhdl", parent=hd, alignment=TA_LEFT)
+    cel = ParagraphStyle("hcel", fontName=_CURRENCY_FONT, fontSize=8, textColor=C_BODY, leading=10, alignment=TA_RIGHT)
+    nam = ParagraphStyle("hnam", fontName=_CURRENCY_FONT, fontSize=8, textColor=C_NAVY, leading=10)
+
+    rows = [[Paragraph("RATIO", hdl), *[Paragraph(y["label"], hd) for y in years], Paragraph("TREND", hdl)]]
+    if has_interim:
+        rows[0] += [Paragraph(w["prior"], hd), Paragraph(w["current"], hd)]
+    direction = {d["id"]: d for d in h.get("direction", [])}
+    interim_by = {"net_income_margin": "margin", "interest_coverage": "cover", "quick_ratio": "acid"}
+    checks = {c["id"]: c for c in (w.get("checks") or [])}
+    for rid, label in (("net_income_margin", "Net Income Margin"), ("interest_coverage", "Interest Coverage"),
+                       ("debt_to_ebitda", "Net Debt / EBITDA"), ("quick_ratio", "Acid-Test Ratio"),
+                       ("dscr", "Debt Service Coverage *"), ("altman_z", "Altman Z'-Score *")):
+        txt, fg = _DIR_TXT.get((direction.get(rid) or {}).get("direction"), ("", C_GREY_FG))
+        row = [Paragraph(label, nam), *[Paragraph(y["ratios"][rid]["display"], cel) for y in years],
+               Paragraph(txt, ParagraphStyle("htr", fontName="Helvetica-Bold", fontSize=7, textColor=fg, leading=10))]
+        if has_interim:
+            c = checks.get(interim_by.get(rid))
+            if c:
+                flag = ParagraphStyle("hfl", parent=cel, textColor=C_AMB_FG if c["triggered"] else C_BODY,
+                                      fontName=_CURRENCY_FONT_BOLD if c["triggered"] else _CURRENCY_FONT)
+                row += [Paragraph(c["prior"], cel), Paragraph(c["current"] + (" !" if c["triggered"] else ""), flag)]
+            else:
+                row += [Paragraph("\u2014", cel), Paragraph("\u2014", cel)]
+        rows.append(row)
+
+    name_w, trend_w = 120, 70
+    rest = CW - name_w - trend_w
+    n_num = len(years) + (2 if has_interim else 0)
+    widths = [name_w, *[rest / n_num] * len(years), trend_w] + ([rest / n_num] * 2 if has_interim else [])
+    t = Table(rows, colWidths=widths)
+    style = [
+        ("LINEBELOW",     (0,0), (-1,0),  0.75, C_NAVY),
+        ("LINEBELOW",     (0,1), (-1,-1), 0.5, C_BORDER),
+        ("TOPPADDING",    (0,0), (-1,-1), 4),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+        ("LEFTPADDING",   (0,0), (-1,-1), 6),
+        ("RIGHTPADDING",  (0,0), (-1,-1), 6),
+        ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
+    ]
+    if has_interim:
+        style.append(("BACKGROUND", (len(years) + 2, 0), (-1, -1), C_AMB_BG))
+    t.setStyle(TableStyle(style))
+    E.append(t)
+    E.append(Spacer(1, 3))
+    E.append(Paragraph("* Shown for context, not part of the trend. Weakening or improving = a change of more than 10% "
+                       "from the oldest to the latest year. ! = interim early-warning check triggered. "
+                       "Half-years are never annualised.", sub))
+    E.append(Spacer(1, 6))
+
+    comp = h["components"]
+    flags = "; ".join(f["label"] for f in h.get("redFlags", [])) or "none"
+    adj_lines = [
+        f"A. Direction: <b>{comp['direction']:+.1f}</b>",
+        f"B. Stability: <b>{comp['stability']:+.1f}</b> \u2014 {h['stability']['detail']}",
+        f"C. Red flags: <b>{comp['redFlags']:+.1f}</b> \u2014 {flags}",
+        f"Subtotal {h['subtotal']:+.1f} \u00d7 confidence {h['factor']:.1f} = <b>{h['adjustment']:+.1f} points</b> "
+        "(indicative; not applied to the score while the model is validated)",
+    ]
+    notes = []
+    for note in h.get("notes", []):
+        if note["type"] == "restatement":
+            diffs = ", ".join(f"{d['field']} {d['pct']:+.1f}%" for d in note["differences"])
+            notes.append(f"{note['period']} figures differ between documents ({diffs}); the newer audited figures are used.")
+        elif note.get("message"):
+            notes.append(note["message"])
+    for y in years:
+        if y.get("oneOff"):
+            notes.append(f"{y['label']}: {_fmt_bn(y['oneOff'].get('amount'))} excluded from the trend as a one-off "
+                         f"({y['oneOff'].get('reason') or 'no reason given'}).")
+    sources = ", ".join(f"{y['label']} {_SOURCE_TXT.get(y.get('source'), y.get('source') or '')}" for y in years)
+    notes.append(f"Sources: {sources}.")
+    notes += h.get("confidenceReasons", [])
+
+    body = ParagraphStyle("hbody", fontName=_CURRENCY_FONT, fontSize=7.5, textColor=C_BODY, leading=10)
+    lbl = ParagraphStyle("hlbl", fontName="Helvetica-Bold", fontSize=7, textColor=C_GREY, leading=9)
+    box = Table([[
+        [Paragraph("HISTORY ADJUSTMENT", lbl), Spacer(1, 3), *[Paragraph(x, body) for x in adj_lines]],
+        [Paragraph("NOTES ON THE DATA", lbl), Spacer(1, 3), *[Paragraph(x, body) for x in notes]],
+    ]], colWidths=[HALF, HALF])
+    box.setStyle(TableStyle([
+        ("BACKGROUND",    (0,0), (-1,-1), C_CREAM),
+        ("LINEAFTER",     (0,0), (0,-1),  0.5, C_BORDER),
+        ("LEFTPADDING",   (0,0), (-1,-1), 10),
+        ("RIGHTPADDING",  (0,0), (-1,-1), 10),
+        ("TOPPADDING",    (0,0), (-1,-1), 8),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 8),
+        ("VALIGN",        (0,0), (-1,-1), "TOP"),
+    ]))
+    E.append(box)
+    E.append(Spacer(1, 8))
+    return E
+
+
+_SOURCE_TXT = {"current": "from the scored statement", "upload": "from an uploaded statement",
+               "comparative": "from a comparative column", "stored": "from stored issuer history"}
+
+
 # ── Main element builder ───────────────────────────────────────
 def _build_elements(assessment: Assessment):
     ST     = _ST()
@@ -250,6 +408,7 @@ def _build_elements(assessment: Assessment):
     n      = assessment.narrative or {}
     cp     = f.get("cpTerms")    or {}
     ratios = assessment.ratios   or []
+    hist   = getattr(assessment, "history", None)
 
     # Header metrics come from the saved ratios. Assessments saved before a ratio
     # existed fall back to the engine on the saved figures, never to a local formula.
@@ -336,7 +495,10 @@ def _build_elements(assessment: Assessment):
         [Paragraph(verdict, ST["hd_verd"]),
          Spacer(1, 4),
          Paragraph(f"{score} / {max_score} pts &nbsp;&middot;&nbsp; "
-                   f"{score_pct}% &nbsp;&middot;&nbsp; Threshold: 60%", ST["hd_score"])],
+                   f"{score_pct}% &nbsp;&middot;&nbsp; Threshold: 60%", ST["hd_score"]),
+         *([Spacer(1, 3), Paragraph(
+             f"{hist['yearsAvailable']}-year history: {hist['overall']}",
+             ST["hd_score"])] if _history_ok(hist) else [])],
     ]], colWidths=[CW * 0.68, CW * 0.32])
     hdr.setStyle(TableStyle([
         ("BACKGROUND",    (0,0), (-1,-1), C_NAVY),
@@ -407,7 +569,8 @@ def _build_elements(assessment: Assessment):
         ("FORWARD RISK OUTLOOK",        "#EF9F27", fr,  *_badge_colors(fr),  n.get("futureRisksReview","")),
         ("DISTRESS INDICATOR",          "#EF9F27", "See Z-score", C_GREY_BG, C_GREY_FG, distress),
     ]
-    sc_rows = [[_tile(*tiles[i], ST), _tile(*tiles[i+1], ST)] for i in range(0, 6, 2)]
+    tiles  += _history_tiles(hist, n)
+    sc_rows = [[_tile(*tiles[i], ST), _tile(*tiles[i+1], ST)] for i in range(0, len(tiles), 2)]
     sc_tbl  = Table(sc_rows, colWidths=[HALF, HALF])
     sc_tbl.setStyle(TableStyle([
         ("LEFTPADDING",   (0,0), (-1,-1), 10),
@@ -416,8 +579,7 @@ def _build_elements(assessment: Assessment):
         ("BOTTOMPADDING", (0,0), (-1,-1), 10),
         ("VALIGN",        (0,0), (-1,-1), "TOP"),
         ("LINEAFTER",     (0,0), (0,-1),  0.5, C_BORDER),
-        ("LINEBELOW",     (0,0), (-1,1),  0.5, C_BORDER),
-        ("LINEBELOW",     (0,2), (-1,2),  0.5, C_BORDER),
+        ("LINEBELOW",     (0,0), (-1,-1), 0.5, C_BORDER),
     ]))
     E.append(sc_tbl)
 
@@ -544,6 +706,9 @@ def _build_elements(assessment: Assessment):
                 ST["r_val"]))
         E.append(Spacer(1, 6))
 
+    # ── 6b. HISTORICAL PERFORMANCE ────────────────────────────
+    E += _history_section(hist, ST)
+
     # ── 7. VERDICT BAR ────────────────────────────────────────
     vd_word_ps = ParagraphStyle("vdw2", fontName="Helvetica-Bold", fontSize=12,
                                 textColor=vd_color, leading=15, alignment=TA_RIGHT)
@@ -607,6 +772,11 @@ def _build_elements(assessment: Assessment):
 
     disc_style = ParagraphStyle("disc", fontName=_CURRENCY_FONT, fontSize=6.5, leading=9,
                                 textColor=C_GREY, alignment=TA_LEFT)
+
+    if _history_ok(hist):
+        DISCLAIMER += (f" History {_history_span(hist)} (version {hist.get('version')}) compares audited years"
+                       " and unaudited half-years supplied by the analyst; the history adjustment shown is indicative"
+                       " and is not part of the score.")
 
     ft = Table([[
         Paragraph(

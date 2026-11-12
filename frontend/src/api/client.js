@@ -224,6 +224,9 @@ export const previewScores = (figures) =>
 export const getDraft = () =>
   api.get("/assessment/draft");
 
+export const getIssuerHistory = (rcNumber) =>
+  api.get(`/assessment/issuer/${encodeURIComponent(rcNumber)}`);
+
 export const updateDraftFigures = (draftId, figures) =>
   api.patch(`/assessment/${draftId}/figures`, { figures });
 

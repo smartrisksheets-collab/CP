@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { updateDraftFigures } from "../../api/client.js";
+import HistoryEditor from "../HistoryEditor.jsx";
+import { historyInputError } from "../../utils/history.js";
 
 const AI  = { background:"#EEF4FF", borderColor:"#9DBFEA" };
 const MAN = { background:"#ecfdf5", borderColor:"#01b88e" };
@@ -86,6 +88,8 @@ export default function ReviewData({ figures, onChange, onBack, onNext, draftId 
       const r = figures[id];
       if (r !== null && r !== undefined && (r < 0 || r > 100)) { setError(`${label} must be a percentage between 0 and 100.`); return; }
     }
+    const histErr = historyInputError(figures.history);
+    if (histErr) { setError(histErr); return; }
     setError("");
     onNext();
   }
@@ -169,6 +173,8 @@ export default function ReviewData({ figures, onChange, onBack, onNext, draftId 
         </div>
         <div style={{ fontSize:11, color:"#888", marginTop:8 }}>Interest coverage uses the reported finance cost. Rates are only used when finance cost is empty; always enter them as a percentage, e.g. 13.5 for 13.5% or 0.8 for 0.8%.</div>
       </div>
+
+      <HistoryEditor figures={figures} onChange={onChange} />
 
       <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:20 }}>
         <button onClick={onBack} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#1F2854", fontFamily:"Arial,sans-serif" }}>Back</button>

@@ -66,6 +66,7 @@ TENANTS = [
         "allowed_emails" : [],
         "allowed_domains": ["*"],
         "session_ttl"    : 86400,
+        "history_mode"   : "shadow",  # issuer history on for local development only
     },
 ]
 
