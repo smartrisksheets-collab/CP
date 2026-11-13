@@ -25,8 +25,9 @@ const note = { ...td, fontSize:11, color:"var(--muted)" };
 
 const groupOf = (r) => GROUPS[r.category] || r.category || "";
 
-// One table for saved and preview results: rows come straight from the scoring engine
-export default function RatioTable({ ratios = [], totalScore, maxScore, totalLabel = "TOTAL", totalColor }) {
+// One table for saved and preview results: rows come straight from the scoring engine.
+// Columns: Benchmark (full marks), Result, Band (where the result landed), Score.
+export default function RatioTable({ ratios = [], totalScore, maxScore, totalLabel = "TOTAL", totalColor, modelVersion }) {
   const rows = ratios.map((r, i) => {
     const group      = groupOf(r);
     const newGroup   = i === 0 || groupOf(ratios[i - 1]) !== group;
@@ -36,9 +37,10 @@ export default function RatioTable({ ratios = [], totalScore, maxScore, totalLab
 
     return (
       <Fragment key={r.id || i}>
-        {newGroup && <tr><td colSpan={4} style={cat}>{group}</td></tr>}
+        {newGroup && <tr><td colSpan={5} style={cat}>{group}</td></tr>}
         <tr>
           <td style={td}>{r.name}</td>
+          <td style={{ ...td, textAlign:"center", fontSize:12, color:"var(--muted)", whiteSpace:"nowrap" }}>{r.benchmark || "—"}</td>
           <td style={{ ...td, textAlign:"center" }}><span style={{ ...chip, ...tone }}>{r.display_value}</span></td>
           <td style={{ ...td, textAlign:"center" }}><span style={{ ...chip, background:"var(--chip-bg)", color:"var(--muted)" }}>{r.band || "N/A"}</span></td>
           <td style={{ ...td, textAlign:"right", fontWeight:"bold", color:tone.color }}>
@@ -46,19 +48,20 @@ export default function RatioTable({ ratios = [], totalScore, maxScore, totalLab
           </td>
         </tr>
         {infoNames.length > 0 && (
-          <tr><td colSpan={4} style={note}>{infoNames.join(" and ")} {infoNames.length > 1 ? "are" : "is"} shown for information and {infoNames.length > 1 ? "are" : "is"} not part of the {maxScore}-point score.</td></tr>
+          <tr><td colSpan={5} style={note}>{infoNames.join(" and ")} {infoNames.length > 1 ? "are" : "is"} shown for information and {infoNames.length > 1 ? "are" : "is"} not part of the {maxScore}-point score.</td></tr>
         )}
       </Fragment>
     );
   });
 
   return (
-    <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13, minWidth:480 }}>
+    <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13, minWidth:560 }}>
       <thead>
         <tr>
           <th style={th}>Ratio</th>
+          <th style={{ ...th, textAlign:"center" }} title="Value needed for full marks">Benchmark</th>
           <th style={{ ...th, textAlign:"center" }}>Result</th>
-          <th style={{ ...th, textAlign:"center" }}>Band</th>
+          <th style={{ ...th, textAlign:"center" }} title="Band the result falls in">Band</th>
           <th style={{ ...th, textAlign:"right" }}>Score</th>
         </tr>
       </thead>
@@ -66,9 +69,12 @@ export default function RatioTable({ ratios = [], totalScore, maxScore, totalLab
         {rows}
         {totalScore !== undefined && (
           <tr style={{ background:"var(--bg)" }}>
-            <td colSpan={3} style={{ ...td, fontWeight:"bold" }}>{totalLabel}</td>
+            <td colSpan={4} style={{ ...td, fontWeight:"bold" }}>{totalLabel}</td>
             <td style={{ ...td, textAlign:"right", fontWeight:"bold", color:totalColor }}>{totalScore} / {maxScore}</td>
           </tr>
+        )}
+        {modelVersion && (
+          <tr><td colSpan={5} style={{ ...note, borderBottom:"none", textAlign:"right" }}>Scoring model {modelVersion}</td></tr>
         )}
       </tbody>
     </table>

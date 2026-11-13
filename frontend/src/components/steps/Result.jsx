@@ -97,7 +97,7 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
       {/* Score breakdown */}
       <div style={{ ...css.card, overflowX:"auto" }}>
         <div style={css.title}>Score Breakdown</div>
-        <RatioTable ratios={ratios} maxScore={maxScore} />
+        <RatioTable ratios={ratios} maxScore={maxScore} modelVersion={scoreResult?.model_version} />
       </div>
 
       {scoreResult?.history && <HistoryPanel history={scoreResult.history} />}
