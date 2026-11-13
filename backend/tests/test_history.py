@@ -256,3 +256,5 @@ def test_interim_prior_half_without_balance_sheet_still_compares():
     w = analyse(_figures([*THREE_YEARS, *_interim(prior=prior)]))["interim"]
     res = {c["id"]: c["triggered"] for c in w["checks"]}
     assert w["status"] == "ok" and res["margin"] is True and res["acid"] is None
+    acid = next(c for c in w["checks"] if c["id"] == "acid")
+    assert acid["prior"] == "N/A"   # not 0.00x

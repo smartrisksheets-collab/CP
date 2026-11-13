@@ -152,7 +152,25 @@ def _trend_figures(p: dict) -> dict:
     return f
 
 
+# Inputs a ratio cannot do without. An interim's prior half usually has no balance sheet,
+# so its acid-test is "N/A", never 0.00x (D047).
+_REQUIRED = {
+    "net_income_margin": ("revenue", "netIncome"),
+    "interest_coverage": ("ebit",),
+    "debt_to_ebitda"   : ("ebitda",),
+    "quick_ratio"      : ("currentAssets", "currentLiabilities"),
+    "dscr"             : ("ebitda",),
+    "altman_z"         : ("totalAssets", "currentAssets", "currentLiabilities"),
+}
+
+
+def _missing(f: dict, ratio_id: str) -> bool:
+    return any(not is_finite_number(f.get(k)) or _n(f.get(k)) == 0 for k in _REQUIRED.get(ratio_id, ()))
+
+
 def _ratio(f: dict, ratio_id: str) -> dict:
+    if _missing(f, ratio_id):
+        return {"value": 0.0, "display": "N/A", "special": "na"}
     value, special = _MEASURES[ratio_id].measure(f)
     fmt = _MEASURES[ratio_id].fmt
     if special:
