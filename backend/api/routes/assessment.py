@@ -12,7 +12,9 @@ from datetime import datetime, timezone, timedelta
 from api.deps import get_db, get_current_user, limiter
 from api.models import CreditTransaction, User, Assessment, Tenant
 from api.scoring import compute_all_ratios, normalise_rates, CUTOFF_SCORE
-from api.claude import extract_figures, extract_rating, extract_cp_terms, generate_narrative, extract_periods, extract_fi
+from api.claude import (extract_figures, extract_rating, extract_cp_terms, generate_narrative, extract_periods,
+                        extract_fi, extract_bond_terms)
+from api.instruments import clean_terms, normalise_instrument
 from api.report import build_pdf
 from api.documents import read_document
 from api.history import analyse, merge_periods, needs_comment, normalise_rc, parse_period_end, periods_to_store
@@ -153,6 +155,30 @@ async def _fi_mode(tenant_id: int, db: AsyncSession) -> str:
     return result.scalar_one_or_none() or "off"
 
 
+async def _instrument_mode(tenant_id: int, db: AsyncSession) -> str:
+    result = await db.execute(select(Tenant.instrument_mode).where(Tenant.id == tenant_id))
+    return result.scalar_one_or_none() or "off"
+
+
+def _apply_instrument(figures: dict, mode: str) -> str | None:
+    """
+    Settle figures["instrument"] and figures["terms"] (D052). With the tenant's instrument mode
+    off, everything is commercial paper as before. Returns the code to save, None for plain CP.
+    """
+    if mode == "off":
+        figures.pop("instrument", None)
+        figures.pop("terms", None)
+        return None
+    code = normalise_instrument(figures.get("instrument")) or "cp"
+    figures["instrument"] = code
+    terms = clean_terms(code, figures.get("terms"))
+    if terms:
+        figures["terms"] = terms
+    else:
+        figures.pop("terms", None)
+    return code
+
+
 async def _fi_for(figures: dict, mode: str, db: AsyncSession) -> dict | None:
     """FI ratios with verified peer medians, when the tenant has the sector feature on (D050)."""
     if mode == "off":
@@ -225,6 +251,7 @@ async def extract(
     client_name   : str | None              = Form(None),
     rc_number     : str | None              = Form(None),
     sector        : str | None              = Form(None),  # api/fi.py SECTORS code
+    instrument    : str | None              = Form(None),  # api/instruments.py code
     draft_id      : int | None              = Form(None),
     current_user  : dict                    = Depends(get_current_user),
     db            : AsyncSession            = Depends(get_db),
@@ -287,6 +314,8 @@ async def extract(
 
     if sector:
         figures["sector"] = sector
+    if await _instrument_mode(current_user["tenant_id"], db) != "off":
+        figures["instrument"] = normalise_instrument(instrument) or "cp"
     if sector in FI_SECTORS:
         if isinstance(fi_outcome, BaseException):
             log.warning("FI extraction failed: %r", fi_outcome)
@@ -377,6 +406,29 @@ async def extract_cp(
     return {"cpTerms": cp_terms}
 
 
+# ── POST /assessment/extract-terms ────────────────────────────
+@router.post("/extract-terms")
+@limiter.limit("10/minute")
+async def extract_terms(
+    request      : Request,
+    terms_pdf    : list[UploadFile] = File(...),  # one PDF
+    instrument   : str              = Form(...),
+    current_user : dict             = Depends(get_current_user),
+    db           : AsyncSession     = Depends(get_db),
+):
+    """Bond or note terms from a pricing supplement or term sheet (D052). Loans are entered by hand."""
+    if normalise_instrument(instrument) != "bond":
+        raise HTTPException(status_code=400, detail="Terms can be read from a document for bonds and notes only.")
+    if await _instrument_mode(current_user["tenant_id"], db) == "off":
+        raise HTTPException(status_code=403, detail="Bond assessments are not switched on for this workspace.")
+    doc = await read_document(terms_pdf, "Bond terms")
+    try:
+        terms = await extract_bond_terms(doc)
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return {"terms": terms}
+
+
 # ── POST /assessment/preview ──────────────────────────────────
 @router.post("/preview")
 @limiter.limit("30/minute")
@@ -435,6 +487,7 @@ async def run_assessment(
             }
 
     figures      = normalise_rates(body.figures)
+    instrument   = _apply_instrument(figures, await _instrument_mode(current_user["tenant_id"], db))
     score_result = compute_all_ratios(figures)
     mode         = await _history_mode(current_user["tenant_id"], db)
     history      = _history_for(figures, mode)
@@ -486,6 +539,7 @@ async def run_assessment(
         assessment.rc_number         = (history or {}).get("rcNumber")
         assessment.sector            = sector
         assessment.fi                = fi
+        assessment.instrument        = instrument
         assessment.status            = "complete"
         assessment.updated_at        = datetime.now(timezone.utc)
     else:
@@ -507,6 +561,7 @@ async def run_assessment(
             rc_number         = (history or {}).get("rcNumber"),
             sector            = sector,
             fi                = fi,
+            instrument        = instrument,
             status            = "complete",
         )
         db.add(assessment)
@@ -721,6 +776,7 @@ async def get_assessment(
         "history"     : assessment.history,
         "sector"      : assessment.sector,
         "fi"          : assessment.fi,
+        "instrument"  : assessment.instrument or "cp",
         "createdAt"   : assessment.created_at.isoformat(),
         "updatedAt"   : assessment.updated_at.isoformat() if assessment.updated_at else None,
     }

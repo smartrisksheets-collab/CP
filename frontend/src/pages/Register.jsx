@@ -4,6 +4,7 @@ import { useIsMobile } from "../hooks/useBreakpoint.js";
 import LegalModal from "../components/LegalModal.jsx";
 import { Loader, Check } from "lucide-react";
 import { useTenant } from "../context/TenantContext.jsx";
+import { useProductCopy } from "../utils/instruments.js";
 import axios from "axios";
 import { errorMessage } from "../api/client.js";
 
@@ -11,6 +12,7 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
 export default function Register() {
   const { tenant } = useTenant();
+  const copy = useProductCopy();
   const hostname   = window.location.hostname;
   const isMobile   = useIsMobile(900);
   const [legalModal, setLegalModal] = useState(null);
@@ -93,7 +95,7 @@ export default function Register() {
                  style={{ height:36, width:"auto", objectFit:"contain", marginBottom:28 }} />
           )}
           <div style={{ fontSize:11, fontWeight:600, letterSpacing:"0.1em", textTransform:"uppercase", color:"var(--accent)", border:"1px solid rgba(var(--accent-rgb),0.3)", padding:"5px 12px", borderRadius:20, display:"inline-block", marginBottom:14 }}>
-            Commercial Paper Assessment
+            {copy.heroLabel}
           </div>
           <h1 style={{ fontSize:28, fontWeight:700, color:"#fff", lineHeight:1.2, marginBottom:14, fontFamily:"'Playfair Display', serif" }}>
             Start assessing.<br />

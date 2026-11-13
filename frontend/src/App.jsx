@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext.jsx";
 import { useTenant } from "./context/TenantContext.jsx";
+import { useProductCopy } from "./utils/instruments.js";
 import { useState } from "react";
 import Login from "./pages/Login.jsx";
 import AppPage from "./pages/AppPage.jsx";
@@ -49,6 +50,7 @@ function FullScreenLoader() {
 
 function SplashScreen({ onContinue }) {
   const { tenant } = useTenant();
+  const copy = useProductCopy();
   const [agreed, setAgreed] = useState(false);
 
   return (
@@ -67,7 +69,7 @@ function SplashScreen({ onContinue }) {
           SmartRisk Credit
         </div>
         <div style={{ fontSize:12, color:"#7a8db8", marginBottom:20 }}>
-          Commercial Paper Risk Assessment
+          {copy.subtitle}
         </div>
         <div style={{ fontSize:13, color:"#c8d0e0", lineHeight:1.75, textAlign:"left", marginBottom:24 }}>
           <strong style={{ color:"#fff" }}>Important Notice</strong><br /><br />

@@ -68,3 +68,9 @@
 - Changed: backend/api/claude.py (principalActivity, suggestedSector, clean_sector_hint), backend/api/fi.py (looks_like_lender, status not_lender), backend/tests/test_fi.py (+3); frontend utils/fi.js, components/FiEditor.jsx
 - Checks: pytest 165 passed; npm run build; Chromium: Review Data shows the suggestion and the not-a-lender warning, "Use Agriculture" switches the sector and hides the FI figures
 - Decision: D051
+
+## 2026-11-12 Bonds, loans and general reviews (p25)
+- Added: backend/api/instruments.py, backend/set_instrument_mode.py, migration 0007_instruments (+ SQL file), backend/tests/test_instruments.py (9), backend/tests/test_instruments_api.py (6); frontend utils/instruments.js, components/steps/InstrumentTerms.jsx
+- Changed: backend/api/claude.py (BOND_TERMS_PROMPT, narrative instrument block and rules), routes/assessment.py (/extract instrument, /extract-terms, /run), routes/tenant.py, models.py, report.py (title, instrument line, terms sections, disclaimer), seed.py, tests/test_documents.py; frontend Upload.jsx (instrument picker, terms step routing), App.jsx, AppPage.jsx (subtitle, FAQ), Login.jsx, Register.jsx, Onboarding.jsx, Pricing.jsx, api/client.js
+- Checks: pytest 180 passed; alembic up/down/up on PostgreSQL 16; bond PDF rendered and inspected; npm run build; lint 23 unchanged; Chromium: Upload picker, bond terms step, "Corporate Credit Assessment" subtitle
+- Decision: D052

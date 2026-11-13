@@ -4,6 +4,7 @@ import { Lock, Check, Loader, Clock } from "lucide-react";
 import LegalModal from "../components/LegalModal.jsx";
 import { useIsMobile } from "../hooks/useBreakpoint.js";
 import { useTenant } from "../context/TenantContext.jsx";
+import { useProductCopy } from "../utils/instruments.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { requestOTP, verifyOTP, errorMessage, takeLogoutReason, IDLE_TIMEOUT_MS } from "../api/client.js";
 
@@ -122,6 +123,7 @@ const LOGOUT_NOTICES = {
 
 export default function Login() {
   const { tenant }    = useTenant();
+  const copy          = useProductCopy();
   const { login }     = useAuth();
   const navigate      = useNavigate();
   const hostname      = window.location.hostname;
@@ -282,14 +284,14 @@ export default function Login() {
                    style={{ height:36, width:"auto", objectFit:"contain" }} />
             </div>
           )}
-          <div style={S.heroLabel}>Commercial Paper Assessment</div>
+          <div style={S.heroLabel}>{copy.heroLabel}</div>
           <h1 style={{ ...S.heroHeading, fontSize: isMobile ? 20 : 30, marginBottom: isMobile ? 8 : 14 }}>
             Analyse listings.{" "}Score clients.{" "}
             <span style={{ color:"var(--accent)" }}>In Mins.</span>
           </h1>
           {!isMobile && (
             <p style={S.heroSub}>
-              Analyse Commercial Paper offerings in 4 quick steps.
+              {copy.heroSub}
               Cut your assessment time in half and score your clients in less than 5 mins.
             </p>
           )}
