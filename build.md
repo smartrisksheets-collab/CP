@@ -74,3 +74,9 @@
 - Changed: backend/api/claude.py (BOND_TERMS_PROMPT, narrative instrument block and rules), routes/assessment.py (/extract instrument, /extract-terms, /run), routes/tenant.py, models.py, report.py (title, instrument line, terms sections, disclaimer), seed.py, tests/test_documents.py; frontend Upload.jsx (instrument picker, terms step routing), App.jsx, AppPage.jsx (subtitle, FAQ), Login.jsx, Register.jsx, Onboarding.jsx, Pricing.jsx, api/client.js
 - Checks: pytest 180 passed; alembic up/down/up on PostgreSQL 16; bond PDF rendered and inspected; npm run build; lint 23 unchanged; Chromium: Upload picker, bond terms step, "Corporate Credit Assessment" subtitle
 - Decision: D052
+
+## 2026-11-13 Service chooser and a process per service (p26)
+- Added: backend/api/repayment.py, backend/api/health.py, backend/tests/test_repayment.py (11), backend/tests/test_health.py (3); frontend components/ServiceChooser.jsx (chooser, band, chip), components/ServicePanels.jsx (repayment check, health report), components/steps/LoanRequest.jsx
+- Changed: backend/api/routes/assessment.py (repayment and health on /preview, /run, detail; instrument on history), report.py (repayment section, health header and verdict, loan header, disclaimer), claude.py (health block and overall view for reviews), instruments.py (repayment lines and rule for loans), tests/test_instruments.py (+4), tests/test_instruments_api.py (+1); frontend AppPage.jsx (chooser home, per-service stepper and band), Upload.jsx (loan request first, no picker, entity labels), Scores.jsx, Result.jsx, Dashboard.jsx, ReportPreview.jsx, Login.jsx, Register.jsx, utils/instruments.js
+- Checks: pytest 199 passed; npm run build; lint unchanged; Chromium end to end on a local tenant with instruments on: loan (request, statements, review, repayment check, result), general review (health report) and commercial paper; loan and review PDFs rendered and inspected
+- Decision: D053

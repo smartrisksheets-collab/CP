@@ -3,6 +3,22 @@ import { useIsMobile } from "../hooks/useBreakpoint.js";
 import { getHistory, generateReport, getAssessment, updateNarrative, deleteAssessment, errorMessage } from "../api/client.js";
 import { Loader, Download, Eye, X, Save, Trash2, Search } from "lucide-react";
 import RatioTable from "./RatioTable.jsx";
+import { ServiceChip } from "./ServiceChooser.jsx";
+import { RepaymentPanel, HealthPanel } from "./ServicePanels.jsx";
+import { ratingTone, overallTone } from "../utils/instruments.js";
+
+// D053: a general review shows its health rating, not a pass or fail
+const HEALTH_BANDS = [[75, "Strong"], [40, "Fair"], [0, "Weak"]];
+function rowVerdict(r) {
+  if (r.instrument === "review") {
+    const pct = r.maxScore ? Math.round((r.totalScore / r.maxScore) * 100) : 0;
+    const rating = HEALTH_BANDS.find(([min]) => pct >= min)[1];
+    return { text: `Health ${pct}% · ${rating}`, tone: ratingTone(rating) };
+  }
+  const ok = r.eligible;
+  return { text: ok ? "Meets Threshold" : "Below Threshold",
+           tone: ok ? { bg:"#EAF3DE", fg:"#27500A", bd:"#97C459" } : { bg:"#FCEBEB", fg:"#791F1F", bd:"#F09595" } };
+}
 
 export default function Dashboard() {
   const [rows, setRows]               = useState([]);
@@ -123,21 +139,22 @@ export default function Dashboard() {
         </thead>
         <tbody>
           {filtered.map((r) => {
-            const eligible = r.eligible;
+            const verdict = rowVerdict(r);
             return (
               <tr key={r.id}>
                 <td style={td}>{new Date(r.createdAt).toLocaleDateString("en-NG", { day:"2-digit", month:"short", year:"numeric" })}</td>
-                <td style={{ ...td, fontWeight:"bold", color:"var(--primary)" }}>{r.clientName || "—"}</td>
+                <td style={{ ...td, fontWeight:"bold", color:"var(--primary)" }}>
+                  {r.clientName || "—"}
+                  {r.instrument && <div style={{ marginTop:4, fontWeight:"normal" }}><ServiceChip code={r.instrument} /></div>}
+                </td>
                 <td style={td}>{r.creditRating || "—"}</td>
                 <td style={{ ...td, textAlign:"right", fontWeight:"bold" }}>{r.totalScore} / 56</td>
                 <td style={td}>
                   <span style={{
                     fontSize:11, padding:"2px 10px", borderRadius:999, fontWeight:"bold",
-                    background: eligible ? "#EAF3DE" : "#FCEBEB",
-                    color:      eligible ? "#27500A" : "#791F1F",
-                    border:     `1px solid ${eligible ? "#97C459" : "#F09595"}`,
+                    background: verdict.tone.bg, color: verdict.tone.fg, border: `1px solid ${verdict.tone.bd}`, whiteSpace:"nowrap",
                   }}>
-                    {eligible ? "Meets Threshold" : "Below Threshold"}
+                    {verdict.text}
                   </span>
                 </td>
                 <td style={{ ...td, textAlign:"center" }}>
@@ -253,10 +270,24 @@ function AssessmentModal({ data, onClose, onSaved, onError }) {
         <div style={{ fontSize:12, color:"#888", marginBottom:20 }}>{new Date(data.createdAt).toLocaleDateString("en-NG", { day:"2-digit", month:"short", year:"numeric" })} · {data.creditRating || "No external rating"}</div>
 
         {/* Verdict */}
+        {data.health ? (
+          <div style={{ borderRadius:8, padding:"16px 20px", textAlign:"center", marginBottom:20, background: ratingTone(data.health.rating).bg, border:`1px solid ${ratingTone(data.health.rating).bd}` }}>
+            <div style={{ fontSize:20, fontWeight:"bold", color: ratingTone(data.health.rating).fg }}>FINANCIAL HEALTH: {data.health.rating.toUpperCase()}</div>
+            <div style={{ fontSize:13, color:"#5A5A5A", marginTop:4 }}>Health score {data.health.pct}% · no pass mark for a general review</div>
+          </div>
+        ) : data.repayment?.status === "ok" ? (
+          <div style={{ borderRadius:8, padding:"16px 20px", textAlign:"center", marginBottom:20, background: overallTone(data.repayment.overall).bg, border:`1px solid ${overallTone(data.repayment.overall).bd}` }}>
+            <div style={{ fontSize:20, fontWeight:"bold", color: overallTone(data.repayment.overall).fg }}>REPAYMENT CHECK: {data.repayment.overall.toUpperCase()}</div>
+            <div style={{ fontSize:13, color:"#5A5A5A", marginTop:4 }}>Indicative score: {data.totalScore} / {data.maxScore} — {data.eligible ? "Meets" : "Below"} the 34-point threshold</div>
+          </div>
+        ) : (
         <div style={{ borderRadius:8, padding:"16px 20px", textAlign:"center", marginBottom:20, background: data.eligible ? "#EAF3DE" : "#FCEBEB", border:`1px solid ${data.eligible ? "#97C459" : "#F09595"}` }}>
           <div style={{ fontSize:20, fontWeight:"bold", color: data.eligible ? "#27500A" : "#791F1F" }}>{data.eligible ? "ELIGIBLE" : "NOT ELIGIBLE"}</div>
           <div style={{ fontSize:13, color:"#5A5A5A", marginTop:4 }}>Score: {data.totalScore} / {data.maxScore} — {data.eligible ? "Meets" : "Below"} the 34-point threshold</div>
         </div>
+        )}
+        {data.repayment?.status === "ok" && <RepaymentPanel check={data.repayment} />}
+        {data.health && <HealthPanel health={data.health} />}
 
         {/* Scores */}
         {data.ratios?.length > 0 && (

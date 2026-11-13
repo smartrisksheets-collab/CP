@@ -158,3 +158,16 @@ def test_tenant_off_forces_commercial_paper(client):
     row = _run(_sql("SELECT instrument, figures FROM assessments WHERE id = :i", i=res.json()["assessmentId"]))[0]
     assert row[0] is None and "instrument" not in row[1] and "terms" not in row[1]
     assert client.get(f"/assessment/{res.json()['assessmentId']}", headers=_auth(client, OFF)).json()["instrument"] == "cp"
+
+
+def test_preview_adds_repayment_and_health(client):
+    terms = {"amount": "500,000,000", "tenor": "24", "interestRate": "22", "repayment": "amortising"}
+    loan = client.post("/assessment/preview", headers=_auth(client, ON),
+                       json={"figures": {**STREADVEST, "instrument": "loan", "terms": terms}}).json()
+    assert loan["repayment"]["status"] == "ok" and loan["health"] is None
+    review = client.post("/assessment/preview", headers=_auth(client, ON),
+                         json={"figures": {**STREADVEST, "instrument": "review"}}).json()
+    assert review["health"]["rating"] in ("Strong", "Fair", "Weak") and review["repayment"] is None
+    off = client.post("/assessment/preview", headers=_auth(client, OFF),
+                      json={"figures": {**STREADVEST, "instrument": "loan", "terms": terms}}).json()
+    assert off["repayment"] is None and off["health"] is None

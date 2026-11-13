@@ -107,3 +107,45 @@ def test_narrative_prompt_follows_instrument(monkeypatch):
     assert "INSTRUMENT BEING ASSESSED: Loan or facility" in loan and "Amount: N5bn" in loan
     assert "supports credit consideration" in loan and "credit decision" in loan
     assert "INSTRUMENT BEING ASSESSED" not in cp and "supports investment consideration" in cp
+
+
+LOAN_TERMS = {"amount": "500,000,000", "tenor": "24", "interestRate": "22", "repayment": "amortising",
+              "facilityType": "Term loan"}
+
+
+def test_loan_report_has_repayment_check():
+    text = _pdf_text({**STREADVEST, "instrument": "loan", "terms": LOAN_TERMS})
+    assert "REPAYMENT CHECK" in text and "REPAYMENT: " in text and "Indicative score" in text
+    assert "Debt service cover" in text and "Credit Committee Recommendation" in text
+
+
+def test_loan_report_asks_for_missing_terms():
+    text = _pdf_text({**STREADVEST, "instrument": "loan", "terms": {"facilityType": "Overdraft"}})
+    assert "REPAYMENT CHECK" in text and "to run the repayment check" in text
+
+
+def test_review_report_is_a_health_report():
+    text = _pdf_text({**STREADVEST, "instrument": "review"})
+    assert "HEALTH:" in text and "Health score" in text and "Overall View" in text
+    assert "THRESHOLD" not in text and "Threshold" not in text and "cut-off" not in text
+
+
+def test_narrative_prompt_for_loan_and_review(monkeypatch):
+    import asyncio
+    from api import claude
+    seen = []
+
+    async def fake_text(prompt):
+        seen.append(prompt)
+        return '{"recommendation": "ok"}'
+
+    monkeypatch.setattr(claude, "_call_text_only", fake_text)
+    result = compute_all_ratios(STREADVEST)
+    info = {"clientName": "X", "totalScore": 50, "eligible": True}
+    asyncio.run(claude.generate_narrative({**STREADVEST, "instrument": "loan", "terms": LOAN_TERMS},
+                                          result["ratios"], info))
+    asyncio.run(claude.generate_narrative({**STREADVEST, "instrument": "review"}, result["ratios"], info))
+    loan, review = seen
+    assert "REPAYMENT CHECK" in loan and "1.5x guide" in loan
+    assert "HEALTH REPORT" in review and "Eligible:" not in review and "Score Tier" not in review
+    assert "NEVER mention a pass mark" in review

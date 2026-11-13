@@ -567,6 +567,28 @@ async def generate_narrative(figures: dict, ratios: list, client_info: dict) -> 
     instrument_block = narrative_block(f)
     instrument_rules = INSTRUMENT_RULES.get(instrument, "")
     consideration    = "credit" if instrument in ("loan", "review") else "investment"
+    if instrument == "review":
+        from api.health import health_report
+        health = health_report(ratios)
+        scoring_block = (
+            "HEALTH REPORT (general review: there is no pass mark, cut-off or eligibility):\n"
+            f"  Health score: {health['pct']}% ({health['rating']})\n"
+            + "".join(f"  {d['name']}: {d['pct']}% ({d['rating']})\n" for d in health["dimensions"]))
+        recommendation_spec = (
+            "2–3 sentences: an overall view of the company's financial health, opening with its health rating"
+            f" ({health['rating']}) and the dimension that most drives it, then the main watch point with its figure."
+            " NEVER mention a pass mark, cut-off, threshold, eligibility, approval or investment.")
+    else:
+        eligible = client_info.get('eligible')
+        tier = ('STRONG (≥ 42 pts)' if (client_info.get('totalScore') or 0) >= 42
+                else 'MARGINAL (34–41 pts)' if eligible else 'BELOW THRESHOLD (< 34 pts)')
+        scoring_block = (
+            "SCORING RESULT:\n"
+            f"  Total Score: {client_info.get('totalScore')} / {MAX_SCORE}\n"
+            f"  Eligible: {f'YES — meets the {CUTOFF_SCORE}-point cut-off' if eligible else f'NO — below the {CUTOFF_SCORE}-point cut-off'}\n"
+            f"  Score Tier: {tier}\n")
+        recommendation_spec = (
+            f"2–3 sentences. Opening MUST match the score tier exactly — no exceptions: STRONG (≥ 42 pts): start with 'The quantitative profile supports {consideration} consideration —' then state key strengths. MARGINAL (34–41 pts): start with 'Analysts are advised to proceed with caution —' then state the specific concern and which ratio drives it. BELOW THRESHOLD (< 34 pts): start with 'Analysts are advised to apply caution and supplement this quantitative assessment with thorough qualitative review —' then state the primary quantitative concern with its computed value. Final sentence: name the single ratio most decisive to the outcome and what qualitative evidence could strengthen the credit case. NEVER use the words: NOT RECOMMENDED, RECOMMENDED for investment, APPROVED FOR INVESTMENT, APPROVED WITH CAUTION, or DECLINED.")
 
     ratio_lines = "\n".join(
         f"  • {r['name']}: {r['display_value']} | Band: {r['band']} | "
@@ -607,11 +629,7 @@ DERIVED METRICS:
 COMPUTED SCORING RATIOS:
 {ratio_lines}
 {history_block}
-SCORING RESULT:
-  Total Score: {client_info.get('totalScore')} / {MAX_SCORE}
-  Eligible: {f'YES — meets the {CUTOFF_SCORE}-point cut-off' if client_info.get('eligible') else f'NO — below the {CUTOFF_SCORE}-point cut-off'}
-  Score Tier: {'STRONG (≥ 42 pts)' if (client_info.get('totalScore') or 0) >= 42 else 'MARGINAL (34–41 pts)' if client_info.get('eligible') else 'BELOW THRESHOLD (< 34 pts)'} 
-
+{scoring_block}
 INSTRUCTIONS:
 - Each narrative section: 2–3 sentences MAXIMUM.
 - Sentence 1: Name the PRIMARY metric driving this status and cite its exact value.
@@ -635,7 +653,7 @@ Return ONLY valid JSON with no markdown and no backticks:
   "futureRiskLevel": "Low|Moderate|High",
   "futureRisksReview": "2-3 sentences: most material forward risk grounded in current trend",
   "creditRatingReview": "1-2 sentences: what the external rating implies for this specific {'issuance' if instrument in ('cp', 'bond') else 'credit decision'}",
-  "recommendation": "2–3 sentences. Opening MUST match the score tier exactly — no exceptions: STRONG (≥ 42 pts): start with 'The quantitative profile supports {consideration} consideration —' then state key strengths. MARGINAL (34–41 pts): start with 'Analysts are advised to proceed with caution —' then state the specific concern and which ratio drives it. BELOW THRESHOLD (< 34 pts): start with 'Analysts are advised to apply caution and supplement this quantitative assessment with thorough qualitative review —' then state the primary quantitative concern with its computed value. Final sentence: name the single ratio most decisive to the outcome and what qualitative evidence could strengthen the credit case. NEVER use the words: NOT RECOMMENDED, RECOMMENDED for investment, APPROVED FOR INVESTMENT, APPROVED WITH CAUTION, or DECLINED.",
+  "recommendation": "{recommendation_spec}",
   "strengths": ["one sentence: metric + exact figure + WHY it is a credit strength", "..."],
   "weaknesses": ["one sentence: metric + exact figure + WHY it elevates credit risk", "..."]{history_json}
 }}"""
