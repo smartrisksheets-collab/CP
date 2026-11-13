@@ -30,6 +30,7 @@ class Tenant(Base):
     session_ttl     : Mapped[int]           = mapped_column(Integer, default=86400)
     history_mode    : Mapped[str]           = mapped_column(Text, default="off", server_default="off")  # off | shadow
     fi_mode         : Mapped[str]           = mapped_column(Text, default="off", server_default="off")  # off | shadow (sector + FI ratios)
+    instrument_mode : Mapped[str]           = mapped_column(Text, default="off", server_default="off")  # off | on (bonds, loans, reviews)
     created_at      : Mapped[datetime]      = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     users                : Mapped[List["User"]]               = relationship(back_populates="tenant")
@@ -120,6 +121,7 @@ class Assessment(Base):
     history            : Mapped[Optional[dict]]= mapped_column(JSONB, nullable=True)  # history analysis (api/history.py)
     sector             : Mapped[Optional[str]] = mapped_column(Text, nullable=True)   # api/fi.py SECTORS code
     fi                 : Mapped[Optional[dict]]= mapped_column(JSONB, nullable=True)  # FI ratios + peer medians at run time
+    instrument         : Mapped[Optional[str]] = mapped_column(Text, nullable=True)   # api/instruments.py code; None = cp
     status             : Mapped[str]                = mapped_column(Text, default="complete")
     deleted_at         : Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at         : Mapped[datetime]           = mapped_column(DateTime(timezone=True), server_default=func.now())

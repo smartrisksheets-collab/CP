@@ -5,6 +5,8 @@ import { extractFigures, getIssuerHistory, errorMessage } from "../../api/client
 import { useTenant } from "../../context/TenantContext.jsx";
 import CPTerms from "./CPTerms.jsx";
 import { SECTORS } from "../../utils/fi.js";
+import InstrumentTerms from "./InstrumentTerms.jsx";
+import { INSTRUMENTS, instrumentLabel, useProductCopy } from "../../utils/instruments.js";
 import { ACCEPT, inspectPdf, prepareDocument, checkWarnings, appendDocument, countKw } from "../../utils/documentInput.js";
 
 const RATINGS = ["","AAA","AA+","AA","AA-","A+","A","A-", "A1+", "A1", "A2", "A3", "BBB+","BBB","BBB-","BB+","BB","BB-","B+","B","B-","CCC","CC","C","D"];
@@ -444,6 +446,8 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
   const { tenant } = useTenant();
   const historyOn  = !!tenant?.historyMode && tenant.historyMode !== "off";
   const fiOn       = !!tenant?.fiMode && tenant.fiMode !== "off";
+  const { multi }  = useProductCopy();
+  const instrument = multi ? ((figures?.instrument ?? clientInfo.instrument) || "cp") : "cp";
   const [slots, setSlots]       = useState({ prior: BLANK_SLOT, interim: BLANK_SLOT });
   const [stored, setStored]     = useState(null); // issuer lookup: null | { found, periods, name } | { error }
   const info = clientInfo;
@@ -580,6 +584,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
     if (info.clientName) fd.append("client_name", info.clientName);
     if (draftId)         fd.append("draft_id",    String(draftId));
     if (fiOn && info.sector) fd.append("sector", info.sector);
+    if (multi) fd.append("instrument", instrument);
     if (historyOn) {
       for (const h of HISTORY_SLOTS) if (slots[h.key].doc) appendDocument(fd, h.field, slots[h.key].doc);
       if (info.rcNumber?.trim()) fd.append("rc_number", info.rcNumber.trim());
@@ -648,6 +653,19 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
       : 99                                                                 // hold at 99 while Claude works
     : 0;
 
+  if (subStep === 1 && instrument !== "cp") {
+    return (
+      <InstrumentTerms
+        instrument={instrument}
+        figures={figures}
+        onFiguresChange={onFiguresChange}
+        onBack={() => goToSubStep(0)}
+        onNext={onContinue}
+        clientName={info.clientName}
+      />
+    );
+  }
+
   if (subStep === 1) {
     return (
       <CPTerms
@@ -679,6 +697,29 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
       {/* Client info */}
       <div style={css.card}>
         <div style={css.title}>Client Information</div>
+        {multi && (
+          <div role="radiogroup" aria-label="What are you assessing?" style={{ marginBottom:14 }}>
+            <div style={{ ...css.label, marginBottom:6 }}>What are you assessing?</div>
+            <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,minmax(0,1fr))", gap:8 }}>
+              {INSTRUMENTS.map(([code, label, hint]) => {
+                const on = instrument === code;
+                return (
+                  <button key={code} type="button" role="radio" aria-checked={on}
+                    onClick={() => {
+                      set("instrument", code);
+                      // After extraction the figures carry the instrument too
+                      if (figures && Object.keys(figures).length) onFiguresChange?.({ ...figures, instrument: code });
+                    }}
+                    style={{ textAlign:"left", padding:"8px 12px", borderRadius:6, cursor:"pointer", fontFamily:"Arial,sans-serif",
+                             border: on ? "1.5px solid var(--accent)" : "1px solid #D8D8D8", background: on ? "rgba(var(--accent-rgb),0.08)" : "#fff" }}>
+                    <div style={{ fontSize:13, fontWeight:600, color:"#1F2854" }}>{label}</div>
+                    <div style={{ fontSize:11, color:"#888" }}>{hint}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {/* One row on desktop: client name twice as wide, the other fields equal */}
         <div style={{ ...css.grid, gridTemplateColumns: isMobile ? "1fr" : `minmax(0,${fiOn ? 1.5 : 2}fr) repeat(${2 + (historyOn ? 1 : 0) + (fiOn ? 1 : 0)},minmax(0,1fr))` }}>
           <div>
@@ -807,10 +848,10 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
       <div style={{ ...css.actions, flexDirection: isMobile ? "column-reverse" : "row", alignItems: isMobile ? "stretch" : "center" }}>
         {canGoNext && !loading && (
           <button
-            onClick={() => goToSubStep(1)}
+            onClick={() => (instrument === "review" ? onContinue() : goToSubStep(1))}
             style={{ ...css.btn, background:"transparent", color:"#1F2854", border:"1px solid #1F2854", display:"flex", alignItems:"center", gap:6 }}
           >
-            Continue to CP Terms <ChevronRight size={14} />
+            {instrument === "review" ? "Continue to Review Data" : instrument === "cp" ? "Continue to CP Terms" : `Continue to ${instrumentLabel(instrument)} Terms`} <ChevronRight size={14} />
           </button>
         )}
         <div style={{ display:"flex", flexDirection:"column", alignItems:"stretch" }}>

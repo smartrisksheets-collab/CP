@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { getQuotaStatus, getPacks, initializePayment, errorMessage } from "../api/client.js";
 import { Loader, ArrowLeft, Check, Mail, MessageCircle, X } from "lucide-react";
 import { useIsMobile } from "../hooks/useBreakpoint.js";
+import { useProductCopy } from "../utils/instruments.js";
 
 const PAYSTACK_PK = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "";
 
@@ -56,6 +57,7 @@ const C = {
 };
 
 export default function Pricing() {
+  const copy     = useProductCopy();
   const isMobile = useIsMobile(640);
   const isTablet = useIsMobile(960);
   const { user }   = useAuth();
@@ -193,7 +195,7 @@ export default function Pricing() {
 
               {/* Features */}
               <div style={{ flex:1, display:"flex", flexDirection:"column", gap:10, marginBottom:24 }}>
-                {m.features.map((f, i) => (
+                {m.features.map((f) => (f === "CP indicative terms extraction" ? copy.termsFeature : f)).map((f, i) => (
                   <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:8, fontSize:13, color:C.grey, lineHeight:1.5 }}>
                     <Check size={13} color={C.emerald} style={{ flexShrink:0, marginTop:2 }} />
                     {f}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { saveOnboarding } from "../api/client.js";
+import { useProductCopy } from "../utils/instruments.js";
 
 const QUESTIONS = [
   {
@@ -46,6 +47,7 @@ export function useOnboardingDone() {
 }
 
 export default function Onboarding({ onDone }) {
+  const { multi } = useProductCopy();
   const [step, setStep]       = useState(0);
   const [answers, setAnswers] = useState({ role: null, process: null, volume: null });
 
@@ -69,7 +71,9 @@ export default function Onboarding({ onDone }) {
     }
   }
 
-  const q       = QUESTIONS[step];
+  const q       = { ...QUESTIONS[step], q: multi
+    ? QUESTIONS[step].q.replace("CP issuers", "issuers and borrowers").replace("CP assessments", "credit assessments")
+    : QUESTIONS[step].q };
   const current = answers[q.key];
 
   return (
