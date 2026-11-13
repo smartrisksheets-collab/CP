@@ -172,6 +172,14 @@ def _measure(rid: str, f: dict, base: dict):
     raise KeyError(rid)
 
 
+# Any of these above zero means the statements show a lending business
+LENDER_SIGNS = ("grossLoans", "stage3Loans", "interestIncome", "customerDeposits")
+
+
+def looks_like_lender(fi: dict) -> bool:
+    return any((_num((fi or {}).get(k)) or 0) > 0 for k in LENDER_SIGNS)
+
+
 def compute_fi(figures: dict) -> dict | None:
     """
     FI ratios for a financial issuer, or None when the issuer is not tagged financial_services.
@@ -185,6 +193,13 @@ def compute_fi(figures: dict) -> dict | None:
         return {
             "version": VERSION, "sector": "financial_services", "status": "no_data", "ratios": [],
             "message": "No financial-institution figures yet. Enter them on the Review Data step to see the FI ratios.",
+        }
+    if not looks_like_lender(f):
+        # Tagged financial services, but no loans, interest income or deposits: most likely the wrong sector
+        return {
+            "version": VERSION, "sector": "financial_services", "status": "not_lender", "ratios": [],
+            "message": "No loans, interest income or customer deposits were found, so this issuer does not look like "
+                       "a lender and the FI ratios are left out. Check the sector on the Review Data step.",
         }
     ratios = []
     for rid, name, category, formula in FI_SPECS:

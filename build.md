@@ -63,3 +63,8 @@
 - Changed: backend/api/models.py, claude.py (FI_PROMPT), routes/assessment.py, routes/tenant.py, report.py (FI section), seed.py (localhost fi_mode shadow), tests/test_documents.py; frontend Upload.jsx (Sector field), ReviewData.jsx, Scores.jsx, Result.jsx
 - Checks: pytest 162 passed; alembic upgrade/downgrade/upgrade on PostgreSQL 16; PDF rendered and inspected; npm run build; lint unchanged (only pre-existing errors); Chromium: Upload one row with Sector, Review Data FI figures, Scores FI panel with peer medians (local medians marked verified for the check only)
 - Decision: D050
+
+## 2026-11-12 Sector check and suggested sector (p24)
+- Changed: backend/api/claude.py (principalActivity, suggestedSector, clean_sector_hint), backend/api/fi.py (looks_like_lender, status not_lender), backend/tests/test_fi.py (+3); frontend utils/fi.js, components/FiEditor.jsx
+- Checks: pytest 165 passed; npm run build; Chromium: Review Data shows the suggestion and the not-a-lender warning, "Use Agriculture" switches the sector and hides the FI figures
+- Decision: D051
