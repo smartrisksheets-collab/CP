@@ -6,6 +6,8 @@ import ReportPreview from "../ReportPreview.jsx";
 import RatioTable from "../RatioTable.jsx";
 import HistoryPanel from "../HistoryPanel.jsx";
 import FiPanel from "../FiPanel.jsx";
+import { RepaymentPanel, HealthPanel } from "../ServicePanels.jsx";
+import { overallTone, ratingTone } from "../../utils/instruments.js";
 
 // Declared at module scope so React keeps the same component between renders
 function NarrSection({ label, rating, review, ratingColor }) {
@@ -22,7 +24,7 @@ function NarrSection({ label, rating, review, ratingColor }) {
   );
 }
 
-export default function Result({ scoreResult, assessmentId, narrative: initialNarrative, clientInfo, onBack, onNew }) {
+export default function Result({ scoreResult, assessmentId, narrative: initialNarrative, clientInfo, onBack, onNew, instrument = "cp" }) {
   const isMobile = useIsMobile();
   const [narrative, setNarrative] = useState(initialNarrative);
   const [downloading, setDownloading] = useState(false);
@@ -36,6 +38,14 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
   const cutoff   = scoreResult?.cutoff ?? 34;
   const ratios   = scoreResult?.ratios ?? [];
   const n        = narrative || {};
+  // D053: a general review has no pass or fail; a loan leads with its repayment check
+  const health    = instrument === "review" ? scoreResult?.health : null;
+  const repayment = instrument === "loan" && scoreResult?.repayment?.status === "ok" ? scoreResult.repayment : null;
+  const lead      = health ? { ...ratingTone(health.rating), text:`FINANCIAL HEALTH: ${health.rating.toUpperCase()}`,
+                               sub:`Health score ${health.pct}% (${score} of ${maxScore} points) · no pass mark for a general review` }
+                  : repayment ? { ...overallTone(repayment.overall), text:`REPAYMENT CHECK: ${repayment.overall.toUpperCase()}`,
+                                  sub:`Indicative score ${score} / ${maxScore}: ${eligible ? "meets" : "below"} the ${cutoff}-point (60%) threshold` }
+                  : null;
 
   async function handleDownload() {
     setDownloading(true);
@@ -74,6 +84,14 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
   return (
     <div>
       {/* Verdict */}
+      {lead ? (
+        <div data-testid="lead-verdict" style={{ borderRadius:8, padding:20, textAlign:"center", marginBottom:16, background:lead.bg, border:`1px solid ${lead.bd}` }}>
+          <div style={{ fontSize:22, fontWeight:"bold", color:lead.fg }}>{lead.text}</div>
+          <div style={{ fontSize:13, marginTop:6, color:"#5A5A5A" }}>
+            {lead.sub}{scoreResult?.model_version && <> · Scoring model {scoreResult.model_version}</>}
+          </div>
+        </div>
+      ) : (
       <div style={{
         borderRadius:8, padding:20, textAlign:"center", marginBottom:16,
         background: eligible ? "#EAF3DE" : "#FCEBEB",
@@ -87,13 +105,17 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
           {scoreResult?.model_version && <> · Scoring model {scoreResult.model_version}</>}
         </div>
       </div>
+      )}
+
+      {repayment && <RepaymentPanel check={repayment} />}
+      {health && <HealthPanel health={health} />}
 
       {/* Metrics */}
-      <div style={{ display:"flex", gap:10, marginBottom:16, flexWrap:"wrap" }}>
+      {!health && <div style={{ display:"flex", gap:10, marginBottom:16, flexWrap:"wrap" }}>
         <div style={css.metric}><div style={{ fontSize:11, color:"#888", marginBottom:6, textTransform:"uppercase" }}>Total Score</div><div style={{ fontSize:22, fontWeight:"bold", color:"var(--primary)" }}>{score}</div></div>
         <div style={css.metric}><div style={{ fontSize:11, color:"#888", marginBottom:6, textTransform:"uppercase" }}>Max Score</div><div style={{ fontSize:22, fontWeight:"bold", color:"var(--primary)" }}>{maxScore}</div></div>
         <div style={css.metric}><div style={{ fontSize:11, color:"#888", marginBottom:6, textTransform:"uppercase" }}>Cut-off</div><div style={{ fontSize:22, fontWeight:"bold", color:"var(--primary)" }}>{cutoff}</div></div>
-      </div>
+      </div>}
 
       {/* Score breakdown */}
       <div style={{ ...css.card, overflowX:"auto" }}>
@@ -121,7 +143,7 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
       {/* Recommendation */}
       {n.recommendation && (
         <div style={css.card}>
-          <div style={css.title}>Recommendation</div>
+          <div style={css.title}>{health ? "Overall View" : "Recommendation"}</div>
           <p style={{ fontSize:13, lineHeight:1.7, color:"#333" }}>{n.recommendation}</p>
         </div>
       )}
@@ -134,7 +156,7 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
 
       <div style={{ display:"flex", flexDirection: isMobile ? "column-reverse" : "row", gap:10, justifyContent:"flex-end", marginTop:20, flexWrap: isMobile ? "nowrap" : "wrap" }}>
         <button onClick={onBack} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#1F2854", fontFamily:"Arial,sans-serif", textAlign:"center" }}>
-          Back to Scores
+          Back to {health ? "Preview" : instrument === "loan" ? "Repayment Check" : "Scores"}
         </button>
         <button onClick={() => setShowPreview(true)} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #1F2854", background:"transparent", color:"#1F2854", fontFamily:"Arial,sans-serif", display:"flex", alignItems:"center", gap:6 }}>
           <Eye size={14} /> Preview & Edit

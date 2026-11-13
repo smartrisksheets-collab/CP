@@ -85,14 +85,20 @@ def narrative_block(figures: dict) -> str:
             lines.append(f"  {name}: {terms[key]}")
     if code == "review":
         lines.append("  There is no instrument: assess the company's general creditworthiness and financial health.")
-    return "\n".join(lines) + "\n"
+    out = "\n".join(lines) + "\n"
+    if code == "loan":
+        from api.repayment import repayment_check, summary_lines
+        out += summary_lines(repayment_check(figures))
+    return out
 
 
 INSTRUMENT_RULES = {
     "bond": "- This is a corporate bond or note, not commercial paper. Judge repayment over the bond's full tenor:"
             " weigh leverage, coverage and the multi-year trend more than near-term liquidity. Never call it commercial paper.\n",
     "loan": "- This is a loan or facility, not commercial paper. Judge whether the company can service and repay this"
-            " facility over its tenor, citing the amount and tenor when given. Never call it commercial paper.\n",
+            " facility over its tenor, citing the amount and tenor when given. Never call it commercial paper.\n"
+            "- When a REPAYMENT CHECK is given, the cash flow review and the recommendation MUST cite the debt service"
+            " cover with the facility and say whether it is within the 1.5x guide.\n",
     "review": "- There is no instrument. Write about the company's general creditworthiness and financial health."
               " Never mention commercial paper, an issuance or investment in an instrument.\n",
 }

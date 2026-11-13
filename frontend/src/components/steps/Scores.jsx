@@ -4,6 +4,8 @@ import { runAssessment, previewScores, errorMessage } from "../../api/client.js"
 import RatioTable from "../RatioTable.jsx";
 import HistoryPanel from "../HistoryPanel.jsx";
 import FiPanel from "../FiPanel.jsx";
+import { RepaymentPanel, HealthPanel } from "../ServicePanels.jsx";
+import { serviceOf } from "../../utils/instruments.js";
 import { Loader, Zap, ChevronRight } from "lucide-react";
 
 const RUN_MESSAGES = [
@@ -29,7 +31,8 @@ function withComment(figures, comment) {
   return { ...figures, history: { ...figures.history, analystComment: comment.trim() || null } };
 }
 
-export default function Scores({ figures, extractedFigures, scoreResult, scoredFiguresKey, onBack, onNext, onQuotaExceeded, onFiguresChange, clientInfo, draftId }) {
+export default function Scores({ figures, extractedFigures, scoreResult, scoredFiguresKey, onBack, onNext, onQuotaExceeded, onFiguresChange, clientInfo, draftId, instrument = "cp", onEditRequest }) {
+  const isReview = instrument === "review";
   const isMobile  = useIsMobile(640);
   const [preview, setPreview]     = useState(null);
   const [previewErr, setPreviewErr] = useState("");
@@ -80,7 +83,8 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
       const res = await runAssessment(f, clientInfo, extractedFigures, draftId);
       const d   = res.data;
       onNext(
-        { ratios: d.ratios, total_score: d.totalScore, eligible: d.eligible, max_score: d.maxScore, cutoff: d.cutoff, model_version: d.modelVersion, history: d.history || null, fi: d.fi || null },
+        { ratios: d.ratios, total_score: d.totalScore, eligible: d.eligible, max_score: d.maxScore, cutoff: d.cutoff, model_version: d.modelVersion, history: d.history || null, fi: d.fi || null,
+          repayment: d.repayment || null, health: d.health || null },
         d.assessmentId,
         d.narrative,
         currentKey,
@@ -100,7 +104,11 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
   return (
     <div>
       <div style={{ fontSize:13, color:"#5A5A5A", marginBottom:14 }}>
-        Client: <strong>{clientInfo.clientName}</strong> &nbsp;·&nbsp; Preview scores below. Click <em>View Result</em> to run the full AI assessment.
+        {serviceOf(instrument).entity}: <strong>{clientInfo.clientName}</strong> &nbsp;·&nbsp; {isReview
+          ? <>Preview the health report below. Click <em>Build Health Report</em> to run the full AI review.</>
+          : instrument === "loan"
+            ? <>The repayment check leads; the score is indicative. Click <em>View Result</em> to run the full AI assessment.</>
+            : <>Preview scores below. Click <em>View Result</em> to run the full AI assessment.</>}
       </div>
 
       {error && (
@@ -108,6 +116,9 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
           {error}
         </div>
       )}
+
+      {instrument === "loan" && preview?.repayment && <RepaymentPanel check={preview.repayment} onEditRequest={onEditRequest} />}
+      {isReview && preview?.health && <HealthPanel health={preview.health} />}
 
       <div style={{ background:"var(--white)", border:"1px solid var(--border)", borderRadius:8, padding:20, marginBottom:16, overflowX:"auto" }}>
         {previewErr && <div style={{ fontSize:13, color:"var(--muted)" }}>{previewErr}</div>}
@@ -117,9 +128,9 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
             ratios={preview.ratios}
             totalScore={preview.total_score}
             maxScore={preview.max_score}
-            totalLabel="TOTAL (preview)"
+            totalLabel={isReview ? "POINTS (preview)" : instrument === "loan" ? "TOTAL (indicative)" : "TOTAL (preview)"}
             modelVersion={preview.model_version}
-            totalColor={preview.eligible ? "var(--score-full)" : "var(--error)"}
+            totalColor={isReview ? "var(--primary)" : preview.eligible ? "var(--score-full)" : "var(--error)"}
           />
         )}
       </div>
@@ -138,7 +149,7 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
           <button
             onClick={() => onNext(scoreResult, null, null, currentKey)}
             style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #1F2854", background:"transparent", color:"#1F2854", fontFamily:"Arial,sans-serif", display:"flex", alignItems:"center", gap:6 }}>
-            Continue to Result <ChevronRight size={14} />
+            Continue to {isReview ? "Health Report" : "Result"} <ChevronRight size={14} />
           </button>
         )}
 
@@ -148,7 +159,7 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
               style={{ padding:"9px 20px", fontSize:13, borderRadius: loading ? "6px 6px 0 0" : 6, cursor: loading ? "not-allowed" : "pointer", border:"1px solid #1F2854", background: loading ? "#2a3870" : "#1F2854", color:"#fff", fontFamily:"Arial,sans-serif", display:"flex", alignItems:"center", gap:8 }}>
               {loading
                 ? <><Loader size={14} style={{ animation:"spin 0.8s linear infinite", flexShrink:0 }} />{RUN_MESSAGES[msgIdx]}</>
-                : <><Zap size={14} /> View Result</>
+                : <><Zap size={14} /> {isReview ? "Build Health Report" : "View Result"}</>
               }
             </button>
             {loading && (

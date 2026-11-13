@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
-import { useProductCopy } from "../utils/instruments.js";
+import { useProductCopy, serviceOf, flowIndex } from "../utils/instruments.js";
+import ServiceChooser, { ServiceBand, ServiceChip } from "../components/ServiceChooser.jsx";
 import Upload from "../components/steps/Upload.jsx";
 import ReviewData from "../components/steps/ReviewData.jsx";
 import Scores from "../components/steps/Scores.jsx";
@@ -34,7 +35,22 @@ export default function AppPage() {
   const [scoredFiguresKey, setScoredFiguresKey] = useState(() => ss("sr_scoredFiguresKey", null));
   const [draftId,   setDraftId]   = useState(() => { try { const d = sessionStorage.getItem("sr_draftId"); return d ? parseInt(d) : null; } catch { return null; } });
   const [draftOffer, setDraftOffer] = useState(null);
+  const [uploadSubStep, setUploadSubStep] = useState(() => { try { return parseInt(sessionStorage.getItem("sr_uploadSubStep") || "0"); } catch { return 0; } });
   const navigate = useNavigate();
+
+  // D053: a tenant with instruments on picks a service first, then follows that service's steps
+  const service      = copy.multi ? (clientInfo.instrument || figures.instrument || null) : "cp";
+  const showChooser  = copy.multi && !service;
+  const flowSteps    = copy.multi && service ? serviceOf(service).steps : STEPS;
+  const flowAt       = copy.multi && service ? flowIndex(service, step, uploadSubStep) : step;
+
+  function chooseService(code) {
+    setClientInfo({ instrument: code });
+    setDraftOffer(null);  // the chooser offered it; starting a service sets it aside
+    setUploadSubStep(0);
+    try { sessionStorage.setItem("sr_uploadSubStep", "0"); } catch { /* storage blocked */ }
+    setStep(0);
+  }
 
   function setStep(n) {
     setStepRaw(n);
@@ -137,6 +153,7 @@ export default function AppPage() {
     setScoredFiguresKey(null);
     setDraftId(null);
     setDraftOffer(null);
+    setUploadSubStep(0);
     try {
       [
         "sr_step","sr_figures","sr_clientInfo","sr_scoreResult",
@@ -148,12 +165,16 @@ export default function AppPage() {
   }
 
   function handleDraftResume(draft) {
+    const info = copy.multi
+      ? { clientName: draft.clientName, instrument: draft.figures?.instrument || "cp" }  // older drafts are CP
+      : { clientName: draft.clientName };
     setFigures(draft.figures || {});
-    setClientInfo({ clientName: draft.clientName });
+    setClientInfo(info);
     setDraftId(draft.id);
+    setUploadSubStep(1);
     try {
       sessionStorage.setItem("sr_figures",    JSON.stringify(draft.figures || {}));
-      sessionStorage.setItem("sr_clientInfo", JSON.stringify({ clientName: draft.clientName }));
+      sessionStorage.setItem("sr_clientInfo", JSON.stringify(info));
       sessionStorage.setItem("sr_draftId",    String(draft.id));
       sessionStorage.setItem("sr_uploadSubStep",    "1");
       sessionStorage.setItem("sr_extractionCount",  "1");
@@ -218,8 +239,8 @@ export default function AppPage() {
                   onMouseLeave={e => e.currentTarget.style.background="none"}>
                   <LayoutDashboard size={13}/> Past Assessments
                 </button>
-                {step > 0 && (
-                  <button onClick={() => { setShowAssessMenu(false); setConfirmNewTop(true); }}
+                {(step > 0 || (copy.multi && service)) && (
+                  <button onClick={() => { setShowAssessMenu(false); setConfirmNewTop("new"); }}
                     style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"10px 14px", background:"none", border:"none", color:"#ccc", fontSize:12, cursor:"pointer", fontFamily:"Arial,sans-serif" }}
                     onMouseEnter={e => e.currentTarget.style.background="rgba(255,255,255,0.06)"}
                     onMouseLeave={e => e.currentTarget.style.background="none"}>
@@ -295,9 +316,9 @@ export default function AppPage() {
         style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 24px", fontSize:14, color:"var(--accent)", borderBottom:"1px solid #2a3870", cursor:"pointer" }}>
         <LayoutDashboard size={16} /> Past Assessments
       </div>
-      {STEPS.map((label, i) => {
-        const active = i === step;
-        const done   = i < step;
+      {!showChooser && flowSteps.map((label, i) => {
+        const active = i === flowAt;
+        const done   = i < flowAt;
         return (
           <div key={i} style={{
             display:"flex", alignItems:"center", gap:12,
@@ -328,9 +349,9 @@ export default function AppPage() {
       display:"flex", background:"#fff",
       borderBottom:"1px solid #E0E0E0",
     }}>
-      {STEPS.map((label, i) => {
-        const active = i === step;
-        const done   = i < step;
+      {flowSteps.map((label, i) => {
+        const active = i === flowAt;
+        const done   = i < flowAt;
         return (
           <div key={i} style={{
             flex:1, padding:"12px 16px", fontSize:13,
@@ -359,7 +380,17 @@ export default function AppPage() {
 
   // ── Main content ─────────────────────────────────────────
   let content;
-  if (step === 0) {
+  if (showChooser) {
+    content = (
+      <ServiceChooser
+        onChoose={chooseService}
+        draft={draftOffer}
+        onResume={handleDraftResume}
+        onDiscard={handleDraftDiscard}
+        onPastAssessments={() => setShowDash(true)}
+      />
+    );
+  } else if (step === 0) {
     content = (
       <Upload
         clientInfo={clientInfo}
@@ -381,6 +412,7 @@ export default function AppPage() {
         onQuotaError={(msg) => setQuotaMsg(msg)}
         hasDownstreamData={!!(scoreResult || narrative)}
         onNewAssessment={handleNewAssessment}
+        onSubStepChange={setUploadSubStep}
       />
     );
   } else if (step === 1) {
@@ -405,6 +437,12 @@ export default function AppPage() {
         onQuotaExceeded={(msg) => setQuotaMsg(msg)}
         onBack={() => setStep(1)}
         draftId={draftId}
+        instrument={service || "cp"}
+        onEditRequest={() => {
+          setUploadSubStep(0);
+          try { sessionStorage.setItem("sr_uploadSubStep", "0"); } catch { /* storage blocked */ }
+          setStep(0);
+        }}
         onNext={(result, id, narr, figuresKey) => {
           setScoreResult(result);
           if (id !== null) setAssessmentId(id);
@@ -422,6 +460,7 @@ export default function AppPage() {
         assessmentId={assessmentId}
         narrative={narrative}
         clientInfo={clientInfo}
+        instrument={service || "cp"}
         onBack={() => setStep(2)}
         onNew={startNew}
       />
@@ -457,7 +496,7 @@ export default function AppPage() {
       `}</style>
       {header}
       {mobileMenuEl}
-      <div className="sr-stepper sr-stepper-scroll">{stepper}</div>
+      {!showChooser && <div className="sr-stepper sr-stepper-scroll">{stepper}</div>}
       <div style={{ maxWidth:960, margin:"0 auto", width:"100%", padding:"16px 12px 0" }} className="sr-content-pad">
         {quota && quota.credits < 2 && (
           <div style={{ marginBottom:12, padding:"10px 16px", borderRadius:8, background:"#FFF8E1", border:"1px solid #FFD54F", display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, flexWrap:"wrap" }}>
@@ -474,11 +513,16 @@ export default function AppPage() {
             </button>
           </div>
         )}
-        {draftOffer && (
+        {copy.multi && service && (
+          <ServiceBand code={service} index={flowAt}
+            onChange={() => (step > 0 || Object.keys(figures).length || clientInfo.clientName ? setConfirmNewTop("service") : setClientInfo({}))} />
+        )}
+        {draftOffer && !showChooser && (
           <div style={{ marginBottom:16, padding:"14px 18px", borderRadius:8, background:"#FEF6E7", border:"1px solid #F0C060", display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, flexWrap:"wrap" }}>
             <div>
               <div style={{ fontSize:13, fontWeight:"bold", color:"#7A4F00", marginBottom:2 }}>Unfinished assessment found</div>
               <div style={{ fontSize:12, color:"#7A4F00" }}>
+                {copy.multi && <><ServiceChip code={draftOffer.figures?.instrument || "cp"} />{" "}</>}
                 {draftOffer.clientName || "Unnamed client"} — started {new Date(draftOffer.createdAt).toLocaleDateString("en-NG", { day:"2-digit", month:"short", year:"numeric" })}
               </div>
             </div>
@@ -561,14 +605,16 @@ export default function AppPage() {
           <div style={{ background:"#fff", borderRadius:10, padding:"28px 32px", maxWidth:420, width:"100%", boxShadow:"0 16px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
               <AlertTriangle size={22} color="#d4820a" />
-              <div style={{ fontSize:15, fontWeight:"bold", color:"#1F2854" }}>Start New Assessment?</div>
+              <div style={{ fontSize:15, fontWeight:"bold", color:"#1F2854" }}>{confirmNewTop === "service" ? "Change service?" : "Start New Assessment?"}</div>
             </div>
             <p style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.75, marginBottom:20 }}>
-              This will clear all current data. Make sure you have downloaded your report before proceeding.
+              {confirmNewTop === "service"
+                ? "This clears the current assessment so you can pick another service. Make sure you have downloaded any report you need."
+                : "This will clear all current data. Make sure you have downloaded your report before proceeding."}
             </p>
             <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
               <button onClick={() => setConfirmNewTop(false)} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#5A5A5A", fontFamily:"Arial,sans-serif" }}>Cancel</button>
-              <button onClick={() => { setConfirmNewTop(false); startNew(); }} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"none", background:"#1F2854", color:"#fff", fontFamily:"Arial,sans-serif", fontWeight:600 }}>Yes, start new</button>
+              <button onClick={() => { setConfirmNewTop(false); startNew(); }} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"none", background:"#1F2854", color:"#fff", fontFamily:"Arial,sans-serif", fontWeight:600 }}>{confirmNewTop === "service" ? "Yes, change service" : "Yes, start new"}</button>
             </div>
           </div>
         </div>

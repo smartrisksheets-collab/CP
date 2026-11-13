@@ -15,6 +15,8 @@ except ImportError:
 from api.models import Assessment
 from api.scoring import CUTOFF_SCORE, MAX_SCORE, compute_all_ratios
 from api.instruments import TERM_FIELDS, instrument_line, instrument_of, report_title
+from api.health import STRONG as HEALTH_STRONG, FAIR as HEALTH_FAIR, health_report
+from api.repayment import repayment_check
 
 # ── Unicode font (for ₦ and other non-Latin-1 chars) ──────────
 import os as _os
@@ -528,6 +530,58 @@ def _fi_section(fi, ST):
     return E
 
 
+# ── Repayment check for a loan (api/repayment.py, D053) ───────
+def _x(v):
+    return "N/M" if v is None else f"{v:.2f}x"
+
+
+def _repayment_section(check, ST):
+    if not check:
+        return []
+    E = [_sec_hdr("REPAYMENT CHECK", ST), Spacer(1, 4)]
+    sub = ParagraphStyle("rsub", fontName=_CURRENCY_FONT, fontSize=7, textColor=C_GREY, leading=9)
+    if check.get("status") != "ok":
+        E += [Paragraph(check.get("message", "Not enough facility terms to run the check."), ST["r_val"]), Spacer(1, 6)]
+        return E
+    fac, fy = check["facility"], check["firstYear"]
+    cur = "\u20a6" if _HAS_UNIFONT else "NGN "
+    E.append(Paragraph(
+        f"Overall: <b>{check['overall']}</b>. The facility's payments in its first 12 months "
+        f"({cur}{fy['total'] * 1000:,.0f}: principal {cur}{fy['principal'] * 1000:,.0f}, interest "
+        f"{cur}{fy['interest'] * 1000:,.0f}) are added to the debt service the company already carries.", ST["rec_body"]))
+    E.append(Spacer(1, 4))
+    hd  = ParagraphStyle("rhd", fontName="Helvetica-Bold", fontSize=7, textColor=C_GREY, leading=9, alignment=TA_RIGHT)
+    hdl = ParagraphStyle("rhdl", parent=hd, alignment=TA_LEFT)
+    cel = ParagraphStyle("rcel", fontName=_CURRENCY_FONT, fontSize=8, textColor=C_BODY, leading=10, alignment=TA_RIGHT)
+    nam = ParagraphStyle("rnam", fontName=_CURRENCY_FONT, fontSize=8, textColor=C_NAVY, leading=10)
+    rows = [[Paragraph("MEASURE", hdl), Paragraph("TODAY", hd), Paragraph("WITH FACILITY", hd),
+             Paragraph("GUIDE", hd), Paragraph("READING", hd)]]
+    for m in check["measures"]:
+        fmt = (lambda v: f"{cur}{v * 1000:,.0f}") if m["unit"] == "amount" else _x
+        rd = m.get("reading") or ""
+        colour = "#1E7E34" if rd == "Within guide" else "#B45309" if rd == "Near guide" else "#B91C1C"
+        rows.append([Paragraph(m["label"].replace(" (N'000)", ""), nam), Paragraph(fmt(m["today"]), cel),
+                     Paragraph(f"<b>{fmt(m['withFacility'])}</b>", cel), Paragraph(m.get("guide") or "", cel),
+                     Paragraph(f'<font color="{colour}"><b>{rd}</b></font>' if rd else "", cel)])
+    t = Table(rows, colWidths=[CW * 0.40, CW * 0.15, CW * 0.17, CW * 0.12, CW * 0.16])
+    t.setStyle(TableStyle([
+        ("LINEBELOW",     (0,0), (-1,0),  0.75, C_NAVY),
+        ("LINEBELOW",     (0,1), (-1,-1), 0.5, C_BORDER),
+        ("TOPPADDING",    (0,0), (-1,-1), 3),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 3),
+        ("LEFTPADDING",   (0,0), (-1,-1), 6),
+        ("RIGHTPADDING",  (0,0), (-1,-1), 6),
+        ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
+    ]))
+    E += [t, Spacer(1, 3)]
+    for x in check.get("notes") or []:
+        E.append(Paragraph(x, sub))
+    E.append(Paragraph("Debt service is the year's finance cost plus short-term debt, as in the DSCR. "
+                       "Guides are the full-marks benchmarks of the scoring model.", sub))
+    E.append(Spacer(1, 8))
+    return E
+
+
 _SOURCE_TXT = {"current": "from the scored statement", "upload": "from an uploaded statement",
                "comparative": "from a comparative column", "stored": "from stored issuer history"}
 
@@ -572,6 +626,23 @@ def _build_elements(assessment: Assessment):
     verdict    = "MEETS THRESHOLD" if eligible else "BELOW THRESHOLD"
     vd_color   = C_EMERALD  if eligible else C_RED
     vd_margin  = "Meets"    if eligible else "Below"
+    health     = health_report(ratios) if instr == "review" else None   # D053: no pass or fail
+    repayment  = repayment_check(f) if instr == "loan" else None
+    if health:
+        score_pct = health["pct"]
+        verdict   = f"HEALTH: {health['rating'].upper()}"
+        vd_color  = {"Strong": C_EMERALD, "Fair": colors.HexColor("#B45309")}.get(health["rating"], C_RED)
+    hd_score_line = (f"Health score {score_pct}% &nbsp;&middot;&nbsp; {score} / {max_score} pts" if health else
+                     f"{score} / {max_score} pts &nbsp;&middot;&nbsp; {score_pct}% &nbsp;&middot;&nbsp; Threshold: 60%")
+    hd_verd_colour = None
+    if health:
+        hd_verd_colour = {"Strong": "#6ee7b7", "Fair": "#FCD34D"}.get(health["rating"], "#FCA5A5")
+    if repayment and repayment.get("status") == "ok":
+        # The repayment check leads a loan; the score is indicative (D053)
+        verdict        = f"REPAYMENT: {repayment['overall'].upper()}"
+        hd_verd_colour = {"Comfortable": "#6ee7b7", "Tight": "#FCD34D"}.get(repayment["overall"], "#FCA5A5")
+        hd_score_line  = (f"Indicative score {score} / {max_score} pts &nbsp;&middot;&nbsp; {score_pct}%"
+                          f" &nbsp;&middot;&nbsp; Threshold: 60%")
 
     try:
         review_date = f.get("reviewDate") or assessment.created_at.strftime("%d %b %Y")
@@ -626,10 +697,10 @@ def _build_elements(assessment: Assessment):
          Paragraph(f"Review date: {review_date} &nbsp;|&nbsp; "
                    f"Rating: {assessment.credit_rating or 'N/A'} &nbsp;|&nbsp; "
                    f"{instrument_line(instr, terms)}", ST["hd_sub"])],
-        [Paragraph(verdict, ST["hd_verd"]),
+        [Paragraph(verdict, ParagraphStyle("hdv2", parent=ST["hd_verd"], textColor=colors.HexColor(hd_verd_colour))
+                   if hd_verd_colour else ST["hd_verd"]),
          Spacer(1, 4),
-         Paragraph(f"{score} / {max_score} pts &nbsp;&middot;&nbsp; "
-                   f"{score_pct}% &nbsp;&middot;&nbsp; Threshold: 60%", ST["hd_score"]),
+         Paragraph(hd_score_line, ST["hd_score"]),
          *([Spacer(1, 3), Paragraph(
              f"{hist['yearsAvailable']}-year history: {hist['overall']}",
              ST["hd_score"])] if _history_ok(hist) else [])],
@@ -667,6 +738,7 @@ def _build_elements(assessment: Assessment):
     # ── 3. CP TERMS (other instruments: their own terms, D052) ─
     if instr != "cp":
         E += _terms_section(instr, terms, ST)
+        E += _repayment_section(repayment, ST)
     else:
         E += _cp_terms_section(cp, ST)
 
@@ -825,17 +897,25 @@ def _build_elements(assessment: Assessment):
     # ── 7. VERDICT BAR ────────────────────────────────────────
     vd_word_ps = ParagraphStyle("vdw2", fontName="Helvetica-Bold", fontSize=12,
                                 textColor=vd_color, leading=15, alignment=TA_RIGHT)
+    if health:
+        vd_mid = Paragraph(f"Strong \u2265 {HEALTH_STRONG}% &nbsp;&middot;&nbsp; Fair \u2265 {HEALTH_FAIR}% "
+                           "&nbsp;&middot;&nbsp; no pass mark for a general review", ST["vd_thr"])
+        vd_sub = Paragraph(f"Health score {score_pct}%", ST["vd_sub"])
+    else:
+        vd_mid = Paragraph(f"60% eligibility threshold at {cutoff} pts", ST["vd_thr"])
+        vd_sub = Paragraph(f"{vd_margin} threshold by {margin_pts} pt{'s' if margin_pts!=1 else ''}", ST["vd_sub"])
+    if repayment and repayment.get("status") == "ok":
+        verdict = "MEETS THRESHOLD" if eligible else "BELOW THRESHOLD"   # the bar below is the indicative score
     vd = Table([[
-        [Paragraph("Total Score", ST["vd_lbl"]),
+        [Paragraph("Health Score" if health else "Indicative Score" if repayment else "Total Score", ST["vd_lbl"]),
          Spacer(1, 3),
          Paragraph(f"{score} / {max_score}", ST["vd_score"])],
         [_bar(_VD_M - 16, score_pct, C_EMERALD, height=7),
          Spacer(1, 3),
-         Paragraph(f"60% eligibility threshold at {cutoff} pts", ST["vd_thr"])],
+         vd_mid],
         [Paragraph(verdict, vd_word_ps),
          Spacer(1, 3),
-         Paragraph(f"{vd_margin} threshold by {margin_pts} pt{'s' if margin_pts!=1 else ''}",
-                   ST["vd_sub"])],
+         vd_sub],
     ]], colWidths=[_VD_L, _VD_M, _VD_R])
     vd.setStyle(TableStyle([
         ("BACKGROUND",    (0,0), (-1,-1), C_CREAM),
@@ -852,7 +932,8 @@ def _build_elements(assessment: Assessment):
     # ── 8. RECOMMENDATION ─────────────────────────────────────
     rec = Table([[
         "",
-        [Paragraph("Investment Committee Recommendation", ST["rec_lbl"]),
+        [Paragraph({"review": "Overall View", "loan": "Credit Committee Recommendation"}.get(
+             instr, "Investment Committee Recommendation"), ST["rec_lbl"]),
          Spacer(1, 4),
          Paragraph(n.get("recommendation",""), ST["rec_body"])],
     ]], colWidths=[4, CW - 4])
@@ -883,6 +964,15 @@ def _build_elements(assessment: Assessment):
         "Confidential — for authorised personnel only."
     )
 
+    if health:
+        DISCLAIMER = (
+            "IMPORTANT NOTICE: This general credit review rates financial health from a standardised 12-ratio model "
+            f"(maximum {max_score} points). The health score is the share of points earned; Strong is {HEALTH_STRONG}% "
+            f"or more, Fair {HEALTH_FAIR}% or more, Weak below. There is no pass mark. It is not a credit rating and "
+            "does not constitute a prediction of default. This report is prepared for decision-support purposes only "
+            "and does not constitute financial advice. Confidential — for authorised personnel only."
+        )
+
     disc_style = ParagraphStyle("disc", fontName=_CURRENCY_FONT, fontSize=6.5, leading=9,
                                 textColor=C_GREY, alignment=TA_LEFT)
 
@@ -892,7 +982,9 @@ def _build_elements(assessment: Assessment):
                        " and is not part of the score.")
 
     if instr != "cp":
-        DISCLAIMER += (" The scoring model and its 60% cut-off were calibrated on commercial paper issuers; for "
+        DISCLAIMER += ((" The scoring model was calibrated on commercial paper issuers; for a general credit review"
+                        " the health score is indicative until bands calibrated for it are available.") if health else
+                       " The scoring model and its 60% cut-off were calibrated on commercial paper issuers; for "
                        + {"bond": "a corporate bond or note", "loan": "a loan or facility",
                           "review": "a general credit review"}[instr]
                        + " the score is indicative until bands calibrated for it are available.")
