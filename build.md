@@ -47,3 +47,8 @@
 - Changed: backend/api/scoring.py (labels and benchmarks only), backend/api/history.py (N/A for missing inputs), backend/tests/test_scoring.py (+label and benchmark checks), backend/tests/test_history.py, frontend AppPage.jsx (DSCR best practice text)
 - Checks: pytest 124 passed; band probe test fails on the old labels and passes on the new; PDF rendered and inspected; npm run build; lint 23 unchanged
 - Decision: D047
+
+## 2026-11-12 Model v2.1, Acid-Test above 1.0x (p21)
+- Changed: backend/api/scoring.py (_V21, MODEL_VERSION v2.1), backend/tests/test_scoring.py (+6), backend/scripts/backtest_models.py (default v2.0 vs v2.1), frontend AppPage.jsx (best practice > 1.0x)
+- Checks: pytest 132 passed; build; lint 23 unchanged
+- Decision: D048
