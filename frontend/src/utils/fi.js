@@ -17,6 +17,13 @@ export const SECTORS = [
 
 export const isFiSector = (sector) => sector === "financial_services";
 
+export const sectorLabel = (code) => (SECTORS.find(([c]) => c === code) || [null, code])[1];
+
+// Same rule as looks_like_lender in backend/api/fi.py: any loans, interest income or deposits
+export function looksLikeLender(fi) {
+  return ["grossLoans", "stage3Loans", "interestIncome", "customerDeposits"].some((k) => Number(fi?.[k]) > 0);
+}
+
 // [id, label, kind]; kind "pct" is a ratio the issuer reports, otherwise N'000
 export const FI_GROUPS = [
   ["Loans and asset quality", [

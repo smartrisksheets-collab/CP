@@ -1,6 +1,6 @@
 // Review Data: the issuer's sector and, for a financial issuer, the figures behind the FI ratios
 // (backend/api/fi.py). The FI ratios are shown for context and are never part of the score.
-import { SECTORS, FI_GROUPS, isFiSector } from "../utils/fi.js";
+import { SECTORS, FI_GROUPS, isFiSector, sectorLabel, looksLikeLender } from "../utils/fi.js";
 
 const AI  = { background:"#EEF4FF", borderColor:"#9DBFEA" };
 const MAN = { background:"#ecfdf5", borderColor:"#01b88e" };
@@ -9,6 +9,10 @@ export default function FiEditor({ figures, onChange }) {
   const fi    = figures.fi || {};
   const isFi  = isFiSector(figures.sector);
   const extracted = Object.values(fi).some((v) => v !== null && v !== undefined && v !== "");
+  const suggested = figures.suggestedSector;
+  const showHint  = !!suggested && suggested !== figures.sector;
+  // Tagged financial services but the statement shows no lending: most likely the wrong sector
+  const notLender = isFi && extracted && !looksLikeLender(fi);
 
   const css = {
     card : { background:"#fff", border:"1px solid #E0E0E0", borderRadius:8, padding:20, marginBottom:16 },
@@ -30,6 +34,19 @@ export default function FiEditor({ figures, onChange }) {
   return (
     <div style={css.card}>
       <div style={css.title}>Sector</div>
+      {showHint && (
+        <div role="status" style={{ marginBottom:12, padding:"10px 12px", borderRadius:6, background:"#EEF4FF", border:"1px solid #9DBFEA", fontSize:12, color:"#1A5276", display:"flex", gap:12, alignItems:"center", justifyContent:"space-between", flexWrap:"wrap" }}>
+          <div>
+            <strong>Suggested sector: {sectorLabel(suggested)}.</strong>
+            {figures.principalActivity && <> The statement gives the principal activity as: <em>{figures.principalActivity}</em></>}
+            {figures.sector ? <> You picked {sectorLabel(figures.sector)}.</> : <> No sector is set yet.</>}
+          </div>
+          <button type="button" onClick={() => setSector(suggested)}
+            style={{ padding:"6px 14px", fontSize:12, borderRadius:6, cursor:"pointer", border:"1px solid #1F2854", background:"#1F2854", color:"#fff", fontFamily:"Arial,sans-serif", whiteSpace:"nowrap" }}>
+            Use {sectorLabel(suggested)}
+          </button>
+        </div>
+      )}
       <div style={{ maxWidth:420 }}>
         <label style={css.label} htmlFor="sr-review-sector">Issuer sector</label>
         <select id="sr-review-sector" style={{ ...css.input, borderColor:"#D0D0D0", background:"#fff", marginTop:4 }}
@@ -45,6 +62,11 @@ export default function FiEditor({ figures, onChange }) {
 
       {isFi && (
         <>
+          {notLender && (
+            <div role="alert" style={{ marginTop:12, padding:"10px 12px", borderRadius:6, background:"#FEF6E7", border:"1px solid #F0C060", fontSize:12, color:"#7A4F00" }}>
+              <strong>This issuer does not look like a lender.</strong> No loans, interest income or customer deposits were found in the statement, so the FI ratios will be left out. Check the sector above; if it is right, enter the figures from the loans and liquidity notes.
+            </div>
+          )}
           {figures.fiWarning && (
             <div style={{ marginTop:12, fontSize:12, color:"#854F0B" }}>{figures.fiWarning}</div>
           )}
