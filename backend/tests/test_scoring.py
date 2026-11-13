@@ -100,7 +100,7 @@ def test_every_model_totals_56():
 
 
 def test_result_records_model_version():
-    assert compute_all_ratios(STREADVEST)["model_version"] == MODEL_VERSION == "v2.0"
+    assert compute_all_ratios(STREADVEST)["model_version"] == MODEL_VERSION == "v2.1"
 
 
 def test_acid_test_uses_current_assets():
@@ -182,7 +182,7 @@ def _label_contains(label: str, v: float) -> bool:
     nums = [float(x) for x in re.findall(r"-?\d+(?:\.\d+)?", label)]
     if "–" not in label:
         op = label.split()[0]
-        return {"<": v < nums[0], ">": v > nums[0], "≥": v >= nums[0]}[op]
+        return {"<": v < nums[0], ">": v > nums[0], "≥": v >= nums[0], "≤": v <= nums[0]}[op]
     lo_part, hi_part = [p.strip() for p in label.split("–")]
     lo, hi = nums[0], nums[1]
     lo_ok = v > lo if lo_part.startswith(">") else v >= lo
@@ -208,3 +208,18 @@ def test_benchmark_is_the_full_marks_band(version):
         if table.get("display_only"):
             full = [table["bands"][-1][2]]
         assert table["benchmark"] in full, f"{version} {rid}: benchmark '{table['benchmark']}' vs {full}"
+
+
+# ── v2.1: Acid-Test full marks above 1.0x (D048) ──
+@pytest.mark.parametrize("ca,band,points", [
+    (750, "≤ 1.0x", -2), (1000, "≤ 1.0x", -2), (1001, "> 1.0x", 2), (1200, "> 1.0x", 2), (2000, "> 1.0x", 2)])
+def test_v21_acid_test_bands(ca, band, points):
+    r = _by_id(compute_all_ratios({"currentAssets": ca, "currentLiabilities": 1000}, "v2.1"))["quick_ratio"]
+    assert (r["band"], r["score"], r["benchmark"]) == (band, points, "> 1.0x")
+
+
+def test_streadvest_v21_gains_one_point_on_acid_test():
+    v20, v21 = compute_all_ratios(STREADVEST, "v2.0"), compute_all_ratios(STREADVEST, "v2.1")
+    assert _by_id(v20)["quick_ratio"]["score"] == 1 and _by_id(v21)["quick_ratio"]["score"] == 2
+    assert v21["total_score"] == v20["total_score"] + 1 == 54
+    assert v21["max_score"] == 56 and v21["cutoff"] == 34

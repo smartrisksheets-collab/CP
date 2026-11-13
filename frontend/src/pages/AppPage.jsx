@@ -737,7 +737,7 @@ function FaqContent() {
 
 function UserGuidePage({ onBack }) {
   const RATIOS = [
-    ["Acid-Test Ratio",         2,  "(Current assets − inventory − prepayments) ÷ current liabilities. Can the company meet short-term obligations from liquid assets alone? A stricter test than the current ratio.",        "> 1.5x"],
+    ["Acid-Test Ratio",         2,  "(Current assets − inventory − prepayments) ÷ current liabilities. Can the company meet short-term obligations from liquid assets alone? A stricter test than the current ratio.",        "> 1.0x"],
     ["Current Ratio",           3,  "Current assets ÷ current liabilities. How many times short-term assets cover short-term obligations.", "≥ 1.5x"],
     ["Cash Ratio",              3,  "Cash and cash equivalents ÷ current liabilities. How much of short-term obligations cash alone could pay today.", "≥ 0.5x"],
     ["Net Income Margin",       4,  "How much of each naira of revenue becomes profit after all costs and tax. A proxy for pricing power and cost discipline.",                               "> 20%"],

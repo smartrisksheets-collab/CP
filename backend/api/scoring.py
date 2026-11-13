@@ -8,8 +8,8 @@ log = logging.getLogger(__name__)
 CUTOFF_PCT = 0.60
 
 # Active scoring model. Saved assessments record the version they were scored under.
-# v1.2 stays available for back-tests and comparison.
-MODEL_VERSION = "v2.0"
+# v1.2 and v2.0 stay available for back-tests and comparison.
+MODEL_VERSION = "v2.1"
 
 
 @dataclass
@@ -245,7 +245,15 @@ _V20 = {
         ("<", 1.23, "< 1.23", -8), ("<=", 2.90, "1.23 – 2.90", 4), (None, None, "> 2.90", 8)]},
 }
 
-MODELS = {"v1.2": _V12, "v2.0": _V20}
+# v2.1 (D048, user decision 2026-11-12): Acid-Test full marks above 1.0x instead of above
+# 1.5x; the 1.0 - 1.5x band (1 point) is gone. At or below 1.0x keeps the -2 penalty.
+_V21 = {
+    **_V20,
+    "quick_ratio": {"max": 2, "benchmark": "> 1.0x", "bands": [
+        ("<=", 1.0, "≤ 1.0x", -2), (None, None, "> 1.0x", 2)]},
+}
+
+MODELS = {"v1.2": _V12, "v2.0": _V20, "v2.1": _V21}
 
 
 def max_score(version: str = MODEL_VERSION) -> int:
