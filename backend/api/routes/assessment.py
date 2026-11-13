@@ -199,7 +199,7 @@ async def _get_draft(assessment_id: int, email: str, tenant_id: int, db: AsyncSe
 @limiter.limit("10/minute")
 async def extract(
     request       : Request,
-    financial_pdf : list[UploadFile]        = File(...),  # one PDF or page photos
+    financial_pdf : list[UploadFile]        = File(...),  # one PDF
     rating_pdf    : list[UploadFile] | None = File(None),
     cp_terms_pdf  : list[UploadFile] | None = File(None),
     prior_pdf     : list[UploadFile] | None = File(None),  # an older audited statement (history)
@@ -325,7 +325,7 @@ async def extract(
 @limiter.limit("10/minute")
 async def extract_cp(
     request      : Request,
-    cp_terms_pdf : list[UploadFile] = File(...),  # one PDF or page photos
+    cp_terms_pdf : list[UploadFile] = File(...),  # one PDF
     current_user : dict             = Depends(get_current_user),
     db           : AsyncSession     = Depends(get_db),
 ):

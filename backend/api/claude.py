@@ -87,7 +87,7 @@ async def _call(content) -> str:
             if e.status_code in (400, 413) and _is_document_error(e.message):
                 raise RuntimeError(
                     "The document could not be read. If it is password-protected or damaged, "
-                    "save an unlocked copy (or photos of the pages) and upload again."
+                    "save an unlocked copy and upload again."
                 )
             raise RuntimeError(f"Claude API error ({e.status_code}): {e.message}")
         except anthropic.APIError as e:
@@ -99,14 +99,14 @@ def _is_document_error(message: str) -> bool:
     return any(k in lc for k in ("pdf", "image", "document", "password", "encrypt"))
 
 
-# Applies to every extraction prompt: uploads may be scans or phone photos
+# Applies to every extraction prompt: PDFs may be scans
 SCAN_NOTE = """
-The pages may be scanned or photographed: possibly rotated, skewed, faint or split across several images in page order.
+The pages may be scanned: possibly rotated, skewed or faint.
 Read them as printed. If a figure is illegible, return null for it rather than guess."""
 
 
 async def _call_with_document(blocks: list[dict], prompt: str) -> str:
-    """Call Claude with a document's content blocks (one PDF or page photos) and a text prompt."""
+    """Call Claude with a document's content blocks (one PDF) and a text prompt."""
     return await _call([*blocks, {"type": "text", "text": prompt + SCAN_NOTE}])
 
 

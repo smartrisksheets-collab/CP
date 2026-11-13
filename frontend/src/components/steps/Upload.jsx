@@ -4,7 +4,7 @@ import { useIsMobile } from "../../hooks/useBreakpoint.js";
 import { extractFigures, getIssuerHistory, errorMessage } from "../../api/client.js";
 import { useTenant } from "../../context/TenantContext.jsx";
 import CPTerms from "./CPTerms.jsx";
-import { ACCEPT, PHOTO_WARNING, inspectPdf, prepareDocument, checkWarnings, appendDocument, countKw } from "../../utils/documentInput.js";
+import { ACCEPT, inspectPdf, prepareDocument, checkWarnings, appendDocument, countKw } from "../../utils/documentInput.js";
 
 const RATINGS = ["","AAA","AA+","AA","AA-","A+","A","A-", "A1+", "A1", "A2", "A3", "BBB+","BBB","BBB-","BB+","BB","BB-","B+","B","B-","CCC","CC","C","D"];
 
@@ -76,7 +76,6 @@ function formatReviewDate(val) {
 const FIN_PAGES_CHECKED = 100; // statements often sit after page 15 of an annual report
 
 async function runFinValidation(doc, clientName) {
-  if (doc.kind === "images") return { ok: true, warnings: [PHOTO_WARNING] };
 
   let info;
   try {
@@ -138,7 +137,6 @@ async function runFinValidation(doc, clientName) {
 }
 
 async function runRatValidation(doc, clientName) {
-  if (doc.kind === "images") return { ok: true, warnings: [PHOTO_WARNING] };
 
   let info;
   try {
@@ -205,15 +203,12 @@ async function runHistoryValidation(doc, clientName, interim) {
 }
 
 const HISTORY_SLOTS = [
-  { key: "prior",   field: "prior_pdf",   title: "Prior-year audited statement",
+  { key: "prior",   field: "prior_pdf",   title: "Previous year's audited statement",
     label: "Click to upload the previous year's audited statement",
-    sub: "Its comparative column adds a third year — one PDF, or photos of the pages", interim: false },
-  { key: "older",   field: "older_pdf",   title: "Older audited statement (optional)",
-    label: "Click to upload an older audited statement",
-    sub: "Only if the prior-year statement is not available — one PDF, or photos", interim: false },
+    sub: "e.g. FY2024 (it also shows FY2023). If not available, the latest one before it. PDF only", interim: false },
   { key: "interim", field: "interim_pdf", title: "Half-year interim (optional, unaudited)",
     label: "Click to upload the latest half-year interim report",
-    sub: "Compared with the same half of last year as an early warning — never changes the score", interim: true },
+    sub: "Compared with the same half of last year as an early warning; never changes the score. PDF only", interim: true },
 ];
 const BLANK_SLOT = { doc: null, v: { validating: false, warnings: [], error: "" }, progress: { show: false, pct: 0, name: "" } };
 
@@ -266,7 +261,7 @@ function UploadZone({ label, sub, file, onFile, onClear, validating, onGuard, pr
 
   return (
     <>
-      <input ref={ref} type="file" accept={ACCEPT} multiple style={{ display:"none" }}
+      <input ref={ref} type="file" accept={ACCEPT} style={{ display:"none" }}
         onChange={(e) => { if (e.target.files.length) onFile(Array.from(e.target.files)); e.target.value = ""; }} />
       <div style={css.zone(hover)}
         onClick={() => { if (onGuard?.()) return; ref.current.click(); }}
@@ -447,7 +442,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
   const isMobile = useIsMobile();
   const { tenant } = useTenant();
   const historyOn  = !!tenant?.historyMode && tenant.historyMode !== "off";
-  const [slots, setSlots]       = useState({ prior: BLANK_SLOT, older: BLANK_SLOT, interim: BLANK_SLOT });
+  const [slots, setSlots]       = useState({ prior: BLANK_SLOT, interim: BLANK_SLOT });
   const [stored, setStored]     = useState(null); // issuer lookup: null | { found, periods, name } | { error }
   const info = clientInfo;
   const set  = (k, v) => onClientInfoChange({ ...info, [k]: v });
@@ -470,7 +465,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
   const fileChanged    = !!extractedFileKey && !!currentFileKey && currentFileKey !== extractedFileKey;
 
   // ── File handlers ───────────────────────────────────────
-  // Turns picked files into a document, showing progress while photos are prepared
+  // Turns the picked file into a document
   async function loadDocument(files, setProgress, setV) {
     const name = files.length === 1 ? files[0].name : `${files.length} files`;
     setV(BLANK);
@@ -710,10 +705,10 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
 
       {/* Financial statement */}
       <div style={css.card}>
-        <div style={css.title}>Financial Statement</div>
+        <div style={css.title}>Most Recent Audited Financial Statement</div>
         <UploadZone
-          label="Click to upload financial statement"
-          sub="Balance sheet + income statement — one PDF, or photos of the pages"
+          label="Click to upload the most recent audited financial statement"
+          sub="The year being scored, e.g. FY2025 (it also shows FY2024). Balance sheet + income statement, PDF only"
           file={finDoc}
           onFile={handleFinFiles}
           onClear={() => { setFinDoc(null); setFinV(BLANK); setFinProgress(BLANK_PROG); }}
@@ -761,7 +756,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
             ))}
           </div>
           <div style={{ fontSize:11, color:"#888", marginTop:10 }}>
-            Each audited statement also gives the year before it, so the current statement plus one older statement covers three years. Everything is read in the same extraction and uses no extra credit. These files can be up to 30MB together; upload only the financial statements pages if a file is large.
+            Each audited statement also shows the year before it, so these two statements cover three years (e.g. FY2025, FY2024 and FY2023), and the year in both is checked for restatements. Read in the same extraction for no extra credit. Up to 30MB together; upload only the financial statements pages if a file is large.
           </div>
         </div>
       )}
@@ -771,7 +766,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
         <div style={css.title}>Credit Rating <span style={{ fontWeight:"normal", fontSize:11, color:"#888" }}>(optional)</span></div>
         <UploadZone
           label="Click to upload credit rating report"
-          sub="DataPro, Agusto & Co, or similar — one PDF, or photos of the pages"
+          sub="DataPro, Agusto & Co, or similar. PDF only"
           file={ratDoc}
           onFile={handleRatFiles}
           onClear={() => { setRatDoc(null); setRatV(BLANK); setRatProgress(BLANK_PROG); }}
