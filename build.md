@@ -52,3 +52,8 @@
 - Changed: backend/api/scoring.py (_V21, MODEL_VERSION v2.1), backend/tests/test_scoring.py (+6), backend/scripts/backtest_models.py (default v2.0 vs v2.1), frontend AppPage.jsx (best practice > 1.0x)
 - Checks: pytest 132 passed; build; lint 23 unchanged
 - Decision: D048
+
+## 2026-11-12 Score table columns, colours and model version (p22)
+- Changed: frontend RatioTable.jsx, Scores.jsx, Result.jsx, index.css
+- Checks: npm run build; lint 23 unchanged; Chromium screenshot of Scores (Benchmark, Result, Band, Score; green/amber/red; "Scoring model v2.1")
+- Decision: D049
