@@ -106,12 +106,18 @@ export default function Register() {
               <p style={{ fontSize:14, color:"rgba(255,255,255,0.55)", lineHeight:1.7, maxWidth:360, marginBottom:24 }}>
                 Create your account and get 2 free assessment credits — no card required.
               </p>
-              {[
-                "Lightening fast financial statement extraction",
+              {(copy.multi ? [
+                "Commercial paper, bonds, loans and general reviews",
+                "Lightning-fast financial statement extraction",
+                "12-ratio quantitative scoring model",
+                "Repayment check for loans, health report for reviews",
+                "Professional PDF report generation",
+              ] : [
+                "Lightning-fast financial statement extraction",
                 "12-ratio quantitative scoring model",
                 "Professional PDF report generation",
                 "Nigerian capital markets calibrated",
-              ].map((f, i) => (
+              ]).map((f, i) => (
                 <div key={i} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
                   <div style={{ width:20, height:20, borderRadius:"50%", background:"rgba(var(--accent-rgb),0.2)", border:"1px solid rgba(var(--accent-rgb),0.4)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                     <Check size={11} color="var(--accent)" strokeWidth={2.5} />

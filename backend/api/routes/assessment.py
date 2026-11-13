@@ -14,7 +14,9 @@ from api.models import CreditTransaction, User, Assessment, Tenant
 from api.scoring import compute_all_ratios, normalise_rates, CUTOFF_SCORE
 from api.claude import (extract_figures, extract_rating, extract_cp_terms, generate_narrative, extract_periods,
                         extract_fi, extract_bond_terms)
-from api.instruments import clean_terms, normalise_instrument
+from api.instruments import clean_terms, instrument_of, normalise_instrument
+from api.health import health_report
+from api.repayment import repayment_check
 from api.report import build_pdf
 from api.documents import read_document
 from api.history import analyse, merge_periods, needs_comment, normalise_rc, parse_period_end, periods_to_store
@@ -177,6 +179,15 @@ def _apply_instrument(figures: dict, mode: str) -> str | None:
     else:
         figures.pop("terms", None)
     return code
+
+
+def _service_extras(figures: dict, ratios: list[dict], mode: str) -> dict:
+    """The repayment check for a loan and the health report for a general review (D053)."""
+    code = instrument_of(figures) if mode != "off" else "cp"
+    return {
+        "repayment": repayment_check(figures) if code == "loan" else None,
+        "health"   : health_report(ratios) if code == "review" else None,
+    }
 
 
 async def _fi_for(figures: dict, mode: str, db: AsyncSession) -> dict | None:
@@ -444,6 +455,8 @@ async def preview_scores(
     mode   = await _history_mode(current_user["tenant_id"], db)
     result["history"] = _history_for(body.figures, mode)
     result["fi"]      = await _fi_for(body.figures, await _fi_mode(current_user["tenant_id"], db), db)
+    result.update(_service_extras(body.figures, result["ratios"],
+                                  await _instrument_mode(current_user["tenant_id"], db)))
     return result
 
 
@@ -483,6 +496,8 @@ async def run_assessment(
                 "narrative"   : completed.narrative,
                 "history"     : completed.history,
                 "fi"          : completed.fi,
+                "instrument"  : completed.instrument or "cp",
+                **_service_extras(completed.figures or {}, completed.ratios or [], "on" if completed.instrument else "off"),
                 "clientInfo"  : {**body.clientInfo, "totalScore": completed.total_score, "eligible": completed.eligible},
             }
 
@@ -604,6 +619,8 @@ async def run_assessment(
         "narrative"   : narrative,
         "history"     : history,
         "fi"          : fi,
+        "instrument"  : instrument or "cp",
+        **_service_extras(figures, score_result["ratios"], "on" if instrument else "off"),
         "clientInfo"  : client_info,
     }
 
@@ -713,7 +730,9 @@ async def history(
             "creditRating": r.credit_rating,
             "reviewDate"  : r.review_date,
             "totalScore"  : r.total_score,
+            "maxScore"    : r.max_score,
             "eligible"    : r.eligible,
+            "instrument"  : r.instrument,
             "createdAt"   : r.created_at.isoformat(),
             "updatedAt"   : r.updated_at.isoformat() if r.updated_at else None,
         }
@@ -777,6 +796,7 @@ async def get_assessment(
         "sector"      : assessment.sector,
         "fi"          : assessment.fi,
         "instrument"  : assessment.instrument or "cp",
+        **_service_extras(assessment.figures or {}, assessment.ratios or [], "on" if assessment.instrument else "off"),
         "createdAt"   : assessment.created_at.isoformat(),
         "updatedAt"   : assessment.updated_at.isoformat() if assessment.updated_at else None,
     }

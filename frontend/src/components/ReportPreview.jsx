@@ -72,9 +72,11 @@ export default function ReportPreview({ assessmentId, narrative, clientInfo, sco
             <div style={{ fontSize:16, fontWeight:"bold", color:"var(--primary)" }}>Preview & Edit Report</div>
             <div style={{ fontSize:12, color:"#888", marginTop:2 }}>
               {clientInfo.clientName} &nbsp;·&nbsp; Score: {score}/56 &nbsp;·&nbsp;
-              <span style={{ color: eligible ? "#1E7E34" : "#A32D2D", fontWeight:"bold" }}>
-                {eligible ? "Meets Threshold" : "Below Threshold"}
-              </span>
+              {scoreResult?.health
+                ? <span style={{ color:"#1F2854", fontWeight:"bold" }}>Health {scoreResult.health.pct}% · {scoreResult.health.rating}</span>
+                : <span style={{ color: eligible ? "#1E7E34" : "#A32D2D", fontWeight:"bold" }}>
+                    {eligible ? "Meets Threshold" : "Below Threshold"}
+                  </span>}
             </div>
           </div>
           <button onClick={onClose} style={{ background:"none", border:"none", cursor:"pointer", color:"#888" }}>

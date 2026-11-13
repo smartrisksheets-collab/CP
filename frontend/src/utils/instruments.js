@@ -28,6 +28,55 @@ export const LOAN_FIELDS = [
 
 export const TERM_FIELDS = { bond: BOND_FIELDS, loan: LOAN_FIELDS };
 
+// The four services (D053): each has its own steps. Upload sub-steps and the app's steps map onto them
+// in flowIndex below. Statements are always read the same way; only the steps around them differ.
+export const SERVICES = {
+  cp: {
+    name: "Commercial paper", entity: "Issuer",
+    blurb: "Score a CP issuer against the 60% pass mark, with the offer's indicative terms.",
+    steps: ["Statements", "CP terms", "Review", "Scores", "Result"],
+  },
+  bond: {
+    name: "Corporate bond / note", entity: "Issuer",
+    blurb: "Score a bond or note issuer, with coupon, maturity and security read from the term sheet.",
+    steps: ["Statements", "Bond terms", "Review", "Scores", "Result"],
+  },
+  loan: {
+    name: "Loan or facility", entity: "Applicant",
+    blurb: "Start from the facility request, then check whether earnings can carry the repayments.",
+    steps: ["Facility request", "Statements", "Review", "Repayment check", "Result"],
+  },
+  review: {
+    name: "General review", entity: "Company",
+    blurb: "A financial health report on a customer or counterparty. No instrument, no pass or fail.",
+    steps: ["Statements", "Review", "Health report"],
+  },
+};
+export const SERVICE_ORDER = ["cp", "bond", "loan", "review"];
+export const serviceOf = (code) => SERVICES[code] || SERVICES.cp;
+
+// Position in the service's own steps from the app step (0 upload, 1 review, 2 scores, 3 result)
+// and the upload sub-step (0 or 1)
+export function flowIndex(code, step, subStep) {
+  if (code === "review") return Math.min(step, 2);
+  if (step === 0) return subStep ? 1 : 0;
+  return step + 1;
+}
+
+// Colours for the repayment check and health readings
+export const TONE = {
+  good: { bg:"#EAF3DE", fg:"#27500A", bd:"#97C459" },
+  mid : { bg:"#FEF6E7", fg:"#7A4F00", bd:"#F0C060" },
+  bad : { bg:"#FCEBEB", fg:"#791F1F", bd:"#F09595" },
+};
+export const overallTone = (o) => TONE[{ Comfortable:"good", Tight:"mid" }[o] || "bad"];
+export const ratingTone  = (r) => TONE[{ Strong:"good", Fair:"mid" }[r] || "bad"];
+
+export const REPAYMENT_TYPES = [
+  ["amortising", "Equal instalments"], ["equal_principal", "Equal principal"],
+  ["bullet", "Bullet at maturity"], ["revolving", "Revolving / overdraft"],
+];
+
 // Wording that changes once a tenant can assess more than commercial paper
 export function useProductCopy() {
   const { tenant } = useTenant();
@@ -36,7 +85,7 @@ export function useProductCopy() {
     multi,
     subtitle : multi ? "Corporate Credit Assessment" : "Commercial Paper Risk Assessment",
     heroLabel: multi ? "Corporate Credit Assessment" : "Commercial Paper Assessment",
-    heroSub  : multi ? "Assess commercial paper, bonds, loans and counterparties in 4 quick steps."
+    heroSub  : multi ? "Commercial paper, bonds, loans and general reviews, each with its own steps."
                      : "Analyse Commercial Paper offerings in 4 quick steps.",
     issuers  : multi ? "issuers and borrowers" : "CP issuers",
     termsFeature: multi ? "CP and bond terms extraction" : "CP indicative terms extraction",

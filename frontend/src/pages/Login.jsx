@@ -124,6 +124,7 @@ const LOGOUT_NOTICES = {
 export default function Login() {
   const { tenant }    = useTenant();
   const copy          = useProductCopy();
+  const historyOn     = !!tenant?.historyMode && tenant.historyMode !== "off";
   const { login }     = useAuth();
   const navigate      = useNavigate();
   const hostname      = window.location.hostname;
@@ -286,27 +287,33 @@ export default function Login() {
           )}
           <div style={S.heroLabel}>{copy.heroLabel}</div>
           <h1 style={{ ...S.heroHeading, fontSize: isMobile ? 20 : 30, marginBottom: isMobile ? 8 : 14 }}>
-            Analyse listings.{" "}Score clients.{" "}
-            <span style={{ color:"var(--accent)" }}>In Mins.</span>
+            {copy.multi ? <>Assess issuers and borrowers.{" "}</> : <>Analyse listings.{" "}Score clients.{" "}</>}
+            <span style={{ color:"var(--accent)" }}>In minutes.</span>
           </h1>
           {!isMobile && (
             <p style={S.heroSub}>
               {copy.heroSub}
-              Cut your assessment time in half and score your clients in less than 5 mins.
             </p>
           )}
           <div style={{ ...S.statStrip, marginBottom: isMobile ? 0 : 20 }}>
-            <div style={S.stat}><div style={S.statVal}>4</div><div style={S.statLbl}>Simple steps</div></div>
-            <div style={S.stat}><div style={S.statVal}>10</div><div style={S.statLbl}>Ratio metrics</div></div>
-            <div style={S.stat}><div style={S.statVal}>5 mins</div><div style={S.statLbl}>Per assessment</div></div>
+            {copy.multi
+              ? <div style={S.stat}><div style={S.statVal}>4</div><div style={S.statLbl}>Services</div></div>
+              : <div style={S.stat}><div style={S.statVal}>4</div><div style={S.statLbl}>Simple steps</div></div>}
+            <div style={S.stat}><div style={S.statVal}>12</div><div style={S.statLbl}>Ratios scored</div></div>
+            {historyOn && <div style={S.stat}><div style={S.statVal}>3 yrs</div><div style={S.statLbl}>History trend</div></div>}
           </div>
           {!isMobile && <div style={S.steps}>
-            {[
+            {(copy.multi ? [
+              ["Commercial paper",      "Score the issuer against the 60% pass mark"],
+              ["Corporate bond / note", "Terms read from the pricing supplement"],
+              ["Loan or facility",      "Facility request and repayment check"],
+              ["General review",        "Financial health report, no pass or fail"],
+            ] : [
               ["Upload financial statement",  "AI extracts all key figures automatically"],
               ["Review & confirm data",        "Verify AI-extracted figures in one screen"],
-              ["View computed scores",         "10 quantitative ratios scored instantly"],
+              ["View computed scores",         "12 quantitative ratios scored instantly"],
               ["Generate PDF report",          "Professional report ready to share"],
-            ].map(([title, sub], i) => (
+            ]).map(([title, sub], i) => (
               <div key={i} style={S.step}>
                 <div style={S.stepNum}>{i+1}</div>
                 <div>
