@@ -117,6 +117,7 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
             totalScore={preview.total_score}
             maxScore={preview.max_score}
             totalLabel="TOTAL (preview)"
+            modelVersion={preview.model_version}
             totalColor={preview.eligible ? "var(--score-full)" : "var(--error)"}
           />
         )}

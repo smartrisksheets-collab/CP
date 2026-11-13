@@ -49,6 +49,7 @@
 - D046 2026-11-12 PDF only (replaces D024's photos); two audited statements on Upload, the older-statement box removed
 - D047 2026-11-12 Band labels and benchmarks made exact; no score changes
 - D048 2026-11-12 Model v2.1: Acid-Test full marks above 1.0x
+- D049 2026-11-12 Score table: Benchmark | Result | Band | Score, amber for partial scores, model version under the total
 
 ## D001 Start Supabase empty
 Render database is suspended for non-payment and unreachable. User confirmed the app stores no data worth keeping. Tenants are recreated by backend/seed.py. Edge cases: no stamping of an existing schema needed; tenant rows must exist before any login, so seed runs after upgrade head.
@@ -197,3 +198,6 @@ Also: history ratios now show N/A, not 0.00x, when a period lacks the inputs (an
 
 ## D048 Model v2.1: Acid-Test full marks above 1.0x
 User decision. The Acid-Test now scores 2/2 above 1.0x and keeps the -2 penalty at or below 1.0x; the old 1.0 - 1.5x band (1 point) is removed and the benchmark is "> 1.0x". Max stays 2, total 56, cut-off 34. Released as a new model version, v2.1 (MODEL_VERSION), per D021: saved assessments keep their v2.0 scores and say so; new assessments and re-run drafts use v2.1. Effect: an issuer with an acid-test above 1.0x and up to 1.5x gains 1 point (Streadvest 53 to 54); others are unchanged. Edge cases: exactly 1.00x is a penalty (the user's rule is strictly above 1.0x), and a value such as 1.004 shows as "1.00x" but scores full marks, because bands use the unrounded value (D047, open). backend/scripts/backtest_models.py now compares v2.0 with v2.1 by default; run it in the Render Shell to list saved assessments whose eligibility would change.
+
+## D049 Score table columns and colours
+User decision, after reading the Band column as the target. The app's score table (Scores, Result and the dashboard, all frontend/src/components/RatioTable.jsx) now shows Ratio | Benchmark (value for full marks, from the engine) | Result | Band (where the result landed) | Score. Partial scores use amber (--score-part, #8A5300 on #FEF6E7) instead of green, matching the Score Colour Guide (green = full marks, amber = positive but below, red = zero or negative); the green had made 1/5 look like full marks. "Scoring model vX" appears under the total on Scores and Result. The PDF already shows Result then Benchmark and is unchanged. Edge case: on a phone the five columns scroll sideways inside their card (min width 560px).
