@@ -3,6 +3,7 @@ import { useIsMobile } from "../../hooks/useBreakpoint.js";
 import { runAssessment, previewScores, errorMessage } from "../../api/client.js";
 import RatioTable from "../RatioTable.jsx";
 import HistoryPanel from "../HistoryPanel.jsx";
+import FiPanel from "../FiPanel.jsx";
 import { Loader, Zap, ChevronRight } from "lucide-react";
 
 const RUN_MESSAGES = [
@@ -79,7 +80,7 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
       const res = await runAssessment(f, clientInfo, extractedFigures, draftId);
       const d   = res.data;
       onNext(
-        { ratios: d.ratios, total_score: d.totalScore, eligible: d.eligible, max_score: d.maxScore, cutoff: d.cutoff, model_version: d.modelVersion, history: d.history || null },
+        { ratios: d.ratios, total_score: d.totalScore, eligible: d.eligible, max_score: d.maxScore, cutoff: d.cutoff, model_version: d.modelVersion, history: d.history || null, fi: d.fi || null },
         d.assessmentId,
         d.narrative,
         currentKey,
@@ -127,6 +128,8 @@ export default function Scores({ figures, extractedFigures, scoreResult, scoredF
         <HistoryPanel history={preview.history} comment={comment}
           onComment={(v) => { setComment(v); if (v.trim()) setCommentError(""); }} commentError={commentError} />
       )}
+
+      {preview?.fi && <FiPanel fi={preview.fi} />}
 
       <div style={{ display:"flex", flexDirection: isMobile ? "column-reverse" : "row", gap:10, justifyContent:"flex-end", marginTop:20, alignItems: isMobile ? "stretch" : "center" }}>
         <button onClick={onBack} style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"#1F2854", fontFamily:"Arial,sans-serif", textAlign:"center" }}>Back</button>

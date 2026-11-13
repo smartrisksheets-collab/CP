@@ -246,6 +246,63 @@ async def extract_figures(blocks: list[dict]) -> dict:
     return figures
 
 
+# ── 1a. Financial-institution figures (api/fi.py) ─────────────
+FI_PROMPT = """You are a senior bank analyst extracting figures from the audited financial statements of a Nigerian
+financial institution: a bank, finance company, microfinance bank, leasing company or lending fintech.
+
+Use the COMPANY (standalone) columns when the statements show both Company and Group; use Group only when there
+are no Company columns. Use the primary statements and their notes only, never ratio tables in the directors' report.
+
+RULES:
+- All amounts in N'000 as plain numbers. No symbols, commas or brackets.
+- If a figure cannot be found, return null. Never estimate, and never copy a current-year figure into a prior-year field.
+- Return ONLY a valid JSON object. No markdown, no explanation.
+
+FIELDS (current year unless the name says prior):
+- grossLoans: loans and advances to customers BEFORE impairment allowance (the gross carrying amount in the loans note).
+  Include finance lease receivables for a leasing company. priorGrossLoans: the same, prior year column.
+- stage3Loans: gross carrying amount of IFRS 9 Stage 3 (credit-impaired) loans and advances to customers.
+  If the notes give non-performing loans instead of a Stage 3 split, use that.
+- stage3Allowance: impairment allowance (ECL) held against the Stage 3 loans.
+- impairmentCharge: impairment charge on loans and advances for the year in the income statement or its note,
+  as a positive number for a charge (negative if it is a net write-back). Loans only where the note splits it.
+- interestIncome: total interest income (for a non-interest bank: income from financing and investments).
+- interestExpense: total interest expense (for a non-interest bank: profit paid to depositors), as a positive number.
+- operatingIncome: total operating income = net interest income + net fee and commission income + other operating
+  income, BEFORE impairment charges. Use the statement's own subtotal if it shows one.
+- operatingExpenses: total operating expenses (staff costs, depreciation and amortisation, other operating expenses),
+  excluding impairment charges and tax, as a positive number.
+- interestEarningAssets: loans and advances to customers (net) + loans to banks and placements + investment securities
+  + treasury bills, at the year end. priorInterestEarningAssets: the same, prior year column.
+- liquidAssets: cash and balances with the central bank (excluding mandatory cash reserves where shown separately)
+  + due from banks and placements + treasury bills, at the year end.
+- customerDeposits: deposits from customers. Return 0 for a non-deposit-taking finance company.
+- borrowingsDue12m: borrowings, commercial papers, notes and debt securities due within 12 months (use the maturity
+  analysis in the liquidity risk note). Exclude customer deposits.
+- totalBorrowings: all borrowings, commercial papers, notes, bonds and debt securities issued. Exclude customer deposits.
+  Return 0 if there are none.
+- capitalAdequacyRatio: the capital adequacy ratio the institution reports, as a percentage number (e.g. 18.2). null if none.
+- reportedLiquidityRatio: the regulatory liquidity ratio the institution reports, as a percentage number. null if none.
+
+Return ONLY this JSON:
+{"grossLoans":number,"priorGrossLoans":number,"stage3Loans":number,"stage3Allowance":number,"impairmentCharge":number,
+"interestIncome":number,"interestExpense":number,"operatingIncome":number,"operatingExpenses":number,
+"interestEarningAssets":number,"priorInterestEarningAssets":number,"liquidAssets":number,"customerDeposits":number,
+"borrowingsDue12m":number,"totalBorrowings":number,"capitalAdequacyRatio":number,"reportedLiquidityRatio":number}"""
+
+
+async def extract_fi(blocks: list[dict]) -> dict:
+    """FI figures for an issuer tagged financial_services. Keys outside FI_FIELDS are dropped."""
+    from api.fi import FI_FIELDS
+    data = _parse_json(await _call_with_document(blocks, FI_PROMPT))
+    out = {k: _num_or_none(data.get(k)) for k in FI_FIELDS}
+    # A ratio returned as a fraction (0.182) is a percentage the model forgot to scale
+    for k in ("capitalAdequacyRatio", "reportedLiquidityRatio"):
+        if out[k] is not None and 0 < out[k] < 1:
+            out[k] = round(out[k] * 100, 4)
+    return out
+
+
 # ── 1b. Multi-period extraction (issuer history) ──────────────
 PERIODS_PROMPT = """You are a senior financial analyst extracting figures from a Nigerian company's financial statements
 for a multi-year credit review. The document is either audited annual financial statements or an unaudited

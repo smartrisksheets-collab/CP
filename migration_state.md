@@ -5,7 +5,7 @@
 - Gates: P1 VERIFIED | P2 VERIFIED | P3 VERIFIED | P4 VERIFIED (dev merged to main)
 - Supabase: Frankfurt (eu-central-1), session pooler aws-1-eu-central-1.pooler.supabase.com:5432
 - Render: new web service in workspace Smarkrisk Pulse_v2, Frankfurt
-- Head revision: 0005_issuer_history (run backend/alembic/sql/0005_issuer_history.sql in the Supabase editor before deploy; 0004 must already be applied, D010)
+- Head revision: 0006_fi_peers (applied by the Render pre-deploy step `alembic upgrade head`; backend/alembic/sql/0006_fi_peers.sql is the same change for the Supabase editor, D010). Adds peer_benchmarks, assessments.sector, assessments.fi, tenants.fi_mode (default off)
 - Target: Supabase free tier, empty start (Render DB unreachable, no data copy)
 - Local DB: Docker postgres:16, compose project smartrisk-cp, host port 5433
 

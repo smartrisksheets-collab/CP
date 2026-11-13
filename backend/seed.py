@@ -67,6 +67,7 @@ TENANTS = [
         "allowed_domains": ["*"],
         "session_ttl"    : 86400,
         "history_mode"   : "shadow",  # issuer history on for local development only
+        "fi_mode"        : "shadow",  # sector and FI ratios on for local development only
     },
 ]
 

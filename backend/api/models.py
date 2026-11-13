@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Integer, Boolean, Text, DateTime, Date, BigInteger,
+    Integer, Boolean, Text, DateTime, Date, BigInteger, Float,
     ForeignKey, ARRAY, func, UniqueConstraint
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -29,6 +29,7 @@ class Tenant(Base):
     allowed_domains : Mapped[List]          = mapped_column(ARRAY(Text), default=list)
     session_ttl     : Mapped[int]           = mapped_column(Integer, default=86400)
     history_mode    : Mapped[str]           = mapped_column(Text, default="off", server_default="off")  # off | shadow
+    fi_mode         : Mapped[str]           = mapped_column(Text, default="off", server_default="off")  # off | shadow (sector + FI ratios)
     created_at      : Mapped[datetime]      = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     users                : Mapped[List["User"]]               = relationship(back_populates="tenant")
@@ -117,6 +118,8 @@ class Assessment(Base):
     review_date        : Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     rc_number          : Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     history            : Mapped[Optional[dict]]= mapped_column(JSONB, nullable=True)  # history analysis (api/history.py)
+    sector             : Mapped[Optional[str]] = mapped_column(Text, nullable=True)   # api/fi.py SECTORS code
+    fi                 : Mapped[Optional[dict]]= mapped_column(JSONB, nullable=True)  # FI ratios + peer medians at run time
     status             : Mapped[str]                = mapped_column(Text, default="complete")
     deleted_at         : Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at         : Mapped[datetime]           = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -213,3 +216,29 @@ class IssuerPeriod(Base):
     assessment_id    : Mapped[Optional[int]]      = mapped_column(ForeignKey("assessments.id"), nullable=True)
     created_at       : Mapped[datetime]           = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at       : Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class PeerBenchmark(Base):
+    """
+    A peer median for one ratio, sector and financial year (api/benchmarks.py). Shown only
+    once verified against the filed statements. Not tenant data: the same for every tenant.
+    """
+    __tablename__ = "peer_benchmarks"
+    __table_args__ = (
+        UniqueConstraint("sector", "ratio_id", "fiscal_year", "peer_group", name="uq_peer_benchmark"),
+    )
+
+    id          : Mapped[int]                = mapped_column(Integer, primary_key=True)
+    sector      : Mapped[str]                = mapped_column(Text, nullable=False)
+    ratio_id    : Mapped[str]                = mapped_column(Text, nullable=False)
+    fiscal_year : Mapped[int]                = mapped_column(Integer, nullable=False)
+    peer_group  : Mapped[str]                = mapped_column(Text, nullable=False)
+    median      : Mapped[float]              = mapped_column(Float, nullable=False)
+    p25         : Mapped[Optional[float]]    = mapped_column(Float, nullable=True)
+    p75         : Mapped[Optional[float]]    = mapped_column(Float, nullable=True)
+    n           : Mapped[int]                = mapped_column(Integer, nullable=False)
+    source_note : Mapped[Optional[str]]      = mapped_column(Text, nullable=True)
+    company_values : Mapped[Optional[list]]  = mapped_column(JSONB, nullable=True)  # company, value, source
+    verified    : Mapped[bool]               = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    verified_at : Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at  : Mapped[datetime]           = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
