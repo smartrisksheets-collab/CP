@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useIsMobile } from "../../hooks/useBreakpoint.js";
 import { Upload as UploadIcon, CheckCircle, Loader, AlertTriangle, AlertCircle, X, ChevronRight, SkipForward } from "lucide-react";
 import { extractCpTerms, errorMessage } from "../../api/client.js";
-import { ACCEPT, PHOTO_WARNING, inspectPdf, prepareDocument, checkWarnings, appendDocument, countKw } from "../../utils/documentInput.js";
+import { ACCEPT, inspectPdf, prepareDocument, checkWarnings, appendDocument, countKw } from "../../utils/documentInput.js";
 
 // ── Reuse validation helpers inline ──────────────────────────
 const CP_REQUIRED_KW = [
@@ -17,7 +17,6 @@ const CP_PROSPECTUS_KW = [
 ];
 
 async function validateCpDocument(doc) {
-  if (doc.kind === "images") return { ok: true, warnings: [PHOTO_WARNING] };
 
   let info;
   try { info = await inspectPdf(doc.files[0], 10); }
@@ -162,7 +161,7 @@ export default function CPTerms({ figures, onFiguresChange, onBack, onNext, clie
         </div>
       )}
       <div style={{ fontSize:13, color:"#5A5A5A", marginBottom:14 }}>
-        Upload the indicative terms email (PDF or photos) to auto-fill the fields below, or enter them manually. This section is <strong>optional</strong> — click Skip if not applicable.
+        Upload the indicative terms email (PDF) to auto-fill the fields below, or enter them manually. This section is <strong>optional</strong> — click Skip if not applicable.
       </div>
 
       {/* Upload zone */}
@@ -182,7 +181,7 @@ export default function CPTerms({ figures, onFiguresChange, onBack, onNext, clie
           </div>
         ) : (
           <>
-            <input ref={ref} type="file" accept={ACCEPT} multiple style={{ display:"none" }}
+            <input ref={ref} type="file" accept={ACCEPT} style={{ display:"none" }}
               onChange={(e) => e.target.files.length && handleFile(e.target.files)} />
             <div style={css.zone(hover)}
               onClick={() => ref.current.click()}
@@ -193,7 +192,7 @@ export default function CPTerms({ figures, onFiguresChange, onBack, onNext, clie
             >
               <UploadIcon size={32} style={{ margin:"0 auto 10px", opacity:0.35, display:"block" }} />
               <div style={{ fontSize:14, fontWeight:"bold", color:"#1F2854", marginBottom:4 }}>Click to upload indicative terms email</div>
-              <div style={{ fontSize:12, color:"#888" }}>Forwarded CP email as PDF, or photos of its pages. CP terms will be extracted into the fields below.</div>
+              <div style={{ fontSize:12, color:"#888" }}>Forwarded CP email as a PDF. CP terms will be extracted into the fields below.</div>
             </div>
           </>
         )}
