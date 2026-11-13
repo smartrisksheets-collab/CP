@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTenant } from "../context/TenantContext.jsx";
+import { useProductCopy } from "../utils/instruments.js";
 import Upload from "../components/steps/Upload.jsx";
 import ReviewData from "../components/steps/ReviewData.jsx";
 import Scores from "../components/steps/Scores.jsx";
@@ -17,6 +18,7 @@ const STEPS = ["Upload", "Review Data", "Scores", "Result"];
 export default function AppPage() {
   const { user, logout }  = useAuth();
   const { tenant }        = useTenant();
+  const copy              = useProductCopy();
 
   function ss(key, fallback) {
     try { const s = sessionStorage.getItem(key); return s ? JSON.parse(s) : fallback; } catch { return fallback; }
@@ -181,7 +183,7 @@ export default function AppPage() {
         )}
         <div>
           <div style={{ color:"var(--accent)", fontSize:16, fontWeight:"bold", letterSpacing:"0.03em" }}>SmartRisk Credit</div>
-          <div style={{ color:"#999", fontSize:12 }}>Commercial Paper Risk Assessment</div>
+          <div style={{ color:"#999", fontSize:12 }}>{copy.subtitle}</div>
         </div>
       </div>
        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
@@ -673,6 +675,7 @@ function Modal({ onClose, title, children, maxWidth = 760 }) {
 
 
 function FaqContent() {
+  const { multi } = useProductCopy();
   const faqs = [
     ["What does SmartRisk Credit actually do?", "SmartRisk Credit is an AI-assisted credit risk scoring tool for Nigerian capital markets professionals. You upload a company's audited financial statements, the AI extracts the key figures, and the tool computes 12 standardised ratios to produce a total score out of 56. A score of 34 or above (60%) indicates the issuer meets the threshold for investing in Commercial Papers (CPs)."],
     ["Is the score a formal credit rating?", "No. The SmartRisk Credit score is a quantitative decision-support tool for internal use only. It is not a regulated credit rating and does not replace the opinion of a licensed credit rating agency such as Agusto & Co., GCR Ratings, or DataPro."],
@@ -710,7 +713,9 @@ function FaqContent() {
     ["How is the cut-off score of 34 determined?", "The cut-off is set at 60% of the maximum possible score of 56 points. This threshold was calibrated against the financial profiles of investment-grade issuers in the Nigerian capital market."],
     ["Is my uploaded data stored or shared?", "No. Uploaded documents are processed only to extract financial figures and are not retained after your session ends. Your email is used only for access management."],
     ["How do I upgrade my plan?", "Click 'Buy Credits' in the header, or email info@smartrisksheets.com with the subject line 'SmartRisk Credit — Upgrade Request'."],
-    ["Can I use this tool for bonds or other fixed income instruments?", "The current version of SmartRisk Credit is purpose-built for Commercial Paper assessment. Bond, Eurobond, Promissory Note, and Bank Facility assessment are all coming in SmartRisk Credit v2, which includes a 14-ratio scoring engine, covenant tracker, debt maturity profiling, and a 5-page investment-grade report. Waitlist members get priority access and founding member pricing when v2 launches."],
+    ["Can I use this tool for bonds or other fixed income instruments?", multi
+      ? "Yes. On the Upload step, choose what you are assessing: commercial paper, a corporate bond or note, a loan or facility, or a general review of a company with no instrument. Bond terms can be read from a pricing supplement or term sheet; loan terms are typed in. The same 56-point model scores every choice. It was calibrated on commercial paper issuers, so for bonds, loans and reviews the report says the score is indicative."
+      : "This workspace is set up for Commercial Paper assessment. Assessments of bonds and notes, loans and facilities, and general company reviews can be switched on for your organisation on request."],
     ["How can my firm partner with SmartRisk Credit?", "We welcome partnerships with asset managers, issuing houses, pension fund administrators, and capital markets infrastructure providers. If you are interested in a white-label deployment, data integration, or referral arrangement, email info@smartrisksheets.com with the subject line \"Partnership Enquiry.\" We typically respond within 2 working days."],
     ["I need quick help — how do I reach the team?", "For step-by-step guidance, check the User Guide button in the top navigation first — most questions are answered there. For quick support during an active assessment, WhatsApp us on 0905 228 8923 — we typically respond within a few hours on business days. For account, billing, or access issues email info@smartrisksheets.com."],
   ];

@@ -14,6 +14,7 @@ except ImportError:
 
 from api.models import Assessment
 from api.scoring import CUTOFF_SCORE, MAX_SCORE, compute_all_ratios
+from api.instruments import TERM_FIELDS, instrument_line, instrument_of, report_title
 
 # ── Unicode font (for ₦ and other non-Latin-1 chars) ──────────
 import os as _os
@@ -397,6 +398,65 @@ def _history_section(h, ST):
     return E
 
 
+def _cp_terms_section(cp, ST):
+    E = [_sec_hdr("COMMERCIAL PAPER TERMS", ST)]
+    cp_tbl = Table([
+        [_cp_cell("Programme Size (\u20a6)", cp.get("programmeSize"),  ST),
+         _cp_cell("Target Size (\u20a6)",    cp.get("targetSize"),     ST),
+         _cp_cell("Discount Rate A",   cp.get("discountRateA"),  ST),
+         _cp_cell("Discount Rate B",   cp.get("discountRateB"),  ST)],
+        [_cp_cell("Offer Opens",       cp.get("offerOpen"),      ST),
+         _cp_cell("Offer Closes",      cp.get("offerClose"),     ST),
+         _cp_cell("Min. Subscription (\u20a6)", cp.get("minSubscription"),ST),
+         _cp_cell("Taxation",          cp.get("taxation"),       ST)],
+        [_cp_cell("Use of Proceeds",   cp.get("useOfProceeds"),  ST),
+         "", _cp_cell("Instrument Type", "Senior Unsecured Commercial Paper", ST), ""],
+    ], colWidths=[QUAR] * 4)
+    cp_tbl.setStyle(TableStyle([
+        ("SPAN",          (0,2), (1,2)),
+        ("SPAN",          (2,2), (3,2)),
+        ("LEFTPADDING",   (0,0), (-1,-1), 10),
+        ("RIGHTPADDING",  (0,0), (-1,-1), 6),
+        ("TOPPADDING",    (0,0), (-1,-1), 7),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 7),
+        ("LINEAFTER",     (0,0), (2,-1),  0.5, C_BORDER),
+        ("LINEBELOW",     (0,0), (-1,1),  0.5, C_BORDER),
+        ("LINEBELOW",     (0,2), (-1,2),  0.5, C_BORDER),
+        ("VALIGN",        (0,0), (-1,-1), "TOP"),
+    ]))
+    E.append(cp_tbl)
+    return E
+
+
+def _terms_section(instr, terms, ST):
+    """Bond or loan terms in a 4-column grid; a general review has no instrument section."""
+    fields = [(label, terms.get(key)) for key, label in TERM_FIELDS.get(instr, ())]
+    if not fields:
+        return []
+    title = {"bond": "BOND / NOTE TERMS", "loan": "LOAN / FACILITY TERMS"}[instr]
+    E = [_sec_hdr(title, ST)]
+    filled = [(lbl, v) for lbl, v in fields if v]
+    if not filled:
+        E.append(Paragraph("No terms were entered for this assessment.", ST["r_val"]))
+        E.append(Spacer(1, 6))
+        return E
+    rows = []
+    for i in range(0, len(filled), 4):
+        chunk = filled[i:i + 4]
+        rows.append([_cp_cell(lbl, v, ST) for lbl, v in chunk] + [""] * (4 - len(chunk)))
+    t = Table(rows, colWidths=[QUAR] * 4)
+    t.setStyle(TableStyle([
+        ("LEFTPADDING",   (0,0), (-1,-1), 10),
+        ("RIGHTPADDING",  (0,0), (-1,-1), 6),
+        ("TOPPADDING",    (0,0), (-1,-1), 7),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 7),
+        ("LINEBELOW",     (0,0), (-1,-1), 0.5, C_BORDER),
+        ("VALIGN",        (0,0), (-1,-1), "TOP"),
+    ]))
+    E.append(t)
+    return E
+
+
 # ── Financial-institution ratios (api/fi.py, D050) ────────────
 def _fi_ok(fi) -> bool:
     return bool(fi) and fi.get("status") == "ok" and bool(fi.get("ratios"))
@@ -478,6 +538,8 @@ def _build_elements(assessment: Assessment):
     f      = assessment.figures   or {}
     n      = assessment.narrative or {}
     cp     = f.get("cpTerms")    or {}
+    instr  = instrument_of(f)                 # D052: cp unless the tenant has instruments on
+    terms  = f.get("terms")      or {}
     ratios = assessment.ratios   or []
     hist   = getattr(assessment, "history", None)
     fi     = getattr(assessment, "fi", None)
@@ -557,13 +619,13 @@ def _build_elements(assessment: Assessment):
 
     # ── 1. HEADER ─────────────────────────────────────────────
     hdr = Table([[
-        [Paragraph("Commercial Paper Assessment", ST["eyebrow"]),
+        [Paragraph(report_title(instr), ST["eyebrow"]),
          Spacer(1, 4),
          Paragraph(assessment.client_name or "Client", ST["hd_name"]),
          Spacer(1, 3),
          Paragraph(f"Review date: {review_date} &nbsp;|&nbsp; "
                    f"Rating: {assessment.credit_rating or 'N/A'} &nbsp;|&nbsp; "
-                   f"Senior Unsecured Commercial Paper", ST["hd_sub"])],
+                   f"{instrument_line(instr, terms)}", ST["hd_sub"])],
         [Paragraph(verdict, ST["hd_verd"]),
          Spacer(1, 4),
          Paragraph(f"{score} / {max_score} pts &nbsp;&middot;&nbsp; "
@@ -602,33 +664,11 @@ def _build_elements(assessment: Assessment):
     ]))
     E.append(metrics)
 
-    # ── 3. CP TERMS ───────────────────────────────────────────
-    E.append(_sec_hdr("COMMERCIAL PAPER TERMS", ST))
-    cp_tbl = Table([
-        [_cp_cell("Programme Size (\u20a6)", cp.get("programmeSize"),  ST),
-         _cp_cell("Target Size (\u20a6)",    cp.get("targetSize"),     ST),
-         _cp_cell("Discount Rate A",   cp.get("discountRateA"),  ST),
-         _cp_cell("Discount Rate B",   cp.get("discountRateB"),  ST)],
-        [_cp_cell("Offer Opens",       cp.get("offerOpen"),      ST),
-         _cp_cell("Offer Closes",      cp.get("offerClose"),     ST),
-         _cp_cell("Min. Subscription (\u20a6)", cp.get("minSubscription"),ST),
-         _cp_cell("Taxation",          cp.get("taxation"),       ST)],
-        [_cp_cell("Use of Proceeds",   cp.get("useOfProceeds"),  ST),
-         "", _cp_cell("Instrument Type", "Senior Unsecured Commercial Paper", ST), ""],
-    ], colWidths=[QUAR] * 4)
-    cp_tbl.setStyle(TableStyle([
-        ("SPAN",          (0,2), (1,2)),
-        ("SPAN",          (2,2), (3,2)),
-        ("LEFTPADDING",   (0,0), (-1,-1), 10),
-        ("RIGHTPADDING",  (0,0), (-1,-1), 6),
-        ("TOPPADDING",    (0,0), (-1,-1), 7),
-        ("BOTTOMPADDING", (0,0), (-1,-1), 7),
-        ("LINEAFTER",     (0,0), (2,-1),  0.5, C_BORDER),
-        ("LINEBELOW",     (0,0), (-1,1),  0.5, C_BORDER),
-        ("LINEBELOW",     (0,2), (-1,2),  0.5, C_BORDER),
-        ("VALIGN",        (0,0), (-1,-1), "TOP"),
-    ]))
-    E.append(cp_tbl)
+    # ── 3. CP TERMS (other instruments: their own terms, D052) ─
+    if instr != "cp":
+        E += _terms_section(instr, terms, ST)
+    else:
+        E += _cp_terms_section(cp, ST)
 
     # ── 4. CREDIT RISK SCORECARD ──────────────────────────────
     E.append(_sec_hdr("CREDIT RISK SCORECARD", ST))
@@ -851,6 +891,11 @@ def _build_elements(assessment: Assessment):
                        " and unaudited half-years supplied by the analyst; the history adjustment shown is indicative"
                        " and is not part of the score.")
 
+    if instr != "cp":
+        DISCLAIMER += (" The scoring model and its 60% cut-off were calibrated on commercial paper issuers; for "
+                       + {"bond": "a corporate bond or note", "loan": "a loan or facility",
+                          "review": "a general credit review"}[instr]
+                       + " the score is indicative until bands calibrated for it are available.")
     if _fi_ok(fi):
         DISCLAIMER += (" Financial-institution ratios and any peer medians are shown for context; they are not part"
                        " of the score. Peer medians come from the published accounts of listed companies.")
@@ -892,4 +937,4 @@ def build_pdf(assessment: Assessment) -> bytes:
         topMargin=MARGIN,  bottomMargin=MARGIN,
     )
     doc.build(_build_elements(assessment))
-    return output.getvalue()
+    return output.getvalue()

@@ -459,6 +459,31 @@ async def extract_cp_terms(blocks: list[dict]) -> dict:
     return _parse_json(raw)
 
 
+# ── 3b. Bond / note terms extraction (api/instruments.py, D052) ─
+BOND_TERMS_PROMPT = """You are extracting the key terms of a corporate bond or note from a Nigerian capital markets document:
+a pricing supplement, term sheet, offer announcement, shelf prospectus summary or an email with indicative terms.
+
+Use the terms table or summary of terms only. Ignore company background, financial highlights, disclaimers and signatures.
+If the document covers several series, use the series being offered now (the first one listed if unclear).
+All fields are strings, copied as written (keep % signs, currency and dates as shown). Return null if a field is absent.
+
+FIELDS:
+- issuer, programmeSize, issueSize, series (series or tranche name)
+- coupon (rate, fixed or floating), couponFrequency (e.g. semi-annual), tenor, issueDate, maturityDate
+- security (ranking and security, e.g. senior unsecured, secured by a debenture), guarantee (guarantee or credit enhancement)
+- redemption (bullet, amortising, sinking fund), callOption, issueRating (rating of the bond itself), trustee, useOfProceeds
+
+Return ONLY valid JSON, no markdown:
+{"issuer":null,"programmeSize":null,"issueSize":null,"series":null,"coupon":null,"couponFrequency":null,"tenor":null,
+"issueDate":null,"maturityDate":null,"security":null,"guarantee":null,"redemption":null,"callOption":null,
+"issueRating":null,"trustee":null,"useOfProceeds":null}"""
+
+
+async def extract_bond_terms(blocks: list[dict]) -> dict:
+    from api.instruments import clean_terms
+    return clean_terms("bond", _parse_json(await _call_with_document(blocks, BOND_TERMS_PROMPT))) or {}
+
+
 # ── 4. Narrative generation ───────────────────────────────────
 HISTORY_RULES = """- futureRisksReview MUST be grounded in the multi-year trend above, citing the figures for the oldest and latest year.
   If the latest year is strong but the trend is weakening (or the reverse), say so plainly; never average them.
@@ -537,6 +562,11 @@ async def generate_narrative(figures: dict, ratios: list, client_info: dict) -> 
         return f"{((curr - prior) / abs(prior) * 100):+.1f}%" if prior else "N/A"
 
     history_block, history_rules, history_json = _history_prompt(client_info.get("history"))
+    from api.instruments import INSTRUMENT_RULES, instrument_of, narrative_block
+    instrument       = instrument_of(f)
+    instrument_block = narrative_block(f)
+    instrument_rules = INSTRUMENT_RULES.get(instrument, "")
+    consideration    = "credit" if instrument in ("loan", "review") else "investment"
 
     ratio_lines = "\n".join(
         f"  • {r['name']}: {r['display_value']} | Band: {r['band']} | "
@@ -549,7 +579,7 @@ async def generate_narrative(figures: dict, ratios: list, client_info: dict) -> 
 COMPANY: {client_info.get('clientName')}
 EXTERNAL CREDIT RATING: {client_info.get('creditRating') or 'Not provided'}
 REVIEW DATE: {client_info.get('reviewDate')}
-
+{instrument_block}
 FINANCIAL FIGURES — CURRENT vs PRIOR YEAR (₦'000):
   Revenue:             {fmt(f.get('revenue'))}  |  Prior: {fmt(py_rev)}  |  Change: {chg(n(f.get('revenue')), py_rev)}
   Net Income:          {fmt(f.get('netIncome'))}  |  Prior: {fmt(py_ni)}  |  Change: {chg(n(f.get('netIncome')), py_ni)}
@@ -593,7 +623,7 @@ INSTRUCTIONS:
 For strengths and weaknesses:
 - Each item must be exactly ONE sentence: name the metric, cite the figure, and state the business implication.
 - Do not just restate the score — explain why it matters to a creditor.
-{history_rules}
+{history_rules}{instrument_rules}
 Return ONLY valid JSON with no markdown and no backticks:
 {{
   "financialStanding": "Strong|Fair|Weak",
@@ -604,8 +634,8 @@ Return ONLY valid JSON with no markdown and no backticks:
   "creditRiskReview": "2-3 sentences: primary leverage metric, what it means for creditors",
   "futureRiskLevel": "Low|Moderate|High",
   "futureRisksReview": "2-3 sentences: most material forward risk grounded in current trend",
-  "creditRatingReview": "1-2 sentences: what the external rating implies for this specific issuance",
-  "recommendation": "2–3 sentences. Opening MUST match the score tier exactly — no exceptions: STRONG (≥ 42 pts): start with 'The quantitative profile supports investment consideration —' then state key strengths. MARGINAL (34–41 pts): start with 'Analysts are advised to proceed with caution —' then state the specific concern and which ratio drives it. BELOW THRESHOLD (< 34 pts): start with 'Analysts are advised to apply caution and supplement this quantitative assessment with thorough qualitative review —' then state the primary quantitative concern with its computed value. Final sentence: name the single ratio most decisive to the outcome and what qualitative evidence could strengthen the credit case. NEVER use the words: NOT RECOMMENDED, RECOMMENDED for investment, APPROVED FOR INVESTMENT, APPROVED WITH CAUTION, or DECLINED.",
+  "creditRatingReview": "1-2 sentences: what the external rating implies for this specific {'issuance' if instrument in ('cp', 'bond') else 'credit decision'}",
+  "recommendation": "2–3 sentences. Opening MUST match the score tier exactly — no exceptions: STRONG (≥ 42 pts): start with 'The quantitative profile supports {consideration} consideration —' then state key strengths. MARGINAL (34–41 pts): start with 'Analysts are advised to proceed with caution —' then state the specific concern and which ratio drives it. BELOW THRESHOLD (< 34 pts): start with 'Analysts are advised to apply caution and supplement this quantitative assessment with thorough qualitative review —' then state the primary quantitative concern with its computed value. Final sentence: name the single ratio most decisive to the outcome and what qualitative evidence could strengthen the credit case. NEVER use the words: NOT RECOMMENDED, RECOMMENDED for investment, APPROVED FOR INVESTMENT, APPROVED WITH CAUTION, or DECLINED.",
   "strengths": ["one sentence: metric + exact figure + WHY it is a credit strength", "..."],
   "weaknesses": ["one sentence: metric + exact figure + WHY it elevates credit risk", "..."]{history_json}
 }}"""

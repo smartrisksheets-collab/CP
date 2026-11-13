@@ -213,6 +213,13 @@ export const extractCpTerms = (formData) =>
     timeout: 330000, // one AI call can take up to 300s on a long scanned document
   });
 
+// Bond or note terms from a pricing supplement or term sheet (D052)
+export const extractInstrumentTerms = (formData) =>
+  api.post("/assessment/extract-terms", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 330000,
+  });
+
 export const runAssessment = (figures, clientInfo, extractedFigures = null, draftId = null) =>
   withRetry(() =>
     api.post("/assessment/run", { figures, clientInfo, extractedFigures, draftId }, { timeout: 180000 })
