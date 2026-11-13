@@ -397,6 +397,77 @@ def _history_section(h, ST):
     return E
 
 
+# ── Financial-institution ratios (api/fi.py, D050) ────────────
+def _fi_ok(fi) -> bool:
+    return bool(fi) and fi.get("status") == "ok" and bool(fi.get("ratios"))
+
+
+def _fi_pct(v):
+    return "\u2014" if v is None else f"{v:.1f}%"
+
+
+def _fi_section(fi, ST):
+    """Indicative FI ratios with peer medians where verified ones exist. Never part of the score."""
+    if not _fi_ok(fi):
+        return []
+    ratios = fi["ratios"]
+    has_peer = any(r.get("peer") for r in ratios)
+    E = [_sec_hdr("FINANCIAL INSTITUTION RATIOS", ST), Spacer(1, 4)]
+    sub = ParagraphStyle("fsub", fontName=_CURRENCY_FONT, fontSize=7, textColor=C_GREY, leading=9)
+    E.append(Paragraph("Indicative: shown for context and not part of the score. "
+                       "Financial issuers do not split current and non-current items, so these ratios read "
+                       "liquidity, asset quality and capital the way a lender's statements present them.", sub))
+    E.append(Spacer(1, 4))
+
+    hd  = ParagraphStyle("fhd", fontName="Helvetica-Bold", fontSize=7, textColor=C_GREY, leading=9, alignment=TA_RIGHT)
+    hdl = ParagraphStyle("fhdl", parent=hd, alignment=TA_LEFT)
+    cel = ParagraphStyle("fcel", fontName=_CURRENCY_FONT, fontSize=8, textColor=C_BODY, leading=10, alignment=TA_RIGHT)
+    nam = ParagraphStyle("fnam", fontName=_CURRENCY_FONT, fontSize=8, textColor=C_NAVY, leading=10)
+    frm = ParagraphStyle("ffrm", fontName=_CURRENCY_FONT, fontSize=6.5, textColor=C_GREY, leading=8)
+
+    head = [Paragraph("RATIO", hdl), Paragraph("ISSUER", hd)]
+    if has_peer:
+        head += [Paragraph("PEER MEDIAN", hd), Paragraph("PEER RANGE (25\u201375%)", hd), Paragraph("PEERS", hd)]
+    rows = [head]
+    for r in ratios:
+        row = [[Paragraph(r["name"], nam), Paragraph(r["formula"], frm)], Paragraph(r["display"], cel)]
+        if has_peer:
+            p = r.get("peer")
+            row += ([Paragraph(_fi_pct(p["median"]), cel),
+                     Paragraph(f"{_fi_pct(p.get('p25'))} \u2013 {_fi_pct(p.get('p75'))}", cel),
+                     Paragraph(str(p["n"]), cel)] if p else
+                    [Paragraph("\u2014", cel), Paragraph("\u2014", cel), Paragraph("\u2014", cel)])
+        rows.append(row)
+    widths = [CW * 0.46, CW * 0.12] + ([CW * 0.13, CW * 0.19, CW * 0.10] if has_peer else [])
+    if not has_peer:
+        widths[0] = CW - widths[1]
+    t = Table(rows, colWidths=widths)
+    t.setStyle(TableStyle([
+        ("LINEBELOW",     (0,0), (-1,0),  0.75, C_NAVY),
+        ("LINEBELOW",     (0,1), (-1,-1), 0.5, C_BORDER),
+        ("TOPPADDING",    (0,0), (-1,-1), 3),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 3),
+        ("LEFTPADDING",   (0,0), (-1,-1), 6),
+        ("RIGHTPADDING",  (0,0), (-1,-1), 6),
+        ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
+    ]))
+    E.append(t)
+    E.append(Spacer(1, 3))
+    notes = [f"{r['name']}: {r['note']}." for r in ratios if r.get("note")]
+    if has_peer:
+        groups = sorted({(r["peer"]["peerGroup"], r["peer"]["fiscalYear"]) for r in ratios if r.get("peer")})
+        notes.append("Peer group: " + "; ".join(f"{g}, FY{y}" for g, y in groups)
+                     + ". Peers report their own definitions (for example NPL or Stage 3, group or bank, with or "
+                       "without regulatory risk reserves), so read the comparison as a guide. A median is shown only "
+                       "when at least 5 peers report the ratio.")
+    else:
+        notes.append("No verified peer medians are available for this sector yet.")
+    for x in notes:
+        E.append(Paragraph(x, sub))
+    E.append(Spacer(1, 8))
+    return E
+
+
 _SOURCE_TXT = {"current": "from the scored statement", "upload": "from an uploaded statement",
                "comparative": "from a comparative column", "stored": "from stored issuer history"}
 
@@ -409,6 +480,7 @@ def _build_elements(assessment: Assessment):
     cp     = f.get("cpTerms")    or {}
     ratios = assessment.ratios   or []
     hist   = getattr(assessment, "history", None)
+    fi     = getattr(assessment, "fi", None)
 
     # Header metrics come from the saved ratios. Assessments saved before a ratio
     # existed fall back to the engine on the saved figures, never to a local formula.
@@ -708,6 +780,7 @@ def _build_elements(assessment: Assessment):
 
     # ── 6b. HISTORICAL PERFORMANCE ────────────────────────────
     E += _history_section(hist, ST)
+    E += _fi_section(fi, ST)
 
     # ── 7. VERDICT BAR ────────────────────────────────────────
     vd_word_ps = ParagraphStyle("vdw2", fontName="Helvetica-Bold", fontSize=12,
@@ -778,6 +851,10 @@ def _build_elements(assessment: Assessment):
                        " and unaudited half-years supplied by the analyst; the history adjustment shown is indicative"
                        " and is not part of the score.")
 
+    if _fi_ok(fi):
+        DISCLAIMER += (" Financial-institution ratios and any peer medians are shown for context; they are not part"
+                       " of the score. Peer medians come from the published accounts of listed companies.")
+
     ft = Table([[
         Paragraph(
             f"Generated by SmartRisk Credit \u00b7 Scoring model {assessment.model_version or 'v1.0'} \u00b7 "
@@ -815,4 +892,4 @@ def build_pdf(assessment: Assessment) -> bytes:
         topMargin=MARGIN,  bottomMargin=MARGIN,
     )
     doc.build(_build_elements(assessment))
-    return output.getvalue()
+    return output.getvalue()

@@ -2,6 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import { updateDraftFigures } from "../../api/client.js";
 import HistoryEditor from "../HistoryEditor.jsx";
 import { historyInputError } from "../../utils/history.js";
+import FiEditor from "../FiEditor.jsx";
+import { fiInputError } from "../../utils/fi.js";
+import { useTenant } from "../../context/TenantContext.jsx";
 
 const AI  = { background:"#EEF4FF", borderColor:"#9DBFEA" };
 const MAN = { background:"#ecfdf5", borderColor:"#01b88e" };
@@ -50,6 +53,8 @@ export default function ReviewData({ figures, onChange, onBack, onNext, draftId 
   const [error, setError]         = useState("");
   const [autoSaved, setAutoSaved] = useState(false);
   const debounceRef               = useRef(null);
+  const { tenant }                = useTenant();
+  const fiOn                      = !!tenant?.fiMode && tenant.fiMode !== "off";
 
   useEffect(() => {
     if (!draftId || !Object.keys(figures).length) return;
@@ -90,6 +95,8 @@ export default function ReviewData({ figures, onChange, onBack, onNext, draftId 
     }
     const histErr = historyInputError(figures.history);
     if (histErr) { setError(histErr); return; }
+    const fiErr = fiOn ? fiInputError(figures) : "";
+    if (fiErr) { setError(fiErr); return; }
     setError("");
     onNext();
   }
@@ -173,6 +180,8 @@ export default function ReviewData({ figures, onChange, onBack, onNext, draftId 
         </div>
         <div style={{ fontSize:11, color:"#888", marginTop:8 }}>Interest coverage uses the reported finance cost. Rates are only used when finance cost is empty; always enter them as a percentage, e.g. 13.5 for 13.5% or 0.8 for 0.8%.</div>
       </div>
+
+      {fiOn && <FiEditor figures={figures} onChange={onChange} />}
 
       <HistoryEditor figures={figures} onChange={onChange} />
 

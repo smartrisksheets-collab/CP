@@ -12,11 +12,13 @@ from datetime import datetime, timezone, timedelta
 from api.deps import get_db, get_current_user, limiter
 from api.models import CreditTransaction, User, Assessment, Tenant
 from api.scoring import compute_all_ratios, normalise_rates, CUTOFF_SCORE
-from api.claude import extract_figures, extract_rating, extract_cp_terms, generate_narrative, extract_periods
+from api.claude import extract_figures, extract_rating, extract_cp_terms, generate_narrative, extract_periods, extract_fi
 from api.report import build_pdf
 from api.documents import read_document
 from api.history import analyse, merge_periods, needs_comment, normalise_rc, parse_period_end, periods_to_store
 from api.issuer_store import load_periods, save_periods
+from api.fi import FI_SECTORS, compute_fi, normalise_sector
+from api.benchmarks import attach_peers, issuer_year, load_peers
 
 router = APIRouter()
 log    = logging.getLogger(__name__)
@@ -146,6 +148,21 @@ async def _history_mode(tenant_id: int, db: AsyncSession) -> str:
     return result.scalar_one_or_none() or "off"
 
 
+async def _fi_mode(tenant_id: int, db: AsyncSession) -> str:
+    result = await db.execute(select(Tenant.fi_mode).where(Tenant.id == tenant_id))
+    return result.scalar_one_or_none() or "off"
+
+
+async def _fi_for(figures: dict, mode: str, db: AsyncSession) -> dict | None:
+    """FI ratios with verified peer medians, when the tenant has the sector feature on (D050)."""
+    if mode == "off":
+        return None
+    fi = compute_fi(figures)
+    if fi and fi.get("status") == "ok":
+        fi = attach_peers(fi, await load_peers(db, fi["sector"], issuer_year(figures)))
+    return fi
+
+
 def _history_for(figures: dict, mode: str) -> dict | None:
     """History analysis when the tenant has history on and the figures carry history."""
     return analyse(figures) if mode != "off" else None
@@ -207,13 +224,16 @@ async def extract(
     interim_pdf   : list[UploadFile] | None = File(None),  # half-year interim report (history)
     client_name   : str | None              = Form(None),
     rc_number     : str | None              = Form(None),
+    sector        : str | None              = Form(None),  # api/fi.py SECTORS code
     draft_id      : int | None              = Form(None),
     current_user  : dict                    = Depends(get_current_user),
     db            : AsyncSession            = Depends(get_db),
 ):
     user = await _get_user(current_user["email"], current_user["tenant_id"], db)
     await _check_quota(user, db)
-    mode = await _history_mode(current_user["tenant_id"], db)
+    mode    = await _history_mode(current_user["tenant_id"], db)
+    fi_mode = await _fi_mode(current_user["tenant_id"], db)
+    sector  = normalise_sector(sector) if fi_mode != "off" else None
 
     # Check every file before charging, so a bad upload never costs a credit
     fin_doc    = await read_document(financial_pdf, "Financial statement")
@@ -243,11 +263,19 @@ async def extract(
         async with gate:
             return await extract_periods(doc, key)
 
+    async def fi_read(doc):
+        async with gate:
+            return await extract_fi(doc)
+
     jobs = [extract_figures(fin_doc)]
     if mode != "off":
         jobs.append(history_read(fin_doc, "current"))
         jobs += [history_read(doc, key) for key, _, doc in history_docs]
+    # FI figures for a financial issuer: a second read of the scored statement (D050)
+    if sector in FI_SECTORS:
+        jobs.append(fi_read(fin_doc))
     outcomes = await asyncio.gather(*jobs, return_exceptions=True)
+    fi_outcome = outcomes.pop() if sector in FI_SECTORS else None
 
     if isinstance(outcomes[0], BaseException):
         await _refund_credit(user, debit_id, db)
@@ -256,6 +284,18 @@ async def extract(
         raise outcomes[0]
     figures = outcomes[0]
     result  = {"figures": figures}
+
+    if sector:
+        figures["sector"] = sector
+    if sector in FI_SECTORS:
+        if isinstance(fi_outcome, BaseException):
+            log.warning("FI extraction failed: %r", fi_outcome)
+            figures["fi"] = {}
+            result["fiWarning"] = ("Financial-institution figures could not be read: "
+                                   f"{fi_outcome if isinstance(fi_outcome, RuntimeError) else 'unexpected error'}. "
+                                   "Enter them on the Review Data step.")
+        else:
+            figures["fi"] = fi_outcome
 
     if mode != "off":
         warnings, extra = [], []
@@ -351,6 +391,7 @@ async def preview_scores(
     result = compute_all_ratios(body.figures)
     mode   = await _history_mode(current_user["tenant_id"], db)
     result["history"] = _history_for(body.figures, mode)
+    result["fi"]      = await _fi_for(body.figures, await _fi_mode(current_user["tenant_id"], db), db)
     return result
 
 
@@ -389,6 +430,7 @@ async def run_assessment(
                 "ratios"      : completed.ratios,
                 "narrative"   : completed.narrative,
                 "history"     : completed.history,
+                "fi"          : completed.fi,
                 "clientInfo"  : {**body.clientInfo, "totalScore": completed.total_score, "eligible": completed.eligible},
             }
 
@@ -396,6 +438,9 @@ async def run_assessment(
     score_result = compute_all_ratios(figures)
     mode         = await _history_mode(current_user["tenant_id"], db)
     history      = _history_for(figures, mode)
+    fi_mode      = await _fi_mode(current_user["tenant_id"], db)
+    fi           = await _fi_for(figures, fi_mode, db)
+    sector       = normalise_sector(figures.get("sector")) if fi_mode != "off" else None
     if needs_comment(history):
         raise HTTPException(
             status_code=422,
@@ -439,6 +484,8 @@ async def run_assessment(
         assessment.narrative         = narrative
         assessment.history           = history
         assessment.rc_number         = (history or {}).get("rcNumber")
+        assessment.sector            = sector
+        assessment.fi                = fi
         assessment.status            = "complete"
         assessment.updated_at        = datetime.now(timezone.utc)
     else:
@@ -458,6 +505,8 @@ async def run_assessment(
             narrative         = narrative,
             history           = history,
             rc_number         = (history or {}).get("rcNumber"),
+            sector            = sector,
+            fi                = fi,
             status            = "complete",
         )
         db.add(assessment)
@@ -499,6 +548,7 @@ async def run_assessment(
         "ratios"      : score_result["ratios"],
         "narrative"   : narrative,
         "history"     : history,
+        "fi"          : fi,
         "clientInfo"  : client_info,
     }
 
@@ -669,6 +719,8 @@ async def get_assessment(
         "ratios"      : assessment.ratios,
         "narrative"   : assessment.narrative,
         "history"     : assessment.history,
+        "sector"      : assessment.sector,
+        "fi"          : assessment.fi,
         "createdAt"   : assessment.created_at.isoformat(),
         "updatedAt"   : assessment.updated_at.isoformat() if assessment.updated_at else None,
     }

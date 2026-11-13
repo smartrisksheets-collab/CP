@@ -57,3 +57,9 @@
 - Changed: frontend RatioTable.jsx, Scores.jsx, Result.jsx, index.css
 - Checks: npm run build; lint 23 unchanged; Chromium screenshot of Scores (Benchmark, Result, Band, Score; green/amber/red; "Scoring model v2.1")
 - Decision: D049
+
+## 2026-11-12 Sector, FI ratios and peer medians (p23)
+- Added: backend/api/fi.py, backend/api/benchmarks.py, backend/scripts/load_benchmarks.py, backend/set_fi_mode.py, backend/data/peer_data_fy2025_banks.csv, migration 0006_fi_peers (+ SQL file), backend/tests/test_fi.py (19), backend/tests/test_fi_api.py (11); frontend utils/fi.js, components/FiEditor.jsx, components/FiPanel.jsx
+- Changed: backend/api/models.py, claude.py (FI_PROMPT), routes/assessment.py, routes/tenant.py, report.py (FI section), seed.py (localhost fi_mode shadow), tests/test_documents.py; frontend Upload.jsx (Sector field), ReviewData.jsx, Scores.jsx, Result.jsx
+- Checks: pytest 162 passed; alembic upgrade/downgrade/upgrade on PostgreSQL 16; PDF rendered and inspected; npm run build; lint unchanged (only pre-existing errors); Chromium: Upload one row with Sector, Review Data FI figures, Scores FI panel with peer medians (local medians marked verified for the check only)
+- Decision: D050
