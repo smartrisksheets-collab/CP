@@ -37,3 +37,8 @@
 - Checks: pytest 119 passed; memory measured for 4 x 5MB, 4 x 10MB and 4 x 20MB uploads
 - Decision: D045
 - Added backend/set_history_mode.py (switch history per tenant from the Render Shell; tested --list, on, off, bad mode, unknown host)
+
+## 2026-11-12 PDF only and two audited statements (p19)
+- Changed: backend/api/documents.py (one PDF per slot), backend/api/claude.py and routes/assessment.py (wording), backend/tests/test_documents.py; frontend utils/documentInput.js (PDF only, photo code removed), Upload.jsx (older-statement box removed, labels), CPTerms.jsx
+- Checks: pytest 120 passed; npm run build; npm run lint 23 before and after; Chromium: every file input accepts .pdf only, single file, a JPG shows the PDF-only error, two statement boxes plus interim
+- Decision: D046

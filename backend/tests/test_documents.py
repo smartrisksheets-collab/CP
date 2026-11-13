@@ -35,10 +35,8 @@ def _status(*parts: bytes) -> int:
 
 def test_sniff_uses_bytes_not_names():
     assert sniff_media_type(PDF) == "application/pdf"
-    assert sniff_media_type(JPEG) == "image/jpeg"
-    assert sniff_media_type(PNG) == "image/png"
-    assert sniff_media_type(WEBP) == "image/webp"
-    assert sniff_media_type(b"PK\x03\x04 docx") is None
+    for other in (JPEG, PNG, WEBP, HEIC, b"PK\x03\x04 docx"):
+        assert sniff_media_type(other) is None
 
 
 def test_pdf_becomes_one_document_block():
@@ -47,36 +45,27 @@ def test_pdf_becomes_one_document_block():
     assert blocks[0]["source"]["media_type"] == "application/pdf"
 
 
-def test_photos_become_image_blocks_in_page_order():
-    blocks = _read(JPEG, PNG, WEBP)
-    assert [b["source"]["media_type"] for b in blocks] == ["image/jpeg", "image/png", "image/webp"]
-    assert all(b["type"] == "image" for b in blocks)
-
-
-def test_image_renamed_pdf_is_read_as_image():
-    blocks = asyncio.run(read_document([_upload(JPEG, "statement.pdf")], "Financial statement"))
-    assert blocks[0]["type"] == "image"
+def test_renamed_photo_is_still_rejected():
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(read_document([_upload(JPEG, "statement.pdf")], "Financial statement"))
+    assert exc.value.status_code == 415 and "photos are no longer accepted" in exc.value.detail
 
 
 @pytest.mark.parametrize("parts, code", [
     ((b"",), 400),                 # empty file
     ((b"not a document",), 415),   # unknown type
-    ((HEIC,), 415),                # iPhone HEIC
+    ((JPEG,), 415),                # photos are PDF-only now (D046)
+    ((PNG,), 415),
+    ((WEBP,), 415),
+    ((HEIC,), 415),
     ((PDF, PDF), 400),             # several PDFs
-    ((PDF, JPEG), 400),            # PDF mixed with photos
+    ((JPEG, JPEG), 400),           # several photos
 ])
 def test_bad_uploads_are_rejected(parts, code):
     assert _status(*parts) == code
 
 
-def test_photo_count_limit():
-    assert len(_read(*[JPEG] * documents.MAX_IMAGES)) == documents.MAX_IMAGES
-    assert _status(*[JPEG] * (documents.MAX_IMAGES + 1)) == 400
-
-
-def test_size_limits(monkeypatch):
-    monkeypatch.setattr(documents, "MAX_IMAGE_MB", 0.00001)
-    assert _status(JPEG) == 413
+def test_size_limit(monkeypatch):
     monkeypatch.setattr(documents, "MAX_DOCUMENT_MB", 0.00001)
     assert _status(PDF) == 413
 
