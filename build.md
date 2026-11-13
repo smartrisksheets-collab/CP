@@ -42,3 +42,8 @@
 - Changed: backend/api/documents.py (one PDF per slot), backend/api/claude.py and routes/assessment.py (wording), backend/tests/test_documents.py; frontend utils/documentInput.js (PDF only, photo code removed), Upload.jsx (older-statement box removed, labels), CPTerms.jsx
 - Checks: pytest 120 passed; npm run build; npm run lint 23 before and after; Chromium: every file input accepts .pdf only, single file, a JPG shows the PDF-only error, two statement boxes plus interim
 - Decision: D046
+
+## 2026-11-12 Exact band labels and benchmarks (p20)
+- Changed: backend/api/scoring.py (labels and benchmarks only), backend/api/history.py (N/A for missing inputs), backend/tests/test_scoring.py (+label and benchmark checks), backend/tests/test_history.py, frontend AppPage.jsx (DSCR best practice text)
+- Checks: pytest 124 passed; band probe test fails on the old labels and passes on the new; PDF rendered and inspected; npm run build; lint 23 unchanged
+- Decision: D047

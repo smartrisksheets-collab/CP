@@ -746,7 +746,7 @@ function UserGuidePage({ onBack }) {
     ["Debt to Asset Ratio",     5,  "What proportion of total assets is funded by debt. A low ratio means creditors have a large cushion if assets need to be liquidated.",                  "< 30%"],
     ["Debt to Capital Ratio",   5,  "The share of total capital (debt + equity) that is debt-funded. Measures structural leverage and the buffer available to absorb losses.",               "< 30%"],
     ["Interest Coverage Ratio", 6,  "How many times operating profit covers the reported finance cost. A ratio below 1.5x means most of operating profit is consumed by interest — a major red flag. A company with no debt scores full points.", "> 5.0x"],
-    ["Debt Service Coverage",   5,  "EBITDA against the debt service due within 12 months (finance cost plus short-term debt, including commercial papers). Below 1.0x means earnings do not cover what falls due this year.",   ">= 1.5x"],
+    ["Debt Service Coverage",   5,  "EBITDA against the debt service due within 12 months (finance cost plus short-term debt, including commercial papers). Below 1.0x means earnings do not cover what falls due this year.",   "≥ 1.5x"],
     ["Net Debt / EBITDA",       5,  "How many years of operating cash flow would be needed to repay all net debt. The most widely used leverage metric by Nigerian rating agencies. Zero or negative EBITDA scores 0.",        "< 2.0x"],
     ["Altman Z'-Score",         8,  "Altman's private-firm bankruptcy predictor (0.717A + 0.847B + 3.107C + 0.420D + 0.998E) combining working capital, retained earnings, profitability, book leverage and asset turnover. Above 2.90 indicates low distress risk; below 1.23 indicates distress.", "> 2.90"],
   ];
