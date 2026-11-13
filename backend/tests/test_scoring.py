@@ -57,13 +57,13 @@ def test_liquidity_with_missing_current_liabilities(cl):
     assert r["cash_ratio"]["category"] == "Liquidity"
 
 
-@pytest.mark.parametrize("ca,band", [(500, "< 1.0x"), (1000, "1.0 - 1.5x"), (1499, "1.0 - 1.5x"), (1500, "≥ 1.5x")])
+@pytest.mark.parametrize("ca,band", [(500, "< 1.0x"), (1000, "1.0 – < 1.5x"), (1499, "1.0 – < 1.5x"), (1500, "≥ 1.5x")])
 def test_current_ratio_band_edges(ca, band):
     r = _by_id(compute_all_ratios({"currentAssets": ca, "currentLiabilities": 1000}))
     assert r["current_ratio"]["band"] == band
 
 
-@pytest.mark.parametrize("cash,band", [(199, "< 0.2x"), (200, "0.2 - 0.5x"), (499, "0.2 - 0.5x"), (500, "≥ 0.5x")])
+@pytest.mark.parametrize("cash,band", [(199, "< 0.2x"), (200, "0.2 – < 0.5x"), (499, "0.2 – < 0.5x"), (500, "≥ 0.5x")])
 def test_cash_ratio_band_edges(cash, band):
     r = _by_id(compute_all_ratios({"cash": cash, "currentLiabilities": 1000}))
     assert r["cash_ratio"]["band"] == band
@@ -145,8 +145,8 @@ def test_altman_band_edges():
     from api.scoring import _V12, _band
     bands = _V12["altman_z"]["bands"]
     assert _band(1.2299, bands)[0] == "< 1.23"
-    assert _band(1.23, bands)[0] == "1.23 - 2.90"
-    assert _band(2.90, bands)[0] == "1.23 - 2.90"
+    assert _band(1.23, bands)[0] == "1.23 – 2.90"
+    assert _band(2.90, bands)[0] == "1.23 – 2.90"
     assert _band(2.9001, bands)[0] == "> 2.90"
 
 
@@ -167,3 +167,44 @@ def test_normalise_rates_is_idempotent():
     once = normalise_rates({"shortTermInterestRate": 0.215, "longTermInterestRate": None})
     assert once["shortTermInterestRate"] == 21.5 and once["rateUnit"] == "percent"
     assert normalise_rates(once) == once
+
+
+# ── Band labels name exactly the values their condition scores (D047) ──
+import re  # noqa: E402
+
+from api.scoring import MODELS, _band  # noqa: E402
+
+
+def _label_contains(label: str, v: float) -> bool:
+    """Read a band label such as '< 10%', '> 15 – 20%', '1.0 – < 1.5x' or 'Negative'."""
+    if label == "Negative":
+        return v < 0
+    nums = [float(x) for x in re.findall(r"-?\d+(?:\.\d+)?", label)]
+    if "–" not in label:
+        op = label.split()[0]
+        return {"<": v < nums[0], ">": v > nums[0], "≥": v >= nums[0]}[op]
+    lo_part, hi_part = [p.strip() for p in label.split("–")]
+    lo, hi = nums[0], nums[1]
+    lo_ok = v > lo if lo_part.startswith(">") else v >= lo
+    hi_ok = v < hi if hi_part.startswith("<") else v <= hi
+    return lo_ok and hi_ok
+
+
+@pytest.mark.parametrize("version", sorted(MODELS))
+def test_every_band_label_matches_its_condition(version):
+    for rid, table in MODELS[version].items():
+        limits = [b[1] for b in table["bands"] if b[1] is not None]
+        probes = {round(x * 0.01, 2) for x in range(-2000, 15000)}  # -20 to 150 in 0.01 steps
+        probes |= {l + d for l in limits for d in (-0.001, 0, 0.001)}
+        for v in sorted(probes):
+            label, _ = _band(v, table["bands"])
+            assert _label_contains(label, v), f"{version} {rid}: {v} scored in band '{label}'"
+
+
+@pytest.mark.parametrize("version", sorted(MODELS))
+def test_benchmark_is_the_full_marks_band(version):
+    for rid, table in MODELS[version].items():
+        full = [b[2] for b in table["bands"] if b[3] == table["max"]]
+        if table.get("display_only"):
+            full = [table["bands"][-1][2]]
+        assert table["benchmark"] in full, f"{version} {rid}: benchmark '{table['benchmark']}' vs {full}"
