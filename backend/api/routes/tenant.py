@@ -33,4 +33,5 @@ async def get_tenant(hostname: str, db: AsyncSession = Depends(get_db)):
         "adminEmail"   : tenant.admin_email,
         "requiresCode" : tenant.access_code is not None,  # never expose the actual code
         "historyMode"  : tenant.history_mode or "off",
-    }
+        "fiMode"       : tenant.fi_mode or "off",
+    }

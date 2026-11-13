@@ -4,6 +4,7 @@ import { useIsMobile } from "../../hooks/useBreakpoint.js";
 import { extractFigures, getIssuerHistory, errorMessage } from "../../api/client.js";
 import { useTenant } from "../../context/TenantContext.jsx";
 import CPTerms from "./CPTerms.jsx";
+import { SECTORS } from "../../utils/fi.js";
 import { ACCEPT, inspectPdf, prepareDocument, checkWarnings, appendDocument, countKw } from "../../utils/documentInput.js";
 
 const RATINGS = ["","AAA","AA+","AA","AA-","A+","A","A-", "A1+", "A1", "A2", "A3", "BBB+","BBB","BBB-","BB+","BB","BB-","B+","B","B-","CCC","CC","C","D"];
@@ -442,6 +443,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
   const isMobile = useIsMobile();
   const { tenant } = useTenant();
   const historyOn  = !!tenant?.historyMode && tenant.historyMode !== "off";
+  const fiOn       = !!tenant?.fiMode && tenant.fiMode !== "off";
   const [slots, setSlots]       = useState({ prior: BLANK_SLOT, interim: BLANK_SLOT });
   const [stored, setStored]     = useState(null); // issuer lookup: null | { found, periods, name } | { error }
   const info = clientInfo;
@@ -577,6 +579,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
     if (ratDoc)          appendDocument(fd, "rating_pdf", ratDoc);
     if (info.clientName) fd.append("client_name", info.clientName);
     if (draftId)         fd.append("draft_id",    String(draftId));
+    if (fiOn && info.sector) fd.append("sector", info.sector);
     if (historyOn) {
       for (const h of HISTORY_SLOTS) if (slots[h.key].doc) appendDocument(fd, h.field, slots[h.key].doc);
       if (info.rcNumber?.trim()) fd.append("rc_number", info.rcNumber.trim());
@@ -596,9 +599,10 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
       }
       if (data.cpTerms) updatedInfo.cpTerms = data.cpTerms;
       onClientInfoChange(updatedInfo);
-      const figs = data.figures?.history
+      let figs = data.figures?.history
         ? { ...data.figures, history: { ...data.figures.history, warnings: data.historyWarnings || [] } }
         : data.figures;
+      if (data.fiWarning) figs = { ...figs, fiWarning: data.fiWarning };
       onExtracted(figs, updatedInfo, data.draftId || null);
       const newCount = extractionCount + 1;
       const fileKey  = currentFileKey;
@@ -676,7 +680,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
       <div style={css.card}>
         <div style={css.title}>Client Information</div>
         {/* One row on desktop: client name twice as wide, the other fields equal */}
-        <div style={{ ...css.grid, gridTemplateColumns: isMobile ? "1fr" : `minmax(0,2fr) repeat(${historyOn ? 3 : 2},minmax(0,1fr))` }}>
+        <div style={{ ...css.grid, gridTemplateColumns: isMobile ? "1fr" : `minmax(0,${fiOn ? 1.5 : 2}fr) repeat(${2 + (historyOn ? 1 : 0) + (fiOn ? 1 : 0)},minmax(0,1fr))` }}>
           <div>
             <label style={css.label}>Client name *</label>
             <input style={css.input} type="text" placeholder="e.g. Flour Mills of Nigeria Plc"
@@ -687,6 +691,22 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
               <label style={css.label} htmlFor="sr-rc-number">RC number</label>
               <input id="sr-rc-number" style={css.input} type="text" inputMode="numeric" placeholder="e.g. RC 123456"
                 value={info.rcNumber || ""} onChange={(e) => set("rcNumber", e.target.value)} onBlur={lookupIssuer} />
+            </div>
+          )}
+          {fiOn && (
+            <div>
+              <label style={css.label} htmlFor="sr-sector">Sector</label>
+              <select id="sr-sector" style={css.select} value={(figures?.sector ?? info.sector) || ""}
+                title="Financial services: banks, finance companies, microfinance banks, leasing companies and lending fintechs. Fintech (payments): no loan book."
+                onChange={(e) => {
+                  const sector = e.target.value || null;
+                  set("sector", sector);
+                  // After extraction the figures carry the sector too, so Review Data and the FI ratios follow it
+                  if (figures && Object.keys(figures).length) onFiguresChange?.({ ...figures, sector });
+                }}>
+                <option value="">Select sector</option>
+                {SECTORS.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+              </select>
             </div>
           )}
           <div>

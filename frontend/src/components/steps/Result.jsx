@@ -5,6 +5,7 @@ import { Download, Loader, Plus, Eye, AlertTriangle } from "lucide-react";
 import ReportPreview from "../ReportPreview.jsx";
 import RatioTable from "../RatioTable.jsx";
 import HistoryPanel from "../HistoryPanel.jsx";
+import FiPanel from "../FiPanel.jsx";
 
 // Declared at module scope so React keeps the same component between renders
 function NarrSection({ label, rating, review, ratingColor }) {
@@ -101,6 +102,8 @@ export default function Result({ scoreResult, assessmentId, narrative: initialNa
       </div>
 
       {scoreResult?.history && <HistoryPanel history={scoreResult.history} />}
+
+      {scoreResult?.fi && <FiPanel fi={scoreResult.fi} />}
 
       {/* Narrative */}
       {(n.financialStandingReview || n.cashFlowReview) && (
