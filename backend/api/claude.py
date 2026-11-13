@@ -207,6 +207,13 @@ bonds and overdrafts are often disclosed only inside those notes.
 - reportingPeriod: Financial year end date from the face of the statements (e.g. 31 December 2025).
 - auditorName: Name of the audit firm from the independent auditors report.
 - auditOpinion: Clean / Qualified / Emphasis of matter.
+- principalActivity: the company's principal activity in one short sentence, from the "principal activities" or
+  "nature of business" paragraph in the directors' report or Note 1 (reporting entity). null if not stated.
+- suggestedSector: the ONE code from this list that best fits the principal activity:
+  financial_services (bank, finance company, microfinance bank, leasing company, mortgage bank or fintech that lends),
+  fintech_payments (payments or technology company with no loan book), manufacturing, consumer_goods, oil_gas, telecom,
+  aviation, healthcare, agriculture (including farming, agro-processing and agro-commodity sourcing or trading),
+  real_estate, other. null if the activity is not stated.
 
 === PRIOR YEAR FIGURES (COMPANY prior year column — for year-on-year analysis) ===
 Extract from the COMPANY prior year column only (the column next to the current year):
@@ -223,9 +230,17 @@ Return ONLY this JSON — no other text:
 "shortTermDebt":number,"longTermDebt":number,"totalDebt":number,
 "shareholdersEquity":number,"retainedEarnings":number,
 "financeCost":number,"shortTermInterestRate":number,"longTermInterestRate":number,
-"reportingPeriod":string,"auditorName":string,"auditOpinion":string,
+"reportingPeriod":string,"auditorName":string,"auditOpinion":string,"principalActivity":string,"suggestedSector":string,
 "priorYearNetIncome":number,"priorYearEBIT":number,"priorYearTotalDebt":number,
 "priorYearTotalAssets":number,"priorYearShareholdersEquity":number}"""
+
+
+def clean_sector_hint(figures: dict) -> dict:
+    """The model's sector suggestion: a known code or None, and the activity text cut to 200 characters."""
+    from api.fi import normalise_sector
+    activity = figures.get("principalActivity")
+    activity = " ".join(str(activity).split())[:200] if isinstance(activity, str) and activity.strip() else None
+    return {"principalActivity": activity, "suggestedSector": normalise_sector(figures.get("suggestedSector"))}
 
 
 async def extract_figures(blocks: list[dict]) -> dict:
@@ -234,6 +249,7 @@ async def extract_figures(blocks: list[dict]) -> dict:
     # The prompt asks for percentages; if the model still returns a decimal (0.215),
     # the legacy rule converts it, then rateUnit marks the figures as percentages
     figures = normalise_rates({k: v for k, v in figures.items() if k != "rateUnit"})
+    figures.update(clean_sector_hint(figures))
 
     # Compute EBITDA server-side
     ebit = figures.get("ebit")

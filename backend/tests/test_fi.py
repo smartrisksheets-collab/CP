@@ -160,3 +160,27 @@ def test_shipped_bank_csv_loads():
     assert s["npl_ratio"]["n"] == 10 and s["npl_ratio"]["median"] == pytest.approx(4.8)
     assert s["cost_to_income"]["n"] == 11 and s["cost_to_income"]["median"] == pytest.approx(53.8)
     assert s["reported_liquidity"]["n"] == 5
+
+
+def test_tagged_lender_without_lending_figures_is_flagged():
+    # A cocoa trader tagged financial services: borrowings only, no loans, interest income or deposits
+    trader = {**FIRM, "fi": {k: None for k in FI} | {"borrowingsDue12m": 76, "totalBorrowings": 100,
+                                                     "customerDeposits": 0}}
+    out = compute_fi(trader)
+    assert out["status"] == "not_lender" and out["ratios"] == []
+    assert "sector" in out["message"]
+
+
+def test_one_lending_sign_is_enough():
+    assert compute_fi({**FIRM, "fi": {"interestIncome": 5}})["status"] == "ok"
+    assert compute_fi({**FIRM, "fi": {"customerDeposits": 5}})["status"] == "ok"
+
+
+def test_sector_hint_is_cleaned():
+    from api.claude import clean_sector_hint
+    out = clean_sector_hint({"principalActivity": "  Sourcing and export of\\n cocoa  " + "x" * 300,
+                             "suggestedSector": "Agriculture"})
+    assert out["suggestedSector"] == "agriculture"
+    assert out["principalActivity"].startswith("Sourcing and export of") and len(out["principalActivity"]) == 200
+    assert clean_sector_hint({"suggestedSector": "cocoa", "principalActivity": ""}) == \
+        {"principalActivity": None, "suggestedSector": None}
