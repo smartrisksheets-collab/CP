@@ -28,7 +28,7 @@ BOND_FIELDS = (
     ("trustee", "Trustee"), ("useOfProceeds", "Use of proceeds"),
 )
 LOAN_FIELDS = (
-    ("facilityType", "Facility type"), ("amount", "Amount"), ("tenor", "Tenor"),
+    ("facilityType", "Facility type"), ("amount", "Amount"), ("currency", "Currency"), ("tenor", "Tenor"),
     ("interestRate", "Interest rate / pricing"), ("repayment", "Repayment"),
     ("moratorium", "Moratorium"), ("collateral", "Collateral / security"),
     ("guarantee", "Guarantee"), ("purpose", "Purpose"), ("covenants", "Key covenants"),

@@ -171,3 +171,16 @@ def test_preview_adds_repayment_and_health(client):
     off = client.post("/assessment/preview", headers=_auth(client, OFF),
                       json={"figures": {**STREADVEST, "instrument": "loan", "terms": terms}}).json()
     assert off["repayment"] is None and off["health"] is None
+
+
+def test_extract_keeps_loan_terms_with_the_draft(client):
+    import json as _json
+    terms = {"amount": "₦5,000,000", "tenor": "24 months", "interestRate": "28% a year", "junk": "x"}
+
+    def go(data):
+        return client.post("/assessment/extract", files=[("financial_pdf", PDF)], headers=_auth(client, ON),
+                           data={"client_name": "X", "instrument": "loan", **data}).json()["figures"]
+    kept = {k: v for k, v in go({"terms": _json.dumps(terms)})["terms"].items() if v}
+    assert kept == {"amount": "₦5,000,000", "tenor": "24 months", "interestRate": "28% a year"}
+    assert "terms" not in go({"terms": "not json"})
+    assert "terms" not in go({"terms": "[1, 2]"})

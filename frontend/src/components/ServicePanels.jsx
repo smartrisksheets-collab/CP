@@ -66,7 +66,9 @@ export function RepaymentPanel({ check, onEditRequest }) {
           </tbody>
         </table>
       </div>
-      {(check.notes || []).map((n) => <div key={n} style={{ fontSize:12, color:"#888", marginTop:6 }}>{n}</div>)}
+      {(check.notes || []).map((n) => n.startsWith("Check the interest")
+        ? <div key={n} role="alert" style={{ fontSize:12, color:"#7A4F00", background:"#FEF6E7", border:"1px solid #F0C060", borderRadius:6, padding:"8px 10px", marginTop:10, lineHeight:1.6 }}>{n.replace(/\bN(?=\d)/g, "₦")}</div>
+        : <div key={n} style={{ fontSize:12, color:"#888", marginTop:6 }}>{n}</div>)}
       <div style={{ fontSize:11, color:"#888", marginTop:8 }}>
         Debt service is the year's finance cost plus short-term debt, as in the DSCR. Guides are the scoring model's full-marks benchmarks.
       </div>
