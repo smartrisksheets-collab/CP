@@ -20,7 +20,7 @@ export const BOND_FIELDS = [
 ];
 
 export const LOAN_FIELDS = [
-  ["facilityType", "Facility type"], ["amount", "Amount"], ["tenor", "Tenor"],
+  ["facilityType", "Facility type"], ["amount", "Amount"], ["currency", "Currency"], ["tenor", "Tenor"],
   ["interestRate", "Interest rate / pricing"], ["repayment", "Repayment"], ["moratorium", "Moratorium"],
   ["collateral", "Collateral / security", true], ["guarantee", "Guarantee"],
   ["purpose", "Purpose", true], ["covenants", "Key covenants", true],
@@ -71,6 +71,9 @@ export const TONE = {
 };
 export const overallTone = (o) => TONE[{ Comfortable:"good", Tight:"mid" }[o] || "bad"];
 export const ratingTone  = (r) => TONE[{ Strong:"good", Fair:"mid" }[r] || "bad"];
+
+// A loan is checked in naira; a foreign-currency facility is entered with its exchange rate (D054)
+export const LOAN_CURRENCIES = [["NGN", "Naira (₦)"], ["USD", "US dollar"], ["EUR", "Euro"], ["GBP", "Pound sterling"]];
 
 export const REPAYMENT_TYPES = [
   ["amortising", "Equal instalments"], ["equal_principal", "Equal principal"],

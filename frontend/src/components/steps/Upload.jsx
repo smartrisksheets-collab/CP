@@ -590,6 +590,7 @@ export default function Upload({ clientInfo, onClientInfoChange, onExtracted, on
     if (draftId)         fd.append("draft_id",    String(draftId));
     if (fiOn && info.sector) fd.append("sector", info.sector);
     if (multi) fd.append("instrument", instrument);
+    if (isLoan && info.terms) fd.append("terms", JSON.stringify(info.terms));  // kept with the draft
     if (historyOn) {
       for (const h of HISTORY_SLOTS) if (slots[h.key].doc) appendDocument(fd, h.field, slots[h.key].doc);
       if (info.rcNumber?.trim()) fd.append("rc_number", info.rcNumber.trim());

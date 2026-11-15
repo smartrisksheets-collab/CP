@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request
 from fastapi.responses import Response
 import asyncio
+import json
 import logging
 import os
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -263,6 +264,7 @@ async def extract(
     rc_number     : str | None              = Form(None),
     sector        : str | None              = Form(None),  # api/fi.py SECTORS code
     instrument    : str | None              = Form(None),  # api/instruments.py code
+    terms         : str | None              = Form(None),  # JSON: a loan's facility request, kept with the draft
     draft_id      : int | None              = Form(None),
     current_user  : dict                    = Depends(get_current_user),
     db            : AsyncSession            = Depends(get_db),
@@ -327,6 +329,15 @@ async def extract(
         figures["sector"] = sector
     if await _instrument_mode(current_user["tenant_id"], db) != "off":
         figures["instrument"] = normalise_instrument(instrument) or "cp"
+        # A loan's facility request comes before the statements; keep it with the draft so a
+        # resumed loan still has its terms (D054)
+        if figures["instrument"] == "loan" and terms:
+            try:
+                cleaned = clean_terms("loan", json.loads(terms))
+            except (ValueError, TypeError):
+                cleaned = None
+            if cleaned:
+                figures["terms"] = cleaned
     if sector in FI_SECTORS:
         if isinstance(fi_outcome, BaseException):
             log.warning("FI extraction failed: %r", fi_outcome)

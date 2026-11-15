@@ -12,7 +12,7 @@ Pure functions; figures are in N'000 as everywhere else.
 """
 import re
 
-from api.scoring import _interest, _n, _total_debt, normalise_rates
+from api.scoring import _interest, _n, _rate, _total_debt, normalise_rates
 
 VERSION = "r1.0"
 
@@ -82,6 +82,26 @@ def first_year_payments(amount: float, tenor: int, rate_pct: float, repayment: s
     return {"principal": principal_paid, "interest": interest_paid, "total": principal_paid + interest_paid}
 
 
+# Reported interest outside this band of what the stated loan rates imply is flagged (D054)
+INTEREST_LOW, INTEREST_HIGH = 0.5, 2.0
+
+
+def interest_check(f: dict) -> dict | None:
+    """
+    Compare reported finance cost with year-end loans x their stated rates. None when either is
+    missing (with no finance cost the rates are already what the DSCR uses). Year-end balances are
+    used, so a loan repaid during the year makes the implied figure low, not high.
+    """
+    reported = abs(_n(f.get("financeCost")))
+    implied = (_n(f.get("shortTermDebt")) * _rate(f, "shortTermInterestRate") +
+               _n(f.get("longTermDebt")) * _rate(f, "longTermInterestRate"))
+    if reported <= 0 or implied <= 0:
+        return None
+    ratio = reported / implied
+    return {"reported": round(reported, 2), "implied": round(implied, 2), "ratio": round(ratio, 2),
+            "flag": "low" if ratio < INTEREST_LOW else "high" if ratio > INTEREST_HIGH else None}
+
+
 def _reading(key: str, value: float | None) -> str:
     if value is None:
         return "N/M"
@@ -146,6 +166,17 @@ def repayment_check(figures: dict) -> dict:
     else:
         overall = "Tight"
     notes = []
+    ic = interest_check(f)
+    if ic and ic["flag"]:
+        cover_at_rates = _ratio(ebitda, ic["implied"] + _n(f.get("shortTermDebt")) + pay["total"])
+        ic["coverAtRates"] = cover_at_rates
+        ic["readingAtRates"] = _reading("dscr", cover_at_rates)
+        notes.insert(0, (
+            f"Check the interest: reported finance cost of N{ic['reported'] * 1000:,.0f} is "
+            f"{'well below' if ic['flag'] == 'low' else 'well above'} the N{ic['implied'] * 1000:,.0f} that "
+            f"year-end loans at their stated rates imply. At the stated rates, debt service cover with the "
+            f"facility would be {'N/M' if cover_at_rates is None else f'{cover_at_rates:.2f}x'} "
+            f"({ic['readingAtRates'].lower()}). Ask whether interest was capitalised or the rates are out of date."))
     if ebitda <= 0:
         notes.append("EBITDA is zero or negative, so earnings do not cover any debt service.")
     if repayment == "revolving":
@@ -154,16 +185,22 @@ def repayment_check(figures: dict) -> dict:
         notes.append("The principal falls due at maturity, after the first 12 months, so it is not in this year's debt service.")
     if tenor <= 12:
         notes.append("The facility is repaid within 12 months, so all of its principal is in this year's debt service.")
+    currency = str(terms.get("currency") or "")
+    if currency and not currency.lower().startswith("naira"):
+        notes.append(f"Foreign-currency facility ({currency}). The check uses the naira amount at that rate; "
+                     "if the naira weakens, the naira cost of each repayment rises, which this check does not test.")
     if moratorium:
         notes.append(f"Interest only during the {moratorium}-month moratorium.")
     return {
         "version": VERSION, "status": "ok",
         "facility": {"amount": amount, "tenorMonths": int(tenor), "ratePct": rate, "repayment": repayment,
                      "repaymentLabel": REPAYMENT_TYPES[repayment], "moratoriumMonths": moratorium,
-                     "facilityType": terms.get("facilityType"), "collateral": terms.get("collateral")},
+                     "facilityType": terms.get("facilityType"), "collateral": terms.get("collateral"),
+                     "currency": terms.get("currency")},
         "firstYear": {k: round(v, 2) for k, v in pay.items()},
         "cover": dscr_with,
         "overall": overall,
+        "interestCheck": ic,
         "measures": measures,
         "notes": notes,
     }

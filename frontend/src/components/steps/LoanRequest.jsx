@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { useIsMobile } from "../../hooks/useBreakpoint.js";
-import { REPAYMENT_TYPES } from "../../utils/instruments.js";
+import { REPAYMENT_TYPES, LOAN_CURRENCIES } from "../../utils/instruments.js";
 
 const css = {
   card : { background:"#fff", border:"1px solid #E0E0E0", borderRadius:8, padding:20, marginBottom:16 },
@@ -25,6 +25,11 @@ const withCommas = (digits) => {
   const [whole, dec] = digits.split(".");
   return whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (dec !== undefined ? `.${dec}` : "");
 };
+// "USD 5,000,000 at ₦1,550 per USD" -> { code, foreign, rate }
+const parseCurrency = (v) => {
+  const m = String(v || "").match(/^(USD|EUR|GBP) ([\d,.]+) at ₦([\d,.]+)/);
+  return m ? { code: m[1], foreign: numberIn(m[2]), rate: numberIn(m[3]) } : { code: "NGN", foreign: "", rate: "" };
+};
 const repaymentLabel = (v) => {
   const t = String(v || "").toLowerCase();
   const hit = REPAYMENT_TYPES.find(([code, label]) => t === code || t === label.toLowerCase());
@@ -38,6 +43,7 @@ export default function LoanRequest({ clientInfo, onClientInfoChange, figures, o
   const [f, setF] = useState(() => ({
     facilityType: start.facilityType || "",
     amount      : numberIn(start.amount),
+    ...(({ code, foreign, rate }) => ({ currency: code, foreign, fxRate: rate }))(parseCurrency(start.currency)),
     tenor       : numberIn(start.tenor),
     interestRate: numberIn(start.interestRate),
     repayment   : repaymentLabel(start.repayment),
@@ -50,9 +56,14 @@ export default function LoanRequest({ clientInfo, onClientInfoChange, figures, o
   const [tried, setTried] = useState(false);
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
 
+  const fx = f.currency !== "NGN";
+  // Naira amount: typed, or the foreign amount at the exchange rate
+  const nairaAmount = fx ? (Number(f.foreign) > 0 && Number(f.fxRate) > 0 ? String(Math.round(Number(f.foreign) * Number(f.fxRate))) : "") : f.amount;
   const errors = {
     name        : !name.trim() ? "Enter the applicant's name." : "",
-    amount      : !(Number(f.amount) > 0) ? "Enter the amount requested." : "",
+    amount      : !fx && !(Number(f.amount) > 0) ? "Enter the amount requested." : "",
+    foreign     : fx && !(Number(f.foreign) > 0) ? `Enter the amount in ${f.currency}.` : "",
+    fxRate      : fx && !(Number(f.fxRate) > 0) ? `Enter how many naira one ${f.currency} buys.` : "",
     tenor       : !(Number(f.tenor) >= 1) ? "Enter the tenor in months." : "",
     interestRate: f.interestRate === "" ? "Enter the interest rate." : Number(f.interestRate) > 100 ? "Enter the rate as a % a year, e.g. 22." : "",
     moratorium  : f.moratorium && Number(f.moratorium) >= Number(f.tenor) ? "The moratorium must be shorter than the tenor." : "",
@@ -65,7 +76,8 @@ export default function LoanRequest({ clientInfo, onClientInfoChange, figures, o
     const months = (n) => `${n} month${Number(n) === 1 ? "" : "s"}`;
     const terms = {
       facilityType: f.facilityType.trim() || null,
-      amount      : `₦${withCommas(f.amount)}`,
+      amount      : `₦${withCommas(nairaAmount)}`,
+      currency    : fx ? `${f.currency} ${withCommas(f.foreign)} at ₦${withCommas(f.fxRate)} per ${f.currency}` : "Naira",
       tenor       : months(f.tenor),
       interestRate: `${f.interestRate}% a year`,
       repayment   : f.repayment,
@@ -111,16 +123,46 @@ export default function LoanRequest({ clientInfo, onClientInfoChange, figures, o
 
       <div style={css.card}>
         <div style={css.title}>Facility Requested</div>
-        <div style={g("minmax(0,1.4fr) repeat(2,minmax(0,1fr))")}>
+        <div style={{ ...g("minmax(0,1fr) minmax(0,1fr)"), marginBottom:12 }}>
           <div>
-            <label style={css.label} htmlFor="sr-loan-amount">Amount *</label>
-            <div style={{ position:"relative" }}>
-              <span style={{ position:"absolute", left:10, top:8, fontSize:13, color:"#888" }}>₦</span>
-              <input id="sr-loan-amount" inputMode="decimal" style={{ ...css.input, paddingLeft:24 }} placeholder="500,000,000"
-                value={withCommas(f.amount)} onChange={(e) => set("amount", numberIn(e.target.value))} />
-            </div>
-            {tried && errors.amount && <div style={css.err}>{errors.amount}</div>}
+            <label style={css.label} htmlFor="sr-loan-currency">Currency</label>
+            <select id="sr-loan-currency" style={css.input} value={f.currency} onChange={(e) => set("currency", e.target.value)}>
+              {LOAN_CURRENCIES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+            </select>
           </div>
+          {fx && (
+            <div>
+              <label style={css.label} htmlFor="sr-loan-fxRate">Exchange rate * <span style={{ color:"#888" }}>(₦ per {f.currency})</span></label>
+              <input id="sr-loan-fxRate" inputMode="decimal" style={css.input} placeholder="1,550"
+                value={withCommas(f.fxRate)} onChange={(e) => set("fxRate", numberIn(e.target.value))} />
+              {tried && errors.fxRate && <div style={css.err}>{errors.fxRate}</div>}
+            </div>
+          )}
+        </div>
+        {fx && nairaAmount && (
+          <div style={{ fontSize:12, color:"#1F2854", marginBottom:12 }}>
+            Naira equivalent: <strong>₦{withCommas(nairaAmount)}</strong>. The check is run in naira, as the statements are.
+          </div>
+        )}
+        <div style={g("minmax(0,1.4fr) repeat(2,minmax(0,1fr))")}>
+          {fx ? (
+            <div>
+              <label style={css.label} htmlFor="sr-loan-foreign">Amount in {f.currency} *</label>
+              <input id="sr-loan-foreign" inputMode="decimal" style={css.input} placeholder="5,000,000"
+                value={withCommas(f.foreign)} onChange={(e) => set("foreign", numberIn(e.target.value))} />
+              {tried && errors.foreign && <div style={css.err}>{errors.foreign}</div>}
+            </div>
+          ) : (
+            <div>
+              <label style={css.label} htmlFor="sr-loan-amount">Amount *</label>
+              <div style={{ position:"relative" }}>
+                <span style={{ position:"absolute", left:10, top:8, fontSize:13, color:"#888" }}>₦</span>
+                <input id="sr-loan-amount" inputMode="decimal" style={{ ...css.input, paddingLeft:24 }} placeholder="500,000,000"
+                  value={withCommas(f.amount)} onChange={(e) => set("amount", numberIn(e.target.value))} />
+              </div>
+              {tried && errors.amount && <div style={css.err}>{errors.amount}</div>}
+            </div>
+          )}
           {field("tenor", "Tenor *", { inputMode:"numeric", placeholder:"24" }, "months")}
           {field("interestRate", "Interest rate *", { inputMode:"decimal", placeholder:"22" }, "% a year")}
         </div>
