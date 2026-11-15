@@ -46,6 +46,7 @@ export default function ServiceChooser({ onChoose, draft, onResume, onDiscard, o
                 <div style={{ minWidth:0 }}>
                   <div style={{ fontSize:15, fontWeight:"bold", color:"#1F2854" }}>{s.name}</div>
                   <div style={{ fontSize:12, color:"#5A5A5A", lineHeight:1.6, marginTop:3 }}>{s.blurb}</div>
+                  {s.audience && <div style={{ fontSize:12, color:"#1F2854", fontWeight:"bold", marginTop:4 }}>{s.audience}</div>}
                 </div>
               </div>
               <div style={{ fontSize:11, color:"#888", lineHeight:1.7 }}>
