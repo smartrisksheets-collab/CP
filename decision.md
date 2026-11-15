@@ -238,3 +238,6 @@ Still stated, not fixed: monthly payments assumed; a bullet beyond 12 months is 
 
 ## D055 The loan service is for companies only
 User decision 2026-11-15: the loan service assesses companies with financial statements; individual borrowers are left out for now. The loan card and the facility request page say "For companies with financial statements". Lending to individuals would need a different model (income, debt-to-income, bank statements, credit bureau) and is not planned.
+
+## D056 Change service button: navy outline
+User decision 2026-11-15: the Change service button was easy to miss (grey border on a white band). It is now a navy (#1F2854) 1.5px outline with navy text and a swap icon, a light navy fill (#EEF1F7) on hover or focus, and full width on phones. Emerald stays for the next-step buttons only.

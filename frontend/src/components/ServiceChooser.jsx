@@ -1,6 +1,7 @@
 // Home after login when a tenant can assess more than commercial paper (D053): pick a service,
 // then follow that service's own steps.
-import { FileText, Landmark, HandCoins, Activity, ChevronRight, LayoutDashboard } from "lucide-react";
+import { useState } from "react";
+import { FileText, Landmark, HandCoins, Activity, ChevronRight, LayoutDashboard, ArrowLeftRight } from "lucide-react";
 import { SERVICES, SERVICE_ORDER, serviceOf } from "../utils/instruments.js";
 import { useIsMobile } from "../hooks/useBreakpoint.js";
 
@@ -95,6 +96,8 @@ export default function ServiceChooser({ onChoose, draft, onResume, onDiscard, o
 
 export function ServiceBand({ code, index, onChange }) {
   const s = serviceOf(code);
+  const isMobile = useIsMobile();
+  const [hover, setHover] = useState(false);
   const i = Math.min(index, s.steps.length - 1);
   return (
     <div data-testid="service-band"
@@ -106,9 +109,13 @@ export function ServiceBand({ code, index, onChange }) {
           <div style={{ fontSize:12, color:"#888" }}>Step {i + 1} of {s.steps.length}: {s.steps[i]}</div>
         </div>
       </div>
-      <button onClick={onChange}
-        style={{ ...btn, padding:"6px 12px", fontSize:12, border:"1px solid #D0D0D0", background:"transparent", color:"#1F2854" }}>
-        Change service
+      {/* Navy outline: a secondary action, distinct from the emerald next-step buttons (D056) */}
+      <button onClick={onChange} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+        onFocus={() => setHover(true)} onBlur={() => setHover(false)}
+        style={{ ...btn, padding:"7px 14px", fontSize:13, fontWeight:600, border:"1.5px solid #1F2854",
+                 background: hover ? "#EEF1F7" : "#fff", color:"#1F2854", justifyContent:"center",
+                 width: isMobile ? "100%" : "auto", transition:"background 0.15s" }}>
+        <ArrowLeftRight size={14} strokeWidth={2} /> Change service
       </button>
     </div>
   );
