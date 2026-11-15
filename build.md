@@ -85,3 +85,8 @@
 - Changed: backend/api/repayment.py (interest_check, currency note), instruments.py (currency term), routes/assessment.py (/extract keeps a loan's terms with the draft), report.py (interest warning highlighted, naira sign in notes), tests/test_repayment.py (+3), tests/test_instruments_api.py (+1); frontend components/steps/LoanRequest.jsx (currency and exchange rate), steps/Upload.jsx (sends terms with the statements), components/ServicePanels.jsx (interest warning), utils/instruments.js
 - Checks: pytest 203 passed; npm run build; lint unchanged; Chromium: US dollar loan end to end; Streadvest PDF shows the interest warning (N85m reported vs N384m implied, cover 4.76x at the stated rates)
 - Decision: D054
+
+## 2026-11-15 Loan service: companies only (p28)
+- Changed: frontend utils/instruments.js (service audience line), components/ServiceChooser.jsx, components/steps/LoanRequest.jsx
+- Checks: npm run build; lint clean on changed files; Chromium screenshots of the loan card and facility request page
+- Decision: D055
