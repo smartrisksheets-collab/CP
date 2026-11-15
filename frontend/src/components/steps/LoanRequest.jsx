@@ -108,6 +108,10 @@ export default function LoanRequest({ clientInfo, onClientInfoChange, figures, o
 
   return (
     <div>
+      <div style={{ fontSize:13, color:"#5A5A5A", marginBottom:12 }}>
+        <strong style={{ color:"#1F2854" }}>For companies with financial statements.</strong>{" "}
+        The check reads the applicant's accounts, so it cannot assess an individual borrower.
+      </div>
       <div style={css.card}>
         <div style={css.title}>Applicant</div>
         <div style={g("minmax(0,2fr) minmax(0,1fr)")}>

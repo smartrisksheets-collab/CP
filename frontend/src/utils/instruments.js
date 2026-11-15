@@ -44,6 +44,7 @@ export const SERVICES = {
   loan: {
     name: "Loan or facility", entity: "Applicant",
     blurb: "Start from the facility request, then check whether earnings can carry the repayments.",
+    audience: "For companies with financial statements",
     steps: ["Facility request", "Statements", "Review", "Repayment check", "Result"],
   },
   review: {
