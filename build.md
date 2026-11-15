@@ -90,3 +90,8 @@
 - Changed: frontend utils/instruments.js (service audience line), components/ServiceChooser.jsx, components/steps/LoanRequest.jsx
 - Checks: npm run build; lint clean on changed files; Chromium screenshots of the loan card and facility request page
 - Decision: D055
+
+## 2026-11-15 Change service button (p29)
+- Changed: frontend components/ServiceChooser.jsx (ServiceBand button)
+- Checks: npm run build; lint clean; Chromium screenshots on desktop, hover and a 390px phone
+- Decision: D056
