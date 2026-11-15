@@ -20,6 +20,7 @@ from api.repayment import repayment_check
 
 # ── Unicode font (for ₦ and other non-Latin-1 chars) ──────────
 import os as _os
+import re
 from reportlab.pdfbase import pdfmetrics as _pm
 from reportlab.pdfbase.ttfonts import TTFont as _TTF
 
@@ -574,8 +575,12 @@ def _repayment_section(check, ST):
         ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
     ]))
     E += [t, Spacer(1, 3)]
+    warn = ParagraphStyle("rwarn", parent=sub, fontSize=7.5, leading=10, textColor=colors.HexColor("#92400E"),
+                          backColor=colors.HexColor("#FEF6E7"), borderPadding=4, spaceBefore=4, spaceAfter=6)
     for x in check.get("notes") or []:
-        E.append(Paragraph(x, sub))
+        x = re.sub(r"\bN(?=\d)", cur, x)
+        E.append(Paragraph(f"<b>{x}</b>" if x.startswith("Check the interest") else x,
+                           warn if x.startswith("Check the interest") else sub))
     E.append(Paragraph("Debt service is the year's finance cost plus short-term debt, as in the DSCR. "
                        "Guides are the full-marks benchmarks of the scoring model.", sub))
     E.append(Spacer(1, 8))

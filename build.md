@@ -80,3 +80,8 @@
 - Changed: backend/api/routes/assessment.py (repayment and health on /preview, /run, detail; instrument on history), report.py (repayment section, health header and verdict, loan header, disclaimer), claude.py (health block and overall view for reviews), instruments.py (repayment lines and rule for loans), tests/test_instruments.py (+4), tests/test_instruments_api.py (+1); frontend AppPage.jsx (chooser home, per-service stepper and band), Upload.jsx (loan request first, no picker, entity labels), Scores.jsx, Result.jsx, Dashboard.jsx, ReportPreview.jsx, Login.jsx, Register.jsx, utils/instruments.js
 - Checks: pytest 199 passed; npm run build; lint unchanged; Chromium end to end on a local tenant with instruments on: loan (request, statements, review, repayment check, result), general review (health report) and commercial paper; loan and review PDFs rendered and inspected
 - Decision: D053
+
+## 2026-11-14 Loan service ready for every client (p27)
+- Changed: backend/api/repayment.py (interest_check, currency note), instruments.py (currency term), routes/assessment.py (/extract keeps a loan's terms with the draft), report.py (interest warning highlighted, naira sign in notes), tests/test_repayment.py (+3), tests/test_instruments_api.py (+1); frontend components/steps/LoanRequest.jsx (currency and exchange rate), steps/Upload.jsx (sends terms with the statements), components/ServicePanels.jsx (interest warning), utils/instruments.js
+- Checks: pytest 203 passed; npm run build; lint unchanged; Chromium: US dollar loan end to end; Streadvest PDF shows the interest warning (N85m reported vs N384m implied, cover 4.76x at the stated rates)
+- Decision: D054

@@ -85,3 +85,33 @@ def test_summary_lines():
     assert summary_lines(None) == ""
     s = summary_lines(repayment_check(fig()))
     assert "REPAYMENT CHECK" in s and "Debt service cover" in s
+
+
+def test_interest_check_flags_low_reported_interest():
+    # Streadvest FY2025 (N'000): interest 85,000 against loans of 694,640 at 25% and 764,104 at 27.5%
+    f = {"ebitda": 5145000, "ebit": 5110760, "financeCost": 85000, "shortTermDebt": 694640,
+         "longTermDebt": 764104, "cash": 2200000, "shortTermInterestRate": 25, "longTermInterestRate": 27.5,
+         "rateUnit": "percent",
+         "terms": {"amount": "₦5,776,666", "tenor": "24 months", "interestRate": "28% a year", "repayment": "Equal instalments"}}
+    c = repayment_check(f)
+    ic = c["interestCheck"]
+    assert ic["flag"] == "low" and ic["implied"] == pytest.approx(383789, rel=1e-3)
+    assert ic["coverAtRates"] == pytest.approx(5145000 / (383789.1 + 694640 + c["firstYear"]["total"]), rel=1e-3)
+    assert c["notes"][0].startswith("Check the interest") and "N85,000,000" in c["notes"][0]
+    assert c["overall"] == "Comfortable"  # the reading stays on the audited figure
+
+
+def test_interest_check_quiet_when_consistent_or_missing():
+    base = {"ebitda": 4000, "ebit": 3000, "shortTermDebt": 1000, "longTermDebt": 0,
+            "shortTermInterestRate": 20, "rateUnit": "percent",
+            "terms": {"amount": "1000000", "tenor": "12", "interestRate": "20"}}
+    assert repayment_check({**base, "financeCost": 180})["interestCheck"]["flag"] is None
+    assert repayment_check({**base, "financeCost": 500})["interestCheck"]["flag"] == "high"
+    assert repayment_check(base)["interestCheck"] is None  # no reported interest: the rates are used
+    assert repayment_check({**base, "financeCost": 180, "shortTermInterestRate": None})["interestCheck"] is None
+
+
+def test_foreign_currency_note():
+    c = repayment_check(fig(currency="USD 1,000 at ₦1,200 per USD"))
+    assert any("Foreign-currency facility (USD 1,000" in n for n in c["notes"])
+    assert not any("Foreign-currency" in n for n in repayment_check(fig(currency="Naira"))["notes"])
