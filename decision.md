@@ -241,3 +241,6 @@ User decision 2026-11-15: the loan service assesses companies with financial sta
 
 ## D056 Change service button: navy outline
 User decision 2026-11-15: the Change service button was easy to miss (grey border on a white band). It is now a navy (#1F2854) 1.5px outline with navy text and a swap icon, a light navy fill (#EEF1F7) on hover or focus, and full width on phones. Emerald stays for the next-step buttons only.
+
+## D057 The last credit finishes its assessment
+Found 2026-11-15 while checking what a client sees when credits run out. A credit is taken when the statements are read (/assessment/extract, refunded if reading fails), but /assessment/run also refused to start at a zero balance, so a client's last credit read the statements and then could not produce a result. /run now skips the credit check when it finishes the user's own draft (the credit was already taken) or returns a finished one; a run with no draft of its own still needs a credit. The out-of-credits pop-up is now titled "No Credits Left" (credits are packs, not monthly) and no longer repeats its message.
