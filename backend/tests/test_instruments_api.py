@@ -184,3 +184,19 @@ def test_extract_keeps_loan_terms_with_the_draft(client):
     assert kept == {"amount": "₦5,000,000", "tenor": "24 months", "interestRate": "28% a year"}
     assert "terms" not in go({"terms": "not json"})
     assert "terms" not in go({"terms": "[1, 2]"})
+
+
+def test_last_credit_finishes_its_assessment(client):
+    # The credit is taken when the statements are read; the run that follows must not need another
+    _run(_sql("UPDATE users SET credits = 1"))
+    ex = _extract(client, ON, "cp").json()
+    assert _run(_sql("SELECT credits FROM users WHERE tenant_id = :t", t=client.tenant_ids[ON]))[0][0] == 0
+    r = _run_assessment(client, ON, ex["figures"], ex["draftId"])
+    assert r.status_code == 200, r.text
+    # A retry of the finished run (e.g. after a timeout) returns the same result, still free
+    again = _run_assessment(client, ON, ex["figures"], ex["draftId"])
+    assert again.status_code == 200 and again.json()["assessmentId"] == r.json()["assessmentId"]
+    # A run with no draft of its own still needs a credit
+    assert _run_assessment(client, ON, ex["figures"], None).status_code == 402
+    # With no credits left, a new assessment is refused at the reading step
+    assert _extract(client, ON, "cp").status_code == 402

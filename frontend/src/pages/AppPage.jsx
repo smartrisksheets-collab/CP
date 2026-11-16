@@ -576,8 +576,8 @@ export default function AppPage() {
             <div style={{ marginBottom:12 }}>
               <Zap size={28} color="var(--accent)" strokeWidth={1.75} />
             </div>
-            <div style={{ fontSize:15, fontWeight:"bold", color:"var(--primary)", marginBottom:8 }}>Monthly Limit Reached</div>
-            <div style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.65, marginBottom:20 }}>{quotaMsg} Purchase credits to continue.</div>
+            <div style={{ fontSize:15, fontWeight:"bold", color:"var(--primary)", marginBottom:8 }}>No Credits Left</div>
+            <div style={{ fontSize:13, color:"#5A5A5A", lineHeight:1.65, marginBottom:20 }}>{quotaMsg}</div>
             <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
               <button onClick={() => setQuotaMsg(null)}
                 style={{ padding:"9px 20px", fontSize:13, borderRadius:6, cursor:"pointer", border:"1px solid #D0D0D0", background:"transparent", color:"var(--primary)", fontFamily:"Arial,sans-serif" }}>
