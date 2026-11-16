@@ -95,3 +95,8 @@
 - Changed: frontend components/ServiceChooser.jsx (ServiceBand button)
 - Checks: npm run build; lint clean; Chromium screenshots on desktop, hover and a 390px phone
 - Decision: D056
+
+## 2026-11-15 Last credit fix (p30)
+- Changed: backend/api/routes/assessment.py (/run credit check), tests/test_instruments_api.py (+1); frontend pages/AppPage.jsx (out-of-credits pop-up)
+- Checks: pytest 204 passed (the new test failed with 402 before the fix); npm run build
+- Decision: D057

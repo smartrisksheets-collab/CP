@@ -481,7 +481,6 @@ async def run_assessment(
     db           : AsyncSession  = Depends(get_db),
 ):
     user = await _get_user(current_user["email"], current_user["tenant_id"], db)
-    await _check_quota(user, db)
 
     # Idempotency — if draft already completed (e.g. client timeout + retry), return existing result
     if body.draftId:
@@ -511,6 +510,13 @@ async def run_assessment(
                 **_service_extras(completed.figures or {}, completed.ratios or [], "on" if completed.instrument else "off"),
                 "clientInfo"  : {**body.clientInfo, "totalScore": completed.total_score, "eligible": completed.eligible},
             }
+
+    # The credit is taken when the statements are read (/extract), so a run that finishes the
+    # user's own draft needs no further credit; only a run without a draft is checked (D057)
+    paid_draft = (await _get_draft(body.draftId, current_user["email"], current_user["tenant_id"], db)
+                  if body.draftId else None)
+    if not paid_draft:
+        await _check_quota(user, db)
 
     figures      = normalise_rates(body.figures)
     instrument   = _apply_instrument(figures, await _instrument_mode(current_user["tenant_id"], db))
